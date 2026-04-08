@@ -4,6 +4,7 @@ import 'package:frontend/app/routes/app_pages.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthController extends GetxController {
   // Controller for receive user input
@@ -63,11 +64,29 @@ class AuthController extends GetxController {
     }
     try {
       isLoading.value = true;
+
+      String? deviceToken;
+      try {
+        deviceToken = await FirebaseMessaging.instance.getToken();
+      } catch (e) {
+        print("Failed to get FCM token: $e");
+      }
+
+      String platform = 'unknown';
+      if (GetPlatform.isAndroid) platform = 'android';
+      else if (GetPlatform.isIOS) platform = 'ios';
+      else if (GetPlatform.isWeb) platform = 'web';
+
       final dio = Dio();
       final String apiUrl = '${dotenv.env['API_URL']}/auth/login';
       final response = await dio.post(
         apiUrl,
-        data: {'username': username, 'password': password},
+        data: {
+          'username': username,
+          'password': password,
+          'device_token': deviceToken,
+          'platform': platform,
+        },
         options: Options(
           headers: {
             'Content-Type': 'application/json',
@@ -98,7 +117,25 @@ class AuthController extends GetxController {
           colorText: Colors.white,
         );
 
-        Get.offAllNamed(Routes.HOME);
+        bool isAdmin = userRoles.any((role) => role.toLowerCase() == 'administrator' || role.toLowerCase() == 'admin');
+        bool isTeacher = userRoles.any((role) => role.toLowerCase() == 'teacher');
+        bool isStudent = userRoles.any((role) => role.toLowerCase() == 'student');
+
+        if (isAdmin) {
+          Get.offAllNamed(Routes.ADMIN_HOME);
+        } else if (isTeacher) {
+          Get.offAllNamed(Routes.TEACHER_HOME);
+        } else if (isStudent) {
+          Get.offAllNamed(Routes.STUDENT_HOME);
+        } else {
+          Get.snackbar(
+            'Error',
+            'Role not recognized',
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+          );
+        }
       }
     } on DioException catch (e) {
       String errorMessage = 'Something went wrong. Please try again.';
@@ -109,12 +146,12 @@ class AuthController extends GetxController {
           errorMessage = responseData['error'];
         }
       else if (responseData is String){
-        errorMessage = responseData.length > 100 ? 'Server Error: Please check Ngrok or Backend' : responseData;
+        errorMessage = responseData.length > 100 ? 'Server Error: Please check Backend' : responseData;
       }
       } else if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
         errorMessage =
-            'Cannot connect to server. Please check your internet or Ngrok URL.';
+            'Cannot connect to server. Please check your internet or Backend URL.';
       }
       Get.snackbar(
         'Login Failed',
