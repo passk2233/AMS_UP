@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1074144160794",
+    "project_id": "ams-up-fcm",
+    "storage_bucket": "ams-up-fcm.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1074144160794:android:c2538bea1e6d8510bdf5a3",
+        "android_client_info": {
+          "package_name": "com.example.frontend"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBr5N4shHfEDHqiH_9xlTYPDkBKgGoN0FQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
