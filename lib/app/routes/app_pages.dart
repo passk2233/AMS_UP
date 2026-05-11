@@ -33,8 +33,6 @@ import '../modules/teachers/feedbacks/bindings/feedbacks_binding.dart';
 import '../modules/teachers/feedbacks/views/feedbacks_view.dart';
 import '../modules/teachers/schedules/bindings/schedules_binding.dart';
 import '../modules/teachers/schedules/views/schedules_view.dart';
-import '../modules/students/student_home/bindings/student_home_binding.dart';
-import '../modules/students/student_home/views/student_home_view.dart';
 import '../modules/teachers/teacher_navigator_bar/bindings/teacher_shell_binding.dart';
 import '../modules/teachers/teacher_navigator_bar/views/teacher_shell_view.dart';
 
@@ -55,11 +53,6 @@ class AppPages {
       name: _Paths.ADMIN_HOME,
       page: () => const AdminShellView(),
       binding: AdminShellBinding(),
-    ),
-    GetPage(
-      name: _Paths.STUDENT_HOME,
-      page: () => const StudentHomeView(),
-      binding: StudentHomeBinding(),
     ),
     GetPage(
       name: _Paths.TEACHER_HOME,
