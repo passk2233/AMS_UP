@@ -9,6 +9,12 @@ abstract class Routes {
   static const STUDENT_HOME = _Paths.STUDENT_HOME;
   static const TEACHER_HOME = _Paths.TEACHER_HOME;
   static const ANNOUNCEMENT = _Paths.ANNOUNCEMENT;
+  static const APPROVE = _Paths.APPROVE;
+  static const EVALUTION = _Paths.EVALUTION;
+  static const PROFILES = _Paths.PROFILES;
+  static const SCHEDULES = _Paths.SCHEDULES;
+  static const BOOKING = _Paths.BOOKING;
+  static const FEEDBACKS = _Paths.FEEDBACKS;
 }
 
 abstract class _Paths {
@@ -19,4 +25,11 @@ abstract class _Paths {
   static const STUDENT_HOME = '/student-home';
   static const TEACHER_HOME = '/teacher-home';
   static const ANNOUNCEMENT = '/announcement';
+  static const APPROVE = '/approve';
+  static const EVALUTION = '/evalution';
+  static const PROFILES = '/profiles';
+  static const SCHEDULES = '/schedules';
+  static const BOOKING = '/booking';
+  static const FEEDBACKS = '/feedbacks';
+
 }
