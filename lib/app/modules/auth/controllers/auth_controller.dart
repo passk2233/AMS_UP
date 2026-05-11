@@ -153,10 +153,13 @@ class AuthController extends GetxController {
       else if (responseData is String){
         errorMessage = responseData.length > 100 ? 'Server Error: Please check Backend' : responseData;
       }
-      } else if (e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout) {
+      } else if (e.type == DioExceptionType.connectionError
+          ) {
         errorMessage =
-            'Cannot connect to server. Please check your internet or Backend URL.';
+            'Cannot connect to server. Please check your internet or Ngrok URL.';
+      } else if(e.type == DioExceptionType.connectionTimeout){
+         errorMessage =
+            'Cannot connect to server. Please check your internet connection.';
       }
       Get.snackbar(
         'Login Failed',
