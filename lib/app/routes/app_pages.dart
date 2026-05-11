@@ -12,8 +12,6 @@ import '../modules/profiles/bindings/profiles_binding.dart';
 import '../modules/profiles/views/profiles_view.dart';
 import '../modules/auth/bindings/auth_binding.dart';
 import '../modules/auth/views/auth_view.dart';
-import '../modules/home/bindings/home_binding.dart';
-import '../modules/home/views/home_view.dart';
 import '../modules/student/Booking_student/bindings/booking_student_binding.dart';
 import '../modules/student/Booking_student/views/booking_student_view.dart';
 import '../modules/student/faculty_feedback/bindings/faculty_feedback_binding.dart';
