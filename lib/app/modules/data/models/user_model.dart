@@ -10,6 +10,7 @@ class UserModel {
   int? active;
   StudentModel? student;
   TeacherModel? teacher;
+  List<String>? roles;
   DateTime? createdAt;
   DateTime? updatedAt;
   DateTime? deletedAt;
@@ -23,6 +24,7 @@ class UserModel {
     this.active,
     this.student,
     this.teacher,
+    this.roles,
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
@@ -38,6 +40,7 @@ class UserModel {
       active: json['active'] as int?,
       student: json['student'] != null ? StudentModel.fromJson(json['student']) : null,
       teacher: json['teacher'] != null ? TeacherModel.fromJson(json['teacher']) : null,
+      roles: json['roles'] != null ? List<String>.from(json['roles'].map((x) => x.toString())) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
       deletedAt: json['deleted_at'] != null ? DateTime.tryParse(json['deleted_at'].toString()) : null,
@@ -54,6 +57,7 @@ class UserModel {
       'active': active,
       'student': student?.toJson(),
       'teacher': teacher?.toJson(),
+      'roles': roles,
       'created_at': createdAt?.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
       'deleted_at': deletedAt?.toIso8601String(),

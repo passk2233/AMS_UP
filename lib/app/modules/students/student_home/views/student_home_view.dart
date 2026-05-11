@@ -8,7 +8,10 @@ class StudentHomeView extends GetView<StudentHomeController> {
   const StudentHomeView({super.key});
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GetBuilder<StudentHomeController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Scaffold(
       appBar: AppBar(
         title: const Text('StudentHomeView'),
         centerTitle: true,
@@ -18,6 +21,9 @@ class StudentHomeView extends GetView<StudentHomeController> {
           'StudentHomeView is working',
           style: TextStyle(fontSize: 20),
         ),
+      ),
+    );
+        },
       ),
     );
   }

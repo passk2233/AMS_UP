@@ -5,6 +5,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:frontend/app/modules/data/models/user_model.dart';
+
 
 class AuthController extends GetxController {
   // Controller for receive user input
@@ -69,13 +71,17 @@ class AuthController extends GetxController {
       try {
         deviceToken = await FirebaseMessaging.instance.getToken();
       } catch (e) {
-        print("Failed to get FCM token: $e");
+        debugPrint("Failed to get FCM token: $e");
       }
 
       String platform = 'unknown';
-      if (GetPlatform.isAndroid) platform = 'android';
-      else if (GetPlatform.isIOS) platform = 'ios';
-      else if (GetPlatform.isWeb) platform = 'web';
+      if (GetPlatform.isAndroid) {
+        platform = 'android';
+      } else if (GetPlatform.isIOS) {
+        platform = 'ios';
+      } else if (GetPlatform.isWeb) {
+        platform = 'web';
+      }
 
       final dio = Dio();
       final String apiUrl = '${dotenv.env['API_URL']}/auth/login';
@@ -97,11 +103,10 @@ class AuthController extends GetxController {
       if (response.statusCode == 200) {
        final data = response.data;
         final token = data['token'];
-        final user = data['user'];
-        final List<dynamic> roles = user['roles'] ?? [];
+        final userModel = UserModel.fromJson(data['user']);
+        final List<String> userRoles = userModel.roles ?? [];
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', token);
-        List<String> userRoles = roles.map((role) => role.toString()).toList();
         await prefs.setStringList('roles', userRoles);
         
         if (rememberMe.value) {
