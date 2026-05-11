@@ -1,5 +1,6 @@
+
 import 'package:flutter/material.dart';
-import 'package:frontend/app/modules/auth/bindings/auth_binding.dart';
+import 'package:frontend/app/modules/student/student_home/bindings/home_student_binding.dart';
 import 'package:frontend/app/routes/app_pages.dart';
 import 'package:get/get.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -24,7 +25,7 @@ class MyApp extends StatelessWidget {
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ), // Add theme
       initialBinding: BindingsBuilder(() {
-        Get.put(AuthBinding());
+        Get.put(HomeStudentBinding());
       }),
     );
   }
