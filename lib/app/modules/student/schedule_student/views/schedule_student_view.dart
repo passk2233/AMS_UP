@@ -44,6 +44,22 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
           _buildCalendarStrip(),
           Expanded(
             child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.errorMessage.value.isNotEmpty) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      controller.errorMessage.value,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                );
+              }
+
               final list = controller.filteredSchedules;
 
               if (list.isEmpty) {
@@ -343,10 +359,7 @@ void _showDetailSchedule({
             _buildDetailField("Section", subtitle),
             _buildDetailField("Location", location),
             _buildDetailField("Teacher", instructor),
-            _buildDetailField(
-              "Class",
-              "4IT-1",
-            ), // สามารถเปลี่ยนเป็นตัวแปรได้ถ้ามีข้อมูล
+            _buildDetailField("Date", DateFormat('yyyy-MM-dd').format(date)),
             const SizedBox(height: 10),
           ],
         ),

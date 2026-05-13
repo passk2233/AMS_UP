@@ -200,7 +200,14 @@ class BookingStudentView extends GetView<BookingStudentController> {
 
   Widget _buildRoomList() {
     return Obx(
-      () => ListView.builder(
+      () {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (controller.errorMessage.value.isNotEmpty) {
+          return Center(child: Text(controller.errorMessage.value));
+        }
+        return ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: controller.filteredRooms.length,
         itemBuilder: (context, index) {
@@ -272,7 +279,8 @@ class BookingStudentView extends GetView<BookingStudentController> {
                                   _showConfirmDialog(
                                     context,
                                     room['name'],
-                                    slot['time'],
+                                    slot['start'] ?? slot['time'],
+                                    slot['end'] ?? slot['time'],
                                   );
                                 },
                           selectedColor: const Color(0xFF4A80F0),
@@ -288,11 +296,18 @@ class BookingStudentView extends GetView<BookingStudentController> {
             ),
           );
         },
-      ),
+      );
+      },
     );
   }
 
-  void _showConfirmDialog(BuildContext context, String roomName, String time) {
+  void _showConfirmDialog(
+    BuildContext context,
+    String roomName,
+    String startTime,
+    String endTime,
+  ) {
+    final purposeController = TextEditingController();
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -301,7 +316,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "ຕ້ອງການຈອງຫ້ອງ $roomName\nວັນທີ ${DateFormat('dd MMM').format(controller.selectedDate.value)}\nເວລາ $time",
+              "ຕ້ອງການຈອງຫ້ອງ $roomName\nວັນທີ ${DateFormat('dd MMM').format(controller.selectedDate.value)}\nເວລາ $startTime - $endTime",
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
@@ -315,6 +330,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
             ),
             const SizedBox(height: 8),
             TextField(
+              controller: purposeController,
               decoration: InputDecoration(
                 hintText: "ກະລຸນາກອກເຫດຜົນທີ່ຈອງ",
                 hintStyle: const TextStyle(fontSize: 12),
@@ -349,7 +365,15 @@ class BookingStudentView extends GetView<BookingStudentController> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      controller.bookSlot(roomName, time);
+                      controller.createBooking(
+                        roomCode: roomName,
+                        bookingDate: controller.selectedDate.value,
+                        startTime: startTime,
+                        endTime: endTime,
+                        purpose: purposeController.text.trim().isEmpty
+                            ? null
+                            : purposeController.text.trim(),
+                      );
                       Get.back();
                     },
                     style: ElevatedButton.styleFrom(

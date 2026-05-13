@@ -8,6 +8,9 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
 
   @override
   Widget build(BuildContext context) {
+    if (!Get.isRegistered<ProfileStudentController>()) {
+      Get.put(ProfileStudentController());
+    }
     return Scaffold(
       backgroundColor: const Color(0xFFF4F7FA), // สีพื้นหลังเทาอ่อนตามแบบ
       appBar: AppBar(
@@ -24,74 +27,72 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
         elevation: 0,
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          children: [
-            // 1. ส่วนหัว Profile (รูปภาพและชื่อ)
-            _buildProfileHeader(),
-            const SizedBox(height: 25),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (controller.errorMessage.value.isNotEmpty) {
+          return Center(child: Text(controller.errorMessage.value));
+        }
 
-            // 2. หมวดหมู่: Personal Information
-            _buildSectionTitle("PERSONAL INFORMATION"),
-            _buildInfoCard([
-              _infoTile(Icons.transgender, "Gender", "Female"),
-              _infoTile(Icons.cake_outlined, "Date of Birth", "17 Sep 2004"),
-              _infoTile(Icons.flag_outlined, "Nationality", "Lao"),
-              _infoTile(
-                Icons.location_on_outlined,
-                "Address",
-                "Vientiane, Lao",
+        return SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              _buildProfileHeader(),
+              const SizedBox(height: 25),
+
+              _buildSectionTitle("PERSONAL INFORMATION"),
+              _buildInfoCard([
+                _infoTile(Icons.transgender, "Gender", controller.gender),
+                _infoTile(
+                  Icons.cake_outlined,
+                  "Date of Birth",
+                  controller.dob == null
+                      ? '-'
+                      : '${controller.dob!.day}/${controller.dob!.month}/${controller.dob!.year}',
+                ),
+                _infoTile(Icons.flag_outlined, "Nationality", controller.nationality),
+                _infoTile(Icons.location_on_outlined, "Address", controller.address),
+                _infoTile(Icons.email_outlined, "Email Address", controller.email),
+                _infoTile(Icons.phone_android_outlined, "Phone Number", controller.phone),
+              ]),
+
+              const SizedBox(height: 20),
+
+              _buildSectionTitle("ACADEMIC INFORMATION"),
+              _buildInfoCard([
+                _infoTile(
+                  Icons.school_outlined,
+                  "Program",
+                  controller.program,
+                  valueColor: Colors.blueAccent,
+                ),
+              ]),
+
+              const SizedBox(height: 20),
+
+              _buildSectionTitle("ACCOUNT SETTINGS"),
+              _buildInfoCard([
+                _actionTile(Icons.vpn_key_outlined, "Change Password"),
+                _actionTile(Icons.notifications_none, "Notifications"),
+                _actionTile(Icons.security_outlined, "Privacy Policy"),
+              ]),
+
+              const SizedBox(height: 30),
+
+              _buildSignOutButton(),
+
+              const SizedBox(height: 10),
+              const Text(
+                "App version 2.0.1",
+                style: TextStyle(color: Colors.grey, fontSize: 12),
               ),
-              _infoTile(
-                Icons.email_outlined,
-                "Email Address",
-                "Souksakhone.sayyavong@gmail.com",
-              ),
-              _infoTile(
-                Icons.phone_android_outlined,
-                "Phone Number",
-                "+856 20 7722 7896",
-              ),
-            ]),
-
-            const SizedBox(height: 20),
-
-            // 3. หมวดหมู่: Academic Information
-            _buildSectionTitle("ACADEMIC INFORMATION"),
-            _buildInfoCard([
-              _infoTile(
-                Icons.star_outline,
-                "Current GPA",
-                "3.68 / 4.0",
-                valueColor: Colors.blueAccent,
-              ),
-            ]),
-
-            const SizedBox(height: 20),
-
-            // 4. หมวดหมู่: Account Settings (ปุ่มที่กดได้)
-            _buildSectionTitle("ACCOUNT SETTINGS"),
-            _buildInfoCard([
-              _actionTile(Icons.vpn_key_outlined, "Change Password"),
-              _actionTile(Icons.notifications_none, "Notifications"),
-              _actionTile(Icons.security_outlined, "Privacy Policy"),
-            ]),
-
-            const SizedBox(height: 30),
-
-            // 5. ปุ่ม Sign Out
-            _buildSignOutButton(),
-
-            const SizedBox(height: 10),
-            const Text(
-              "App version 2.0.1",
-              style: TextStyle(color: Colors.grey, fontSize: 12),
-            ),
-            const SizedBox(height: 100), // ระยะเผื่อ Bottom Bar
-          ],
-        ),
-      ),
+              const SizedBox(height: 100),
+            ],
+          ),
+        );
+      }),
     );
   }
 
@@ -111,22 +112,26 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
             backgroundImage: AssetImage(AssetImages.profile2), // รูปของคุณ
           ),
           const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text(
-                "Souksakhone SAYYAVONG",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "Student ID: 225Q006922",
-                style: TextStyle(color: Colors.blueAccent, fontSize: 13),
-              ),
-              Text(
-                "Computer Science • Junior",
-                style: TextStyle(color: Colors.green, fontSize: 13),
-              ),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  controller.displayName,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                Text(
+                  "Student ID: ${controller.studentCode}",
+                  style: const TextStyle(color: Colors.blueAccent, fontSize: 13),
+                ),
+                Text(
+                  controller.program,
+                  style: const TextStyle(color: Colors.green, fontSize: 13),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -218,7 +223,7 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
       width: double.infinity,
       height: 50,
       child: OutlinedButton.icon(
-        onPressed: () {},
+        onPressed: controller.logout,
         icon: const Icon(Icons.logout, color: Colors.red),
         label: const Text(
           "Sign Out",

@@ -131,7 +131,7 @@ class AuthController extends GetxController {
         } else if (isTeacher) {
           Get.offAllNamed(Routes.TEACHER_HOME);
         } else if (isStudent) {
-          Get.offAllNamed(Routes.STUDENT_HOME);
+          Get.offAllNamed(Routes.HOME_STUDENT);
         } else {
           Get.snackbar(
             'Error',

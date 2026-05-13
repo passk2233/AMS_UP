@@ -35,6 +35,12 @@ class StudentNotiView extends GetView<StudentNotiController> {
           // 2. Notification List
           Expanded(
             child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.errorMessage.value.isNotEmpty) {
+                return Center(child: Text(controller.errorMessage.value));
+              }
               final list = controller.filteredNotifications;
 
               if (list.isEmpty) {

@@ -8,7 +8,9 @@ class ScoreView extends GetView<ScoreController> {
 
   @override
   Widget build(BuildContext context) {
-    Get.put(ScoreController());
+    if (!Get.isRegistered<ScoreController>()) {
+      Get.put(ScoreController());
+    }
     return Scaffold(
       body: Stack(
         children: [
@@ -24,40 +26,44 @@ class ScoreView extends GetView<ScoreController> {
 
           // 2. Content
           SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  // Header Title
-                  const Text(
-                    "ຄະແນນ (Score)",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 20),
+            child: Obx(() {
+              if (controller.isLoading.value) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              if (controller.errorMessage.value.isNotEmpty) {
+                return Center(child: Text(controller.errorMessage.value));
+              }
 
-                  // Profile Summary
-                  _buildProfileSummary(),
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 20),
+                    const Text(
+                      "ຄະແນນ (Score)",
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 20),
 
-                  const SizedBox(height: 20),
+                    _buildProfileSummary(),
 
-                  // Blue Stat Cards (GPA, Credits, Terms)
-                  _buildScoreStats(),
+                    const SizedBox(height: 20),
 
-                  const SizedBox(height: 25),
+                    _buildScoreStats(),
 
-                  // Tab Selection (Terms)
-                  _buildTermSelector(),
+                    const SizedBox(height: 25),
 
-                  const SizedBox(height: 20),
+                    _buildTermSelector(),
 
-                  // List of Subject Scores
-                  _buildScoreList(),
+                    const SizedBox(height: 20),
 
-                  const SizedBox(height: 100), // ເພື່ອບໍ່ໃຫ້ Bottom Bar ບັງ
-                ],
-              ),
-            ),
+                    _buildScoreList(),
+
+                    const SizedBox(height: 100),
+                  ],
+                ),
+              );
+            }),
           ),
         ],
       ),
@@ -76,15 +82,17 @@ class ScoreView extends GetView<ScoreController> {
         const SizedBox(width: 15),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              "Souksakhone SAYYAVONG",
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              controller.displayName,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
-            Text("225Q006922", style: TextStyle(color: Colors.blueAccent)),
+            Text(controller.studentCode, style: const TextStyle(color: Colors.blueAccent)),
             Text(
-              "Computer Science • Junior",
-              style: TextStyle(color: Colors.green, fontSize: 13),
+              controller.currentUser.value?.student?.curriculum?.curriNameEng ??
+                  controller.currentUser.value?.student?.curriculum?.curriNameLao ??
+                  '-',
+              style: const TextStyle(color: Colors.green, fontSize: 13),
             ),
           ],
         ),
@@ -102,9 +110,9 @@ class ScoreView extends GetView<ScoreController> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _statItem("GPA", "3.69", "/4.00", Icons.bar_chart),
-          _statItem("Credits", "36", "/160", Icons.credit_card),
-          _statItem("Terms", "7", "/8", Icons.grid_view),
+          _statItem("GPA", controller.gpa.toStringAsFixed(2), "/4.00", Icons.bar_chart),
+          _statItem("Credits", controller.earnedCredits.toString(), "", Icons.credit_card),
+          _statItem("Courses", controller.enrollments.length.toString(), "", Icons.grid_view),
         ],
       ),
     );
@@ -204,33 +212,35 @@ class ScoreView extends GetView<ScoreController> {
   }
 
   Widget _buildScoreList() {
+    final items = controller.enrollments;
+    if (items.isEmpty) {
+      return const Center(child: Text('No scores found.'));
+    }
+
     return Column(
-      children: [
-        _scoreCard(
-          "115LS101",
-          "3 Credits",
-          "Database System 2",
-          "ຣສ ຫາ ບຸນທັນ",
-          "A",
-          Colors.blue,
-        ),
-        _scoreCard(
-          "225WT111",
-          "3 Credits",
-          "Web Programming",
-          "ຣສ ແສງລັດສະໝີ ຈັນທະມານີວົງ",
-          "B",
-          Colors.orange,
-        ),
-        _scoreCard(
-          "224T665L",
-          "2 Credits",
-          "ການເປັນຜູ້ປະກອບການ",
-          "ອຈ ເກສອນ ແບບສະຖານ",
-          "B+",
-          Colors.green,
-        ),
-      ],
+      children: items.map((e) {
+        final sub = e.studyPlan?.subject;
+        final teacher = e.studyPlan?.teacher;
+        final code = sub?.subjectCode ?? '-';
+        final credit = sub?.credit ?? 0;
+        final title = sub?.nameEng ?? sub?.nameLao ?? '-';
+        final teacherName = teacher?.nameEng ?? teacher?.nameLao ?? '-';
+        final grade = e.grade ?? '-';
+        final color = grade == 'A'
+            ? Colors.blue
+            : (grade == 'B+' || grade == 'B')
+                ? Colors.green
+                : Colors.orange;
+
+        return _scoreCard(
+          code,
+          '$credit Credits',
+          title,
+          teacherName,
+          grade,
+          color,
+        );
+      }).toList(),
     );
   }
 

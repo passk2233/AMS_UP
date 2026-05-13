@@ -1,30 +1,46 @@
 import 'package:flutter/material.dart';
-
 import 'package:get/get.dart';
 
 import '../controllers/feedbacks_controller.dart';
-import '../../../../widgets/widget.dart';
 
 class FeedbacksView extends GetView<FeedbacksController> {
   const FeedbacksView({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('ຄຳເຫັນ / Feedback'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Feedback',
+          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
-          IconButton(
-            onPressed: controller.refreshData,
-            icon: const Icon(Icons.refresh),
+          Container(
+            margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.blue.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Center(
+              child: IconButton(
+                icon: const Icon(Icons.refresh_rounded,
+                    color: Colors.blue, size: 20),
+                onPressed: controller.refreshData,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ),
           ),
         ],
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary),
-          );
+          return const Center(child: CircularProgressIndicator());
         }
         final err = controller.errorMessage.value;
         if (err.isNotEmpty) {
@@ -48,10 +64,13 @@ class FeedbacksView extends GetView<FeedbacksController> {
                     icon: const Icon(Icons.refresh, size: 18),
                     label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: const Color(0xFF4A68FF),
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
-                  )
+                  ),
                 ],
               ),
             ),
@@ -60,7 +79,7 @@ class FeedbacksView extends GetView<FeedbacksController> {
 
         return RefreshIndicator(
           onRefresh: controller.refreshData,
-          color: AppColors.primary,
+          color: Colors.blue,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
@@ -68,7 +87,12 @@ class FeedbacksView extends GetView<FeedbacksController> {
               if (controller.items.isEmpty)
                 const Padding(
                   padding: EdgeInsets.only(top: 40),
-                  child: Center(child: Text('ຍັງບໍ່ມີຄຳເຫັນ')),
+                  child: Center(
+                    child: Text(
+                      'No feedback yet',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
                 )
               else
                 ...controller.items.map((it) {
@@ -80,42 +104,50 @@ class FeedbacksView extends GetView<FeedbacksController> {
                     if (it.semesterLabel.isNotEmpty) it.semesterLabel,
                     if (it.studentGroupName.isNotEmpty) it.studentGroupName,
                   ].join(' • ');
-                  return Card(
-                    elevation: 0,
+                  return Container(
                     margin: const EdgeInsets.only(bottom: 10),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      side: BorderSide(color: Colors.grey.shade200),
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      border: const Border(
+                        left: BorderSide(color: Colors.blue, width: 4),
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.grey.withOpacity(0.1),
+                          blurRadius: 10,
+                          spreadRadius: 2,
+                        ),
+                      ],
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            header,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                            ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          header,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Colors.blue,
                           ),
-                          if (meta.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              meta,
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 10),
+                        ),
+                        if (meta.isNotEmpty) ...[
+                          const SizedBox(height: 4),
                           Text(
-                            it.comment,
-                            style: const TextStyle(fontSize: 13),
+                            meta,
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 12,
+                            ),
                           ),
                         ],
-                      ),
+                        const SizedBox(height: 10),
+                        Text(
+                          it.comment,
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ],
                     ),
                   );
                 }),

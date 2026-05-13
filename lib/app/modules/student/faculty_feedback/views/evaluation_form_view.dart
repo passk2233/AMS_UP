@@ -29,7 +29,20 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
             _buildFacultyHeader(faculty),
             const SizedBox(height: 20),
 
-            for (int i = 0; i < 7; i++) _buildStarRatingQuestion(i),
+            Obx(() {
+              final questions = controller.questions;
+              if (questions.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text('No evaluation questions found.'),
+                );
+              }
+              return Column(
+                children: List.generate(questions.length, (i) {
+                  return _buildStarRatingQuestion(i, questions[i].question);
+                }),
+              );
+            }),
 
             const SizedBox(height: 20),
             const Text("Comment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -89,13 +102,13 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
     );
   }
 
-  Widget _buildStarRatingQuestion(int index) {
+  Widget _buildStarRatingQuestion(int index, String questionText) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 15.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("หัวข้อการประเมินที่ ${index + 1}", style: const TextStyle(fontSize: 16)),
+          Text(questionText, style: const TextStyle(fontSize: 16)),
           Obx(() => Row(
             children: List.generate(5, (starIndex) {
               return IconButton(

@@ -13,3 +13,4 @@ export 'models/student_type_model.dart';
 export 'models/evaluation_question_model.dart';
 export 'models/evaluation_result_model.dart';
 export 'models/study_plan_model.dart';
+export 'models/enrollment_model.dart';

@@ -1,69 +1,111 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class StudentNotiController extends GetxController {
   var selectedFilterIndex = 0.obs;
 
-  // ສ້າງ List ຂໍ້ມູນທັງໝົດ
-  final allNotifications = [
-    {
-      "type": "Urgent",
-      "category": "Academic",
-      "title": "Classroom",
-      "sub": "Database System 2",
-      "status": "Cancel Class",
-      "time": "5m ago",
-    },
-    {
-      "type": "Normal",
-      "category": "Room Booking",
-      "title": "Booking Confirmed",
-      "desc": "Room A301 has been booked for your study group on Jan 26.",
-      "time": "Today, 09:15",
-    },
-    {
-      "type": "Normal",
-      "category": "Academic",
-      "title": "Grade Released",
-      "desc":
-          "Final results for Database System 2 Assignment are now available.",
-      "time": "Yesterday",
-    },
-    {
-      "type": "Normal",
-      "category": "Academic",
-      "title": "Spring Registration",
-      "desc": "Spring 2026 course registration is now open for all juniors.",
-      "time": "2 day ago",
-    },
-  ].obs;
+  final RxBool isLoading = false.obs;
+  final RxString errorMessage = ''.obs;
+  final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
 
-  // ຟັງຊັນກອງຂໍ້ມູນຕາມ Category
-  List get filteredNotifications {
-    if (selectedFilterIndex.value == 0) return allNotifications;
+  late final Dio _dio;
+  String _token = '';
 
-    String category = selectedFilterIndex.value == 1
-        ? "Academic"
-        : "Room Booking";
-    return allNotifications
-        .where((noti) => noti['category'] == category)
-        .toList();
-  }
-
-  final count = 0.obs;
   @override
   void onInit() {
     super.onInit();
+    _initDio();
+    fetchNotifications();
   }
 
-  @override
-  void onReady() {
-    super.onReady();
+  void _initDio() {
+    final baseUrl = dotenv.env['API_URL'] ?? '';
+    _dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+    ));
   }
 
-  @override
-  void onClose() {
-    super.onClose();
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('token') ?? '';
+    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
-  void increment() => count.value++;
+  Future<void> fetchNotifications() async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      await _loadToken();
+      final resp = await _dio.get('/notifications', queryParameters: {'limit': 100});
+      final items = _extractList(resp.data);
+      notifications.assignAll(items.map((j) => NotificationModel.fromJson(j)).toList());
+    } on DioException catch (e) {
+      debugPrint('StudentNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
+      if (e.response?.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('token');
+        errorMessage.value = 'Session expired. Please login again.';
+        Get.offAllNamed('/auth');
+        return;
+      }
+      errorMessage.value = 'Failed to load notifications.';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  List<Map<String, dynamic>> get filteredNotifications {
+    final all = notifications.map(_toViewItem).toList();
+    if (selectedFilterIndex.value == 0) return all;
+
+    final category = selectedFilterIndex.value == 1 ? "Academic" : "Room Booking";
+    return all.where((n) => n['category'] == category).toList();
+  }
+
+  Map<String, dynamic> _toViewItem(NotificationModel n) {
+    final typeRaw = (n.type ?? '').toLowerCase();
+    final isUrgent = typeRaw == 'urgent';
+    final category = typeRaw.contains('booking') ? 'Room Booking' : 'Academic';
+
+    final ts = n.createdAt;
+    final time = ts == null ? '-' : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+
+    if (isUrgent) {
+      return {
+        'type': 'Urgent',
+        'category': category,
+        'title': n.title,
+        'sub': n.message,
+        'status': 'Urgent',
+        'time': time,
+      };
+    }
+
+    return {
+      'type': 'Normal',
+      'category': category,
+      'title': n.title,
+      'desc': n.message,
+      'time': time,
+    };
+  }
+
+  static List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map && data['data'] is List) return data['data'] as List;
+    return const [];
+  }
 }

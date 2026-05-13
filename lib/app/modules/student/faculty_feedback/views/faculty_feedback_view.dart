@@ -29,6 +29,7 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
+              onChanged: (v) => controller.query.value = v,
               decoration: InputDecoration(
                 hintText: 'Search professor or course...',
                 prefixIcon: const Icon(Icons.search),
@@ -43,13 +44,25 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
           ),
           Expanded(
             child: Obx(
-              () => ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: controller.facultyList.length,
-                itemBuilder: (context, index) {
-                  return _buildFacultyCard(controller.facultyList[index]);
-                },
-              ),
+              () {
+                if (controller.isLoading.value) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (controller.errorMessage.value.isNotEmpty) {
+                  return Center(child: Text(controller.errorMessage.value));
+                }
+                final list = controller.filteredFacultyList;
+                if (list.isEmpty) {
+                  return const Center(child: Text('No faculty found.'));
+                }
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: list.length,
+                  itemBuilder: (context, index) {
+                    return _buildFacultyCard(list[index]);
+                  },
+                );
+              },
             ),
           ),
         ],
