@@ -8,7 +8,7 @@ import '../../home/views/home_view.dart';
 import '../../approve/views/approve_view.dart';
 import '../../announcement/views/announcement_view.dart';
 import '../../evalutions/views/evalutions_view.dart';
-import '../../../profiles/views/profiles_view.dart';
+import '../../admin_profile/views/admin_profile_view.dart';
 
 class AdminShellView extends GetView<BottomNavController> {
   const AdminShellView({super.key});
@@ -26,7 +26,7 @@ class AdminShellView extends GetView<BottomNavController> {
                 ApproveView(),
                 AnnouncementView(),
                 EvalutionView(),
-                ProfilesView(),
+                AdminProfileView(),
               ],
             );
           }),

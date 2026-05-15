@@ -29,11 +29,7 @@ class ApproveView extends GetView<ApproveController> {
                   Expanded(
                     child: Obx(() {
                       if (controller.isLoading.value) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.primary,
-                          ),
-                        );
+                        return const AppLoading.adminApprove();
                       }
 
                       if (controller.errorMessage.isNotEmpty &&

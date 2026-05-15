@@ -1,0 +1,259 @@
+import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:get/get.dart';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/widgets/app_dialogs.dart';
+
+/// Controller for the student dashboard / home page.
+/// Fetches user profile, enrollments, and today's schedule.
+class HomePageController extends GetxController {
+  final RxBool isLoading = false.obs;
+  final RxString errorMessage = ''.obs;
+
+  final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
+  final RxList<EnrollmentModel> enrollments = <EnrollmentModel>[].obs;
+  final RxList<StudyPlanModel> studyPlans = <StudyPlanModel>[].obs;
+
+  late final Dio _dio;
+
+  @override
+  void onInit() {
+    super.onInit();
+    _initDio();
+    fetchDashboard();
+  }
+
+  void _initDio() {
+    final baseUrl = dotenv.env['API_URL'] ?? '';
+    _dio = Dio(BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+    ));
+  }
+
+  Future<void> _loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token') ?? '';
+    _dio.options.headers['Authorization'] = 'Bearer $token';
+  }
+
+  Future<void> fetchDashboard() async {
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      await _loadToken();
+
+      // ── ດຶງຂໍ້ມູນຜູ້ໃຊ້ ──
+      final me = await _dio.get('/auth/me');
+      if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
+        currentUser.value = UserModel.fromJson(me.data);
+      }
+
+      final stdId = currentUser.value?.stdId ?? currentUser.value?.student?.id;
+      if (stdId == null) {
+        errorMessage.value = 'ບັນຊີນັກສຶກສາບໍ່ໄດ້ເຊື່ອມຕໍ່.';
+        return;
+      }
+
+      // ── ດຶງ enrollments (ສຳລັບ GPA + ຈຳນວນວິຊາ) ──
+      final enrollResp = await _dio.get('/enrollments', queryParameters: {
+        'std_id': stdId,
+        'limit': 200,
+      });
+      final enrollItems = _extractList(enrollResp.data);
+      enrollments.assignAll(
+        enrollItems.map((j) => EnrollmentModel.fromJson(j)).toList(),
+      );
+
+      // ── ດຶງ study plans (ສຳລັບຫ້ອງຮຽນມື້ນີ້) ──
+      final groupId = currentUser.value?.student?.stdGroupId;
+      if (groupId != null) {
+        final planResp = await _dio.get('/study-plans', queryParameters: {
+          'std_group_id': groupId,
+          'limit': 200,
+        });
+        final planItems = _extractList(planResp.data);
+        studyPlans.assignAll(
+          planItems.map((j) => StudyPlanModel.fromJson(j)).toList(),
+        );
+      }
+    } on DioException catch (e) {
+      debugPrint(
+          'HomePageController Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
+      if (e.response?.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('token');
+        errorMessage.value = 'Session ໝົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.';
+        Get.offAllNamed('/auth');
+        return;
+      }
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້.';
+    } catch (e) {
+      debugPrint('HomePageController error: $e');
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້.';
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // COMPUTED PROPERTIES
+  // ═══════════════════════════════════════════════════════════════════════
+
+  String get displayName {
+    final s = currentUser.value?.student;
+    if (s == null) return currentUser.value?.username ?? '';
+    final name = s.nameLao.trim();
+    final surname = (s.surnameLao ?? '').trim();
+    if (surname.isEmpty) return name;
+    return '$name $surname';
+  }
+
+  String get currentDate => DateFormat('dd/MM/yyyy').format(DateTime.now());
+
+  int get totalClasses => todayClasses.length;
+
+  int get totalSubjects {
+    final unique = <int>{};
+    for (final e in enrollments) {
+      final subId = e.studyPlan?.subject?.id;
+      if (subId != null) unique.add(subId);
+    }
+    return unique.length;
+  }
+
+  double get gpa {
+    double totalPoints = 0;
+    int totalCredits = 0;
+    for (final e in enrollments) {
+      final grade = e.grade?.trim();
+      if (grade == null || grade.isEmpty) continue;
+      final credit = e.studyPlan?.subject?.credit ?? 0;
+      final gp = _gradePoint(grade);
+      if (gp == null || credit <= 0) continue;
+      totalCredits += credit;
+      totalPoints += gp * credit;
+    }
+    if (totalCredits == 0) return 0;
+    return totalPoints / totalCredits;
+  }
+
+  List<Map<String, String>> get todayClasses {
+    final today = DateTime.now().weekday;
+    final todayPlans = studyPlans.where((p) {
+      return _dayOfWeekToWeekday(p.dayOfWeek) == today;
+    }).toList()
+      ..sort((a, b) =>
+          _timeToMinutes(a.startTime).compareTo(_timeToMinutes(b.startTime)));
+
+    return todayPlans.map((p) {
+      final subject = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ວິຊາ';
+      final room = p.room?.roomCode ?? '-';
+      final start = _formatTime(p.startTime);
+      final end = _formatTime(p.endTime);
+      return {
+        'subject': subject,
+        'time': '$start - $end',
+        'room': room,
+      };
+    }).toList();
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // HELPERS
+  // ═══════════════════════════════════════════════════════════════════════
+
+  static double? _gradePoint(String grade) {
+    switch (grade.toUpperCase()) {
+      case 'A':
+        return 4.0;
+      case 'B+':
+        return 3.5;
+      case 'B':
+        return 3.0;
+      case 'C+':
+        return 2.5;
+      case 'C':
+        return 2.0;
+      case 'D+':
+        return 1.5;
+      case 'D':
+        return 1.0;
+      case 'F':
+        return 0.0;
+      default:
+        return null;
+    }
+  }
+
+  int _dayOfWeekToWeekday(String? rawDay) {
+    if (rawDay == null || rawDay.trim().isEmpty) return -1;
+    final d = rawDay.trim().toLowerCase();
+    switch (d) {
+      case 'monday':
+      case 'mon':
+      case '1':
+        return DateTime.monday;
+      case 'tuesday':
+      case 'tue':
+      case '2':
+        return DateTime.tuesday;
+      case 'wednesday':
+      case 'wed':
+      case '3':
+        return DateTime.wednesday;
+      case 'thursday':
+      case 'thu':
+      case '4':
+        return DateTime.thursday;
+      case 'friday':
+      case 'fri':
+      case '5':
+        return DateTime.friday;
+      case 'saturday':
+      case 'sat':
+      case '6':
+        return DateTime.saturday;
+      case 'sunday':
+      case 'sun':
+      case '0':
+      case '7':
+        return DateTime.sunday;
+      default:
+        return -1;
+    }
+  }
+
+  int _timeToMinutes(String? value) {
+    if (value == null || value.trim().isEmpty) return 0;
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(value.trim());
+    if (match == null) return 0;
+    final h = int.tryParse(match.group(1) ?? '') ?? 0;
+    final m = int.tryParse(match.group(2) ?? '') ?? 0;
+    return (h * 60) + m;
+  }
+
+  String _formatTime(String? value) {
+    if (value == null || value.trim().isEmpty) return '-';
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(value.trim());
+    if (match == null) return value.trim();
+    final h = int.tryParse(match.group(1) ?? '') ?? 0;
+    final m = int.tryParse(match.group(2) ?? '') ?? 0;
+    return DateFormat('HH:mm').format(DateTime(2000, 1, 1, h, m));
+  }
+
+  static List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map && data['data'] is List) return data['data'] as List;
+    return const [];
+  }
+}

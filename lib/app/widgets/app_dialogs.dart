@@ -24,7 +24,7 @@ class AppDialogs {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.borderApproved.withOpacity(0.1),
+                  color: AppColors.borderApproved.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -91,7 +91,7 @@ class AppDialogs {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.borderPending.withOpacity(0.1),
+                  color: AppColors.borderPending.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -159,7 +159,7 @@ class AppDialogs {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.rejectRed.withOpacity(0.1),
+                  color: AppColors.rejectRed.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -263,7 +263,7 @@ class AppDialogs {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: confirmColor.withOpacity(0.1),
+                  color: confirmColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(

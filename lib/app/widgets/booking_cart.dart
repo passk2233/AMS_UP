@@ -87,7 +87,7 @@ class BookingCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -236,8 +236,8 @@ class BookingCard extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
           decoration: BoxDecoration(
             color: _isApproved
-                ? AppColors.borderApproved.withOpacity(0.1)
-                : AppColors.rejectRed.withOpacity(0.1),
+                ? AppColors.borderApproved.withValues(alpha: 0.1)
+                : AppColors.rejectRed.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Text(

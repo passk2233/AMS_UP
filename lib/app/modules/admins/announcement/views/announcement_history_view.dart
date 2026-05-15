@@ -14,26 +14,28 @@ class AnnouncementHistoryView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      decoration: const BoxDecoration(
-        image: DecorationImage(
-          image: AssetImage(AssetImages.dashboardBg),
-          fit: BoxFit.cover,
-        ),
-      ),
-      child: Column(
-        children: [
-          // ── Top bar ─────────────────────────────────────────
-          _buildTopBar(),
-          // ── Search bar ──────────────────────────────────────
-          _buildSearchBar(),
-          // ── Sort & Filter row ───────────────────────────────
-          _buildSortFilterRow(),
-          // ── List ────────────────────────────────────────────
-          Expanded(child: _buildList()),
-        ],
+    return GetBuilder<AnnouncementController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(AssetImages.dashboardBg),
+                fit: BoxFit.cover,
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildTopBar(),
+                _buildSearchBar(),
+                _buildSortFilterRow(),
+                Expanded(child: _buildList()),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -209,8 +211,7 @@ class AnnouncementHistoryView extends StatelessWidget {
   Widget _buildList() {
     return Obx(() {
       if (c.isLoading.value) {
-        return const Center(
-            child: CircularProgressIndicator(color: AppColors.primary));
+        return const AppLoading.historyList();
       }
 
       if (c.filteredNotifications.isEmpty) {

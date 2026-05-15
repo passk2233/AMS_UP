@@ -4,10 +4,10 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../data/data_exporter.dart';
-import '../../../widgets/app_dialogs.dart';
+import '../../../data/data_exporter.dart';
+import '../../../../widgets/app_dialogs.dart';
 
-class ProfilesController extends GetxController {
+class AdminProfileController extends GetxController {
   final Dio _dio = Dio();
   String _token = '';
 

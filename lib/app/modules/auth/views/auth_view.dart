@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/app/utilities/assets.dart'; // import assets ของคุณ
+import 'package:frontend/app/utilities/assets.dart';
+import 'package:frontend/app/widgets/app_colors.dart';
 import 'package:get/get.dart';
 import '../controllers/auth_controller.dart';
 
@@ -18,7 +19,7 @@ class AuthView extends GetView<AuthController> {
               height: double.infinity,
               decoration: const BoxDecoration(
                 image: DecorationImage(
-                  image: AssetImage(AssetImages.login1), // ดึงรูปจากคลาสของคุณ
+                  image: AssetImage(AssetImages.login1),
                   fit: BoxFit.cover,
                 ),
               ),
@@ -38,15 +39,15 @@ class AuthView extends GetView<AuthController> {
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               const SizedBox(height: 40.0),
-                              
+
                               // Topic Welcome
                               const Text(
-                                'Welcome\nCEIT AMS',
+                                'ຍິນດີຕ້ອນຮັບ\nCEIT AMS',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 32.0,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
+                                  color: AppColors.textPrimary,
                                   height: 1.2,
                                 ),
                               ),
@@ -54,32 +55,32 @@ class AuthView extends GetView<AuthController> {
 
                               // Field User ID
                               const Text(
-                                'User ID',
+                                'ຊື່ຜູ້ໃຊ້',
                                 style: TextStyle(
                                   fontSize: 14.0,
-                                  color: Colors.black87,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               TextField(
                                 controller: controller.usernameController,
-                                decoration: const InputDecoration(
-                                  hintText: 'please enter your User ID',
+                                decoration: InputDecoration(
+                                  hintText: 'ກະລຸນາໃສ່ຊື່ຜູ້ໃຊ້',
                                   hintStyle: TextStyle(
-                                    color: Colors.black45,
+                                    color: Colors.grey.shade400,
                                     fontSize: 14.0,
                                   ),
-                                  enabledBorder: UnderlineInputBorder(
+                                  enabledBorder: const UnderlineInputBorder(
                                     borderSide: BorderSide(
                                       color: Colors.black54,
                                     ),
                                   ),
-                                  focusedBorder: UnderlineInputBorder(
+                                  focusedBorder: const UnderlineInputBorder(
                                     borderSide: BorderSide(
-                                      color: Colors.black87,
+                                      color: AppColors.primary,
                                       width: 2.0,
                                     ),
                                   ),
-                                  contentPadding: EdgeInsets.symmetric(
+                                  contentPadding: const EdgeInsets.symmetric(
                                     vertical: 8.0,
                                   ),
                                 ),
@@ -88,19 +89,19 @@ class AuthView extends GetView<AuthController> {
 
                               // Field Password
                               const Text(
-                                'Password',
+                                'ລະຫັດຜ່ານ',
                                 style: TextStyle(
                                   fontSize: 14.0,
-                                  color: Colors.black87,
+                                  color: AppColors.textPrimary,
                                 ),
                               ),
                               Obx(() => TextField(
                                     controller: controller.passwordController,
-                                    obscureText: controller.isObscured.value, // แก้จาก isObscured เป็น isObscure ตาม Controller
+                                    obscureText: controller.isObscured.value,
                                     decoration: InputDecoration(
-                                      hintText: 'please enter your Password',
-                                      hintStyle: const TextStyle(
-                                        color: Colors.black45,
+                                      hintText: 'ກະລຸນາໃສ່ລະຫັດຜ່ານ',
+                                      hintStyle: TextStyle(
+                                        color: Colors.grey.shade400,
                                         fontSize: 14.0,
                                       ),
                                       enabledBorder: const UnderlineInputBorder(
@@ -110,20 +111,28 @@ class AuthView extends GetView<AuthController> {
                                       ),
                                       focusedBorder: const UnderlineInputBorder(
                                         borderSide: BorderSide(
-                                          color: Colors.black87,
+                                          color: AppColors.primary,
                                           width: 2.0,
                                         ),
                                       ),
-                                      contentPadding: const EdgeInsets.symmetric(
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
                                         vertical: 8.0,
                                       ),
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          controller.isObscured.value // แก้จาก isObscured
-                                              ? Icons.visibility_off_outlined
-                                              : Icons.visibility_outlined,
+                                      suffixIcon: SizedBox(
+                                        width: AppColors.minTouchTarget,
+                                        height: AppColors.minTouchTarget,
+                                        child: IconButton(
+                                          icon: Icon(
+                                            controller.isObscured.value
+                                                ? Icons
+                                                    .visibility_off_outlined
+                                                : Icons.visibility_outlined,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                          onPressed: () =>
+                                              controller.toggleObscured(),
                                         ),
-                                        onPressed: () => controller.toggleObscured(), // แก้จาก toggleObscured
                                       ),
                                     ),
                                   )),
@@ -133,17 +142,24 @@ class AuthView extends GetView<AuthController> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  Obx(() => Checkbox(
-                                        value: controller.rememberMe.value,
-                                        onChanged: (value) => controller.toggleRememberMe(value),
-                                        activeColor: const Color(0xFF3B95B7),
-                                        side: const BorderSide(color: Colors.black87),
+                                  Obx(() => SizedBox(
+                                        width: AppColors.minTouchTarget,
+                                        height: AppColors.minTouchTarget,
+                                        child: Checkbox(
+                                          value: controller.rememberMe.value,
+                                          onChanged: (value) =>
+                                              controller
+                                                  .toggleRememberMe(value),
+                                          activeColor: AppColors.primary,
+                                          side: const BorderSide(
+                                              color: AppColors.textSecondary),
+                                        ),
                                       )),
                                   const Text(
-                                    'Remember me',
+                                    'ຈົດຈຳຂ້ອຍ',
                                     style: TextStyle(
                                       fontSize: 12.0,
-                                      color: Colors.black87,
+                                      color: AppColors.textPrimary,
                                     ),
                                   ),
                                 ],
@@ -154,11 +170,14 @@ class AuthView extends GetView<AuthController> {
                               SizedBox(
                                 height: 50,
                                 child: ElevatedButton(
-                                  onPressed: controller.isLoading.value ? null : () => controller.login(),
+                                  onPressed: controller.isLoading.value
+                                      ? null
+                                      : () => controller.login(),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF3B95B7),
+                                    backgroundColor: AppColors.primary,
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(30),
+                                      borderRadius:
+                                          BorderRadius.circular(30),
                                     ),
                                     elevation: 0,
                                   ),
@@ -172,7 +191,7 @@ class AuthView extends GetView<AuthController> {
                                           ),
                                         )
                                       : const Text(
-                                          'Login',
+                                          'ເຂົ້າສູ່ລະບົບ',
                                           style: TextStyle(
                                             fontSize: 18,
                                             color: Colors.white,
@@ -180,8 +199,8 @@ class AuthView extends GetView<AuthController> {
                                         )),
                                 ),
                               ),
-                              const SizedBox(height: 40.0), // อันนี้คือ Widget ตัวสุดท้ายใน Column
-                            ], // จบ List ของ children ตรงนี้พอดี!
+                              const SizedBox(height: 40.0),
+                            ],
                           ),
                         );
                       },

@@ -114,19 +114,14 @@ class AdminAppBar extends StatelessWidget {
                 }),
               ),
 
-              // ── Pending requests badge ──────────────────────────────────
+              // ── Notification button ─────────────────────────────────────
               Obx(() {
                 final count = controller.pendingRequestCount.value;
                 return Material(
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(22),
-                    onTap: () {
-                      // Navigate to the Approve tab (index 1)
-                      if (Get.isRegistered<BottomNavController>()) {
-                        Get.find<BottomNavController>().gotoApprovePage();
-                      }
-                    },
+                    onTap: () => Get.toNamed('/admin-noti'),
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -146,7 +141,7 @@ class AdminAppBar extends StatelessWidget {
                         backgroundColor: AppColors.rejectRed,
                         offset: const Offset(6, -6),
                         child: const Icon(
-                          Icons.assignment_outlined,
+                          Icons.notifications_none_rounded,
                           color: Colors.white,
                           size: 22,
                         ),

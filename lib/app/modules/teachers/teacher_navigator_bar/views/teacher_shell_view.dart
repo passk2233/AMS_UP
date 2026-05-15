@@ -6,7 +6,7 @@ import '../teacher_bottom_nav.dart';
 
 import '../../teacher_home/views/teacher_home_view.dart';
 import '../../schedules/views/schedules_view.dart';
-import '../../../booking/views/booking_view.dart';
+import '../../booking/views/booking_view.dart';
 import '../../teacher_evaluation/views/teacher_evaluation_view.dart';
 import '../../teacher_profile/views/teacher_profile_view.dart';
 

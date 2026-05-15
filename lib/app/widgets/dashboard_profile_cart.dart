@@ -60,14 +60,14 @@ class ProfileCard extends StatelessWidget {
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: AppColors.primary.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -95,8 +95,8 @@ class ProfileCard extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.2),
-            border: Border.all(color: Colors.white.withOpacity(0.4), width: 2),
+            color: Colors.white.withValues(alpha: 0.2),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.4), width: 2),
           ),
           child: Center(
             child: Text(
@@ -130,7 +130,7 @@ class ProfileCard extends StatelessWidget {
                 _roleLabel,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -140,7 +140,7 @@ class ProfileCard extends StatelessWidget {
                 _departmentLabel,
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.85),
+                  color: Colors.white.withValues(alpha: 0.85),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -189,7 +189,7 @@ class ProfileCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
@@ -208,7 +208,7 @@ class ProfileCard extends StatelessWidget {
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
           ],

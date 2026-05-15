@@ -1,186 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:frontend/app/widgets/widget.dart';
 
 import '../controllers/teacher_evaluation_controller.dart';
 
 class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
   const TeacherEvaluationView({super.key});
 
+  Color _getScoreColor(double score) {
+    if (score >= 4.5) return AppColors.borderApproved;
+    if (score >= 3.5) return AppColors.borderPending;
+    if (score >= 2.5) return AppColors.statsBlue;
+    return AppColors.rejectRed;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'My Evaluations',
-          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: IconButton(
-                icon: const Icon(Icons.refresh_rounded,
-                    color: Colors.blue, size: 20),
-                onPressed: controller.refreshData,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
-            ),
-          ),
-        ],
+    return GetBuilder<TeacherEvaluationController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return AppPageScaffold(
+      title: 'ການປະເມີນ',
+      trailing: AppIconBubble(
+        icon: Icons.refresh_rounded,
+        onTap: controller.refreshData,
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const Center(child: CircularProgressIndicator());
+          return const AppLoading.evaluation();
         }
 
         final err = controller.errorMessage.value;
         if (err.isNotEmpty) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.cloud_off_rounded,
-                      size: 56, color: Colors.grey),
-                  const SizedBox(height: 16),
-                  Text(
-                    err,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 20),
-                  ElevatedButton.icon(
-                    onPressed: controller.refreshData,
-                    icon: const Icon(Icons.refresh_rounded, size: 20),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A68FF),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          return AppErrorState(
+            message: err,
+            onRetry: controller.refreshData,
           );
         }
 
         return RefreshIndicator(
           onRefresh: controller.refreshData,
-          color: Colors.blue,
+          color: AppColors.primary,
           child: ListView(
             physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics()),
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             children: [
-              // ── Overall Score Card ──
               _buildOverallScoreCard(controller.overallAverage),
               const SizedBox(height: 16),
-
-              // ── Stats Row ──
               Row(
                 children: [
                   Expanded(
-                    child: _StatCard(
-                      title: 'Evaluations',
+                    child: AppStatCard(
+                      label: 'ການປະເມີນ',
                       value: '${controller.totalEvaluations}',
                       icon: Icons.people_alt_outlined,
-                      color: Colors.blue,
+                      color: AppColors.statsBlue,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: _StatCard(
-                      title: 'Subjects',
+                    child: AppStatCard(
+                      label: 'ວິຊາ',
                       value: '${controller.totalSubjects}',
                       icon: Icons.menu_book_rounded,
-                      color: Colors.orange,
+                      color: AppColors.borderPending,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-
-              // ── Section title ──
               const Padding(
                 padding: EdgeInsets.only(left: 4, bottom: 12),
                 child: Text(
-                  'Subject Evaluations',
+                  'ການປະເມີນແຕ່ລະວິຊາ',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
                 ),
               ),
-
-              // ── Subject Evaluation Cards ──
-              ...controller.subjectGroups.map((g) {
-                return _SubjectEvalCard(group: g);
-              }),
-
+              ...controller.subjectGroups.map((g) => _SubjectEvalCard(group: g)),
               if (controller.subjectGroups.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: const [
-                      BoxShadow(color: Colors.black12, blurRadius: 5),
-                    ],
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(Icons.insert_chart_outlined,
-                          size: 56, color: Colors.grey),
-                      SizedBox(height: 12),
-                      Text(
-                        'No evaluation data yet',
-                        style: TextStyle(
-                          color: Colors.grey,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
+                const AppEmptyState(
+                  icon: Icons.insert_chart_outlined,
+                  title: 'ຍັງບໍ່ມີຂໍ້ມູນການປະເມີນ',
                 ),
             ],
           ),
         );
       }),
     );
+        },
+      ),
+    );
   }
 
-  // ── Overall Score Card ───────────────────────────────────────────────────
   Widget _buildOverallScoreCard(double average) {
-    Color scoreColor = const Color(0xFF4A68FF);
-    String label = 'Good';
+    Color scoreColor = _getScoreColor(average);
+    String label = 'ດີ';
     IconData emoji = Icons.thumb_up_alt_rounded;
 
     if (average < 3.0) {
-      scoreColor = Colors.redAccent;
-      label = 'Needs Improvement';
+      label = 'ຕ້ອງປັບປຸງ';
       emoji = Icons.trending_down_rounded;
     } else if (average < 4.0) {
-      scoreColor = Colors.orange;
-      label = 'Average';
+      label = 'ປານກາງ';
       emoji = Icons.trending_flat_rounded;
     } else if (average >= 4.5) {
-      scoreColor = Colors.green;
-      label = 'Excellent';
+      label = 'ດີເລີດ';
       emoji = Icons.emoji_events_rounded;
     }
 
@@ -188,10 +117,10 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: scoreColor,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppColors.cardRadius),
         boxShadow: [
           BoxShadow(
-            color: scoreColor.withOpacity(0.3),
+            color: scoreColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -204,7 +133,7 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Overall Score',
+                  'ຄະແນນລວມ',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -234,12 +163,12 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
+              borderRadius: BorderRadius.circular(AppColors.cardRadius),
+              boxShadow: [
                 BoxShadow(
-                  color: Colors.black12,
+                  color: Colors.black.withValues(alpha: 0.08),
                   blurRadius: 8,
-                  offset: Offset(0, 2),
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
@@ -264,39 +193,25 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SUBJECT EVALUATION CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _SubjectEvalCard extends StatelessWidget {
   final SubjectEvalGroup group;
   const _SubjectEvalCard({required this.group});
 
   Color _scoreColor(double score) {
-    if (score >= 4.5) return Colors.green;
-    if (score >= 3.5) return Colors.orange;
-    if (score >= 2.5) return Colors.blue;
-    return Colors.redAccent;
+    if (score >= 4.5) return AppColors.borderApproved;
+    if (score >= 3.5) return AppColors.borderPending;
+    if (score >= 2.5) return AppColors.statsBlue;
+    return AppColors.rejectRed;
   }
 
   @override
   Widget build(BuildContext context) {
     final scoreColor = _scoreColor(group.averageScore);
 
-    return Container(
+    return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-        border: Border(left: BorderSide(color: scoreColor, width: 5)),
-      ),
+      borderLeftColor: scoreColor,
+      borderLeftWidth: 5,
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
@@ -308,6 +223,7 @@ class _SubjectEvalCard extends StatelessWidget {
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 15,
+              color: AppColors.textPrimary,
             ),
           ),
           subtitle: Padding(
@@ -347,7 +263,7 @@ class _SubjectEvalCard extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: scoreColor.withOpacity(0.1),
+                        color: scoreColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Row(
@@ -371,7 +287,7 @@ class _SubjectEvalCard extends StatelessWidget {
                         size: 13, color: Colors.grey.shade400),
                     const SizedBox(width: 4),
                     Text(
-                      '${group.totalResponses} responses',
+                      '${group.totalResponses} ຄຳຕອບ',
                       style: TextStyle(
                           color: Colors.grey.shade600,
                           fontWeight: FontWeight.w600,
@@ -386,9 +302,9 @@ class _SubjectEvalCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
-                borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(15)),
+                color: AppColors.scaffoldBg,
+                borderRadius:
+                    const BorderRadius.vertical(bottom: Radius.circular(14)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -399,7 +315,7 @@ class _SubjectEvalCard extends StatelessWidget {
                           size: 16, color: Colors.grey.shade600),
                       const SizedBox(width: 6),
                       Text(
-                        'Score Details',
+                        'ລາຍລະອຽດຄະແນນ',
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
                           fontSize: 13,
@@ -451,7 +367,6 @@ class _SubjectEvalCard extends StatelessWidget {
                       ),
                     );
                   }),
-                  // Comments section
                   if (group.comments.isNotEmpty) ...[
                     const Divider(),
                     Row(
@@ -460,7 +375,7 @@ class _SubjectEvalCard extends StatelessWidget {
                             size: 16, color: Colors.grey.shade500),
                         const SizedBox(width: 6),
                         Text(
-                          'Student Comments',
+                          'ຄຳເຫັນຈາກນັກສຶກສາ',
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
@@ -495,72 +410,6 @@ class _SubjectEvalCard extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// STAT CARD
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
       ),
     );
   }

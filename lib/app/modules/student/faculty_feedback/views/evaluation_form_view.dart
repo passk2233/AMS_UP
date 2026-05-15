@@ -11,7 +11,10 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
     // รับข้อมูล Faculty จาก arguments (ห้ามใส่ ?? 0 เพราะเราส่งเป็น Object)
     final Faculty faculty = Get.arguments;
 
-    return Scaffold(
+    return GetBuilder<FacultyFeedbackController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Faculty Feedback', style: TextStyle(color: Colors.white)),
@@ -78,6 +81,9 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
             ),
           ],
         ),
+      ),
+    );
+        },
       ),
     );
   }

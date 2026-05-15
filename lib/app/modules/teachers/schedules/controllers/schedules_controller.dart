@@ -2,25 +2,32 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
+import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../widgets/widget.dart';
 import '../../../data/data_exporter.dart';
-import '../../../../widgets/app_dialogs.dart';
+
 
 class SchedulesController extends GetxController {
+  var selectedDate = DateTime.now().obs;
+  var currentWeek = <DateTime>[].obs;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxList<StudyPlanModel> schedules = <StudyPlanModel>[].obs;
-  final RxInt selectedDay = 0.obs;
+  final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
   late final Dio _dio;
   String _token = '';
+  int? _teacherId;
 
   @override
   void onInit() {
     super.onInit();
+    _generateWeek(DateTime.now());
     _initDio();
-    fetchSchedules();
+    _bootstrap();
   }
 
   void _initDio() {
@@ -42,7 +49,7 @@ class SchedulesController extends GetxController {
     _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
-  Future<void> fetchSchedules() async {
+  Future<void> _bootstrap() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
@@ -51,28 +58,101 @@ class SchedulesController extends GetxController {
         errorMessage.value = 'ບໍ່ພົບ token (ກະລຸນາ login ໃໝ່)';
         return;
       }
-
-      final me = await _dio.get('/auth/me');
-      final user = (me.statusCode == 200 && me.data is Map<String, dynamic>)
-          ? UserModel.fromJson(me.data)
-          : null;
-      final teacherId = user?.teacherId;
-      if (teacherId == null) {
+      await _loadActiveSemester();
+      _initSelectionForSemester();
+      await _loadTeacher();
+      if (_teacherId == null) {
         errorMessage.value = 'ບໍ່ພົບຂໍ້ມູນອາຈານ';
         return;
       }
+      await fetchSchedules();
+    } on DioException catch (e) {
+      final detail = AppDialogs.buildDioErrorDetail(e);
+      debugPrint('Schedules Dio error:\n$detail');
 
-      final resp = await _dio.get('/study-plans', queryParameters: {
+      if (e.response?.statusCode == 401) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('token');
+        errorMessage.value = 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)';
+        Get.offAllNamed('/auth');
+        return;
+      }
+
+      if (errorMessage.value.isEmpty) {
+        errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
+      }
+    } catch (e) {
+      debugPrint('Schedules error: $e');
+      if (errorMessage.value.isEmpty) {
+        errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
+      }
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> _loadActiveSemester() async {
+    try {
+      final resp = await _dio.get('/semasters', queryParameters: {'limit': 20});
+      final items = _extractList(resp.data);
+      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
+      if (all.isEmpty) return;
+
+      final now = DateTime.now();
+      final containing = all.where((s) =>
+          s.startDate != null &&
+          s.endDate != null &&
+          !now.isBefore(_dateOnly(s.startDate!)) &&
+          !now.isAfter(_dateOnly(s.endDate!).add(const Duration(days: 1))));
+      if (containing.isNotEmpty) {
+        activeSemester.value = containing.first;
+        return;
+      }
+
+      final active = all.where((s) => s.status == 1);
+      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+    } on DioException catch (e) {
+      debugPrint(
+          'Schedules semester Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
+    } catch (e) {
+      debugPrint('Schedules semester error: $e');
+    }
+  }
+
+  Future<void> _loadTeacher() async {
+    final me = await _dio.get('/auth/me');
+    final user = (me.statusCode == 200 && me.data is Map<String, dynamic>)
+        ? UserModel.fromJson(me.data)
+        : null;
+    _teacherId = user?.teacherId;
+  }
+
+  Future<void> fetchSchedules() async {
+    final teacherId = _teacherId;
+    if (teacherId == null) {
+      errorMessage.value = 'ບໍ່ພົບຂໍ້ມູນອາຈານ';
+      return;
+    }
+    isLoading.value = true;
+    errorMessage.value = '';
+    try {
+      final query = <String, dynamic>{
         'teacher_id': teacherId,
         'limit': 500,
-      });
+      };
+      final semId = activeSemester.value?.id;
+      if (semId != null) query['semaster_id'] = semId;
+
+      final resp = await _dio.get('/study-plans', queryParameters: query);
       final items = _extractList(resp.data);
       var list = items.map((j) => StudyPlanModel.fromJson(j)).toList();
 
       // Fallback: if backend ignores teacher_id filter, fetch all then filter.
       if (list.isEmpty) {
+        final fallbackQuery = <String, dynamic>{'limit': 500};
+        if (semId != null) fallbackQuery['semaster_id'] = semId;
         final respAll =
-            await _dio.get('/study-plans', queryParameters: {'limit': 500});
+            await _dio.get('/study-plans', queryParameters: fallbackQuery);
         final allItems = _extractList(respAll.data);
         list = allItems
             .map((j) => StudyPlanModel.fromJson(j))
@@ -80,12 +160,16 @@ class SchedulesController extends GetxController {
             .toList();
       }
 
-      list
-        .sort((a, b) {
-          final d = _dayIndex(a.dayOfWeek).compareTo(_dayIndex(b.dayOfWeek));
-          if (d != 0) return d;
-          return (a.startTime ?? '').compareTo(b.startTime ?? '');
-        });
+      if (semId != null) {
+        list = list.where((sp) => sp.semasterId == semId).toList();
+      }
+
+      list.sort((a, b) {
+        final d = _dayOfWeekToWeekday(a.dayOfWeek)
+            .compareTo(_dayOfWeekToWeekday(b.dayOfWeek));
+        if (d != 0) return d;
+        return (a.startTime ?? '').compareTo(b.startTime ?? '');
+      });
       schedules.assignAll(list);
     } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
@@ -108,7 +192,22 @@ class SchedulesController extends GetxController {
     }
   }
 
-  Future<void> refreshData() => fetchSchedules();
+  Future<void> refreshData() => _bootstrap();
+
+  void _initSelectionForSemester() {
+    final sem = activeSemester.value;
+    final start = sem?.startDate;
+    final end = sem?.endDate;
+    final today = _dateOnly(DateTime.now());
+    DateTime initial = today;
+    if (start != null && today.isBefore(_dateOnly(start))) {
+      initial = _dateOnly(start);
+    } else if (end != null && today.isAfter(_dateOnly(end))) {
+      initial = _dateOnly(end);
+    }
+    selectedDate.value = initial;
+    _generateWeek(initial);
+  }
 
   static List<dynamic> _extractList(dynamic data) {
     if (data is List) return data;
@@ -116,25 +215,196 @@ class SchedulesController extends GetxController {
     return const [];
   }
 
-  static int _dayIndex(String? day) {
-    final d = (day ?? '').toLowerCase().trim();
+  void _generateWeek(DateTime date) {
+    final normalized = _dateOnly(date);
+    // Start week on Sunday: Sunday.weekday=7, 7%7=0 so no subtraction.
+    int daysToSubtract = normalized.weekday % 7;
+    DateTime firstDay = normalized.subtract(Duration(days: daysToSubtract));
+    currentWeek
+        .assignAll(List.generate(7, (i) => firstDay.add(Duration(days: i))));
+  }
+
+  void changeWeek(int days) {
+    if (currentWeek.isEmpty) {
+      _generateWeek(selectedDate.value);
+      return;
+    }
+    if (days < 0 && !canGoPrevWeek) return;
+    if (days > 0 && !canGoNextWeek) return;
+
+    final selectedWeekdayIndex = selectedDate.value.weekday % 7;
+    final nextWeekAnchor = currentWeek.first.add(Duration(days: days));
+    _generateWeek(nextWeekAnchor);
+    final candidate = currentWeek[selectedWeekdayIndex.clamp(0, 6)];
+    selectedDate.value = _clampToSemester(candidate);
+  }
+
+  void selectDate(DateTime date) {
+    final normalized = _clampToSemester(_dateOnly(date));
+    selectedDate.value = normalized;
+
+    if (currentWeek.isEmpty) {
+      _generateWeek(normalized);
+      return;
+    }
+    final inCurrentWeek = currentWeek.any((d) =>
+        d.year == normalized.year &&
+        d.month == normalized.month &&
+        d.day == normalized.day);
+    if (!inCurrentWeek) {
+      _generateWeek(normalized);
+    }
+  }
+
+  bool isInSemester(DateTime date) {
+    final sem = activeSemester.value;
+    final start = sem?.startDate;
+    final end = sem?.endDate;
+    final d = _dateOnly(date);
+    if (start != null && d.isBefore(_dateOnly(start))) return false;
+    if (end != null && d.isAfter(_dateOnly(end))) return false;
+    return true;
+  }
+
+  bool get canGoPrevWeek {
+    final sem = activeSemester.value;
+    final start = sem?.startDate;
+    if (start == null || currentWeek.isEmpty) return true;
+    return currentWeek.first.isAfter(_dateOnly(start));
+  }
+
+  bool get canGoNextWeek {
+    final sem = activeSemester.value;
+    final end = sem?.endDate;
+    if (end == null || currentWeek.isEmpty) return true;
+    return currentWeek.last.isBefore(_dateOnly(end));
+  }
+
+  DateTime _clampToSemester(DateTime date) {
+    final sem = activeSemester.value;
+    final start = sem?.startDate;
+    final end = sem?.endDate;
+    final d = _dateOnly(date);
+    if (start != null && d.isBefore(_dateOnly(start))) return _dateOnly(start);
+    if (end != null && d.isAfter(_dateOnly(end))) return _dateOnly(end);
+    return d;
+  }
+
+  DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  List<Map<String, dynamic>> get filteredSchedules {
+    if (!isInSemester(selectedDate.value)) return const [];
+
+    final palette = <Color>[
+      Colors.purple,
+      AppColors.statsBlue,
+      AppColors.borderApproved,
+      AppColors.borderPending,
+      AppColors.rejectRed,
+      Colors.teal,
+    ];
+
+    final selectedWeekday = selectedDate.value.weekday;
+    final selected = schedules.where((p) {
+      final planWeekday = _dayOfWeekToWeekday(p.dayOfWeek);
+      return planWeekday == selectedWeekday;
+    }).toList()
+      ..sort((a, b) =>
+          _timeToMinutes(a.startTime).compareTo(_timeToMinutes(b.startTime)));
+
+    return List.generate(selected.length, (i) {
+      final sp = selected[i];
+      final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';
+      final code = sp.subject?.subjectCode ?? '';
+      final room = sp.room?.roomCode ??
+          (sp.roomId != null ? 'ຫ້ອງ ${sp.roomId}' : '-');
+      final time = '${_formatTime(sp.startTime)} - ${_formatTime(sp.endTime)}';
+      final group = sp.studentGroup?.stdGroupName ?? '';
+
+      return {
+        'date': selectedDate.value,
+        'title': '$subject${code.isNotEmpty ? ' ($code)' : ''}',
+        'subtitle': group.isNotEmpty ? group : null,
+        'time': time,
+        'location': room,
+        'color': palette[i % palette.length],
+      };
+    });
+  }
+
+  String get currentMonthYear =>
+      DateFormat('MMMM yyyy').format(selectedDate.value);
+
+  String get semesterLabel {
+    final s = activeSemester.value;
+    if (s == null) return '';
+    return 'ພາກຮຽນ ${s.term}/${s.year}';
+  }
+
+  String get semesterDateRange {
+    final s = activeSemester.value;
+    if (s == null || s.startDate == null || s.endDate == null) return '';
+    final fmt = DateFormat('dd MMM yyyy');
+    return '${fmt.format(s.startDate!)} - ${fmt.format(s.endDate!)}';
+  }
+
+  int _dayOfWeekToWeekday(String? rawDay) {
+    if (rawDay == null || rawDay.trim().isEmpty) return -1;
+    final d = rawDay.trim().toLowerCase();
     switch (d) {
       case 'monday':
-        return 1;
+      case 'mon':
+      case '1':
+        return DateTime.monday;
       case 'tuesday':
-        return 2;
+      case 'tue':
+      case '2':
+        return DateTime.tuesday;
       case 'wednesday':
-        return 3;
+      case 'wed':
+      case '3':
+        return DateTime.wednesday;
       case 'thursday':
-        return 4;
+      case 'thu':
+      case '4':
+        return DateTime.thursday;
       case 'friday':
-        return 5;
+      case 'fri':
+      case '5':
+        return DateTime.friday;
       case 'saturday':
-        return 6;
+      case 'sat':
+      case '6':
+        return DateTime.saturday;
       case 'sunday':
-        return 7;
+      case 'sun':
+      case '0':
+      case '7':
+        return DateTime.sunday;
       default:
-        return 99;
+        return -1;
     }
+  }
+
+  int _timeToMinutes(String? value) {
+    if (value == null || value.trim().isEmpty) return 0;
+    final t = value.trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(t);
+    if (match == null) return 0;
+    final h = int.tryParse(match.group(1) ?? '') ?? 0;
+    final m = int.tryParse(match.group(2) ?? '') ?? 0;
+    return (h * 60) + m;
+  }
+
+  String _formatTime(String? value) {
+    if (value == null || value.trim().isEmpty) return '-';
+    final t = value.trim();
+    final match = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(t);
+    if (match == null) return t;
+    final h = int.tryParse(match.group(1) ?? '') ?? 0;
+    final m = int.tryParse(match.group(2) ?? '') ?? 0;
+    final dt = DateTime(2000, 1, 1, h, m);
+    return DateFormat('HH:mm').format(dt);
   }
 }

@@ -1,7 +1,7 @@
 import 'package:frontend/app/modules/admins/approve/controllers/approve_controller.dart';
 import 'package:frontend/app/modules/admins/home/controllers/home_controller.dart';
 import 'package:frontend/app/modules/admins/announcement/controllers/announcement_controller.dart';
-import 'package:frontend/app/modules/profiles/controllers/profiles_controller.dart';
+import 'package:frontend/app/modules/admins/admin_profile/controllers/admin_profile_controller.dart';
 import 'package:frontend/app/widgets/admin_app_bar/admin_app_bar_controllers.dart';
 import 'package:get/get.dart';
 
@@ -37,8 +37,8 @@ class BottomNavController extends GetxController {
         Get.find<AnnouncementController>().refreshData();
       }
     } else if (index == 4) {
-      if (Get.isRegistered<ProfilesController>()) {
-        Get.find<ProfilesController>().refreshData();
+      if (Get.isRegistered<AdminProfileController>()) {
+        Get.find<AdminProfileController>().refreshData();
       }
     }
   }

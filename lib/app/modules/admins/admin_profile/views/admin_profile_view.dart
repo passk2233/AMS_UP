@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../utilities/assets.dart';
-import '../../../widgets/widget.dart';
-import '../controllers/profiles_controller.dart';
+import '../../../../utilities/assets.dart';
+import '../../../../widgets/widget.dart';
+import '../controllers/admin_profile_controller.dart';
 
-class ProfilesView extends GetView<ProfilesController> {
-  const ProfilesView({super.key});
+class AdminProfileView extends GetView<AdminProfileController> {
+  const AdminProfileView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<ProfilesController>(
+    return GetBuilder<AdminProfileController>(
       builder: (controller) => LayoutBuilder(
         builder: (context, constraints) {
           return Scaffold(
@@ -29,10 +29,7 @@ class ProfilesView extends GetView<ProfilesController> {
                   Expanded(
                     child: Obx(() {
                       if (controller.isLoading.value) {
-                        return const Center(
-                          child: CircularProgressIndicator(
-                              color: AppColors.laoBlue),
-                        );
+                        return const AppLoading.profile();
                       }
                       if (controller.errorMessage.value.isNotEmpty) {
                         return Center(
@@ -113,7 +110,7 @@ class ProfilesView extends GetView<ProfilesController> {
           borderRadius: BorderRadius.circular(18),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4C4DDC).withOpacity(0.3),
+              color: const Color(0xFF4C4DDC).withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 6),
             ),
@@ -127,8 +124,8 @@ class ProfilesView extends GetView<ProfilesController> {
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.2),
-                border: Border.all(color: Colors.white.withOpacity(0.5), width: 3),
+                color: Colors.white.withValues(alpha: 0.2),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.5), width: 3),
               ),
               child: Center(
                 child: Text(
@@ -157,7 +154,7 @@ class ProfilesView extends GetView<ProfilesController> {
               user?.email ?? '-',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
             const SizedBox(height: 8),
@@ -172,7 +169,7 @@ class ProfilesView extends GetView<ProfilesController> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -258,16 +255,16 @@ class ProfilesView extends GetView<ProfilesController> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: roleInfo.color.withOpacity(0.06),
+                color: roleInfo.color.withValues(alpha: 0.06),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: roleInfo.color.withOpacity(0.2)),
+                border: Border.all(color: roleInfo.color.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: roleInfo.color.withOpacity(0.1),
+                      color: roleInfo.color.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(roleInfo.icon, color: roleInfo.color, size: 18),
@@ -376,7 +373,7 @@ class ProfilesView extends GetView<ProfilesController> {
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.rejectRed,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.rejectRed.withOpacity(0.6),
+            disabledBackgroundColor: AppColors.rejectRed.withValues(alpha: 0.6),
             disabledForegroundColor: Colors.white70,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
@@ -404,7 +401,7 @@ class ProfilesView extends GetView<ProfilesController> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 10,
               offset: const Offset(0, 4)),
         ],

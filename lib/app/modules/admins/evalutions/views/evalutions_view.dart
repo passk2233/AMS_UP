@@ -114,7 +114,7 @@ class EvalutionView extends GetView<EvalutionController> {
         _modeToggle(),
         Expanded(child: Obx(() {
           if (controller.isLoadingQuestions.value) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const AppLoading.questionList();
           }
           if (controller.questionsError.isNotEmpty && controller.questions.isEmpty) {
             return _errorWidget(controller.questionsError.value, controller.fetchQuestions);
@@ -231,7 +231,7 @@ class EvalutionView extends GetView<EvalutionController> {
         _modeToggle(),
         Expanded(child: Obx(() {
           if (controller.isLoadingResults.value) {
-            return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+            return const AppLoading.resultsList();
           }
           if (controller.resultsError.isNotEmpty && controller.results.isEmpty) {
             return _errorWidget(controller.resultsError.value, controller.fetchResults);

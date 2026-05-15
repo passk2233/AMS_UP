@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/faculty_feedback_controller.dart';
 import 'faculty_model.dart';
@@ -9,18 +10,22 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return GetBuilder<FacultyFeedbackController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Scaffold(
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
           onPressed: () => Get.back(),
         ),
         title: const Text(
-          'Faculty Feedback',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          'ປະເມີນອາຈານ',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
       ),
@@ -31,13 +36,27 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
             child: TextField(
               onChanged: (v) => controller.query.value = v,
               decoration: InputDecoration(
-                hintText: 'Search professor or course...',
-                prefixIcon: const Icon(Icons.search),
+                hintText: 'ຄົ້ນຫາອາຈານ ຫຼື ວິຊາ...',
+                hintStyle:
+                    TextStyle(color: Colors.grey.shade400, fontSize: 14),
+                prefixIcon:
+                    Icon(Icons.search_rounded, color: Colors.grey.shade400),
                 filled: true,
-                fillColor: Colors.grey[100],
+                fillColor: AppColors.inputFill,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 14),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(AppColors.buttonRadius),
                   borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppColors.buttonRadius),
+                  borderSide: BorderSide(color: Colors.grey.shade200),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppColors.buttonRadius),
+                  borderSide:
+                      const BorderSide(color: AppColors.primary, width: 1.5),
                 ),
               ),
             ),
@@ -46,21 +65,27 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
             child: Obx(
               () {
                 if (controller.isLoading.value) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const AppLoading.facultyList();
                 }
                 if (controller.errorMessage.value.isNotEmpty) {
-                  return Center(child: Text(controller.errorMessage.value));
+                  return AppErrorState(
+                    message: controller.errorMessage.value,
+                    onRetry: () => controller.onInit(),
+                  );
                 }
                 final list = controller.filteredFacultyList;
                 if (list.isEmpty) {
-                  return const Center(child: Text('No faculty found.'));
+                  return const AppEmptyState(
+                    icon: Icons.school_outlined,
+                    title: 'ບໍ່ພົບອາຈານ',
+                    subtitle: 'ລອງຄົ້ນຫາດ້ວຍຄຳອື່ນ',
+                  );
                 }
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   itemCount: list.length,
-                  itemBuilder: (context, index) {
-                    return _buildFacultyCard(list[index]);
-                  },
+                  itemBuilder: (context, index) =>
+                      _buildFacultyCard(list[index]),
                 );
               },
             ),
@@ -68,33 +93,29 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
         ],
       ),
     );
+        },
+      ),
+    );
   }
 
   Widget _buildFacultyCard(Faculty faculty) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
+    return AppSurfaceCard(
+      margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
       child: Column(
         children: [
           Row(
             children: [
               CircleAvatar(
                 radius: 30,
-                backgroundColor: Colors.blue[50],
+                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
                 child: Text(
                   faculty.initials,
-                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               const SizedBox(width: 16),
@@ -102,18 +123,33 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(faculty.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    Text(faculty.course, style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                    Text(
+                      faculty.name,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      faculty.course,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 14,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
-            child: faculty.isSubmitted 
-                ? _buildSubmittedButton() 
+            height: AppColors.minTouchTarget,
+            child: faculty.isSubmitted
+                ? _buildSubmittedButton()
                 : _buildEvaluateButton(faculty),
           ),
         ],
@@ -122,14 +158,22 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
   }
 
   Widget _buildEvaluateButton(Faculty faculty) {
-    return ElevatedButton(
-      onPressed: () => Get.toNamed(Routes.EVALUATION_FORM, arguments: faculty),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: Colors.blue,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        padding: const EdgeInsets.symmetric(vertical: 12),
+    return ElevatedButton.icon(
+      onPressed: () =>
+          Get.toNamed(Routes.EVALUATION_FORM, arguments: faculty),
+      icon: const Icon(Icons.rate_review_rounded, size: 18),
+      label: const Text(
+        'ປະເມີນ',
+        style: TextStyle(fontWeight: FontWeight.w600),
       ),
-      child: const Text('Evaluate', style: TextStyle(color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppColors.buttonRadius),
+        ),
+        elevation: 0,
+      ),
     );
   }
 
@@ -137,15 +181,22 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF6FBF9),
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.borderApproved.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppColors.buttonRadius),
       ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_outline, color: Colors.green, size: 20),
+          Icon(Icons.check_circle_outline,
+              color: AppColors.borderApproved, size: 20),
           SizedBox(width: 8),
-          Text('Feedback Submitted', style: TextStyle(color: Colors.green)),
+          Text(
+            'ສົ່ງແລ້ວ',
+            style: TextStyle(
+              color: AppColors.borderApproved,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );

@@ -189,7 +189,7 @@ class TeacherEvaluationController extends GetxController {
       final qId = r.evaQuestionId;
       g.questionScores.putIfAbsent(
         qId,
-        () => _QScore(
+        () => QScore(
           questionText: r.evaQuestion?.question ?? 'ຄຳຖາມ #$qId',
           totalScore: 0,
           count: 0,
@@ -237,7 +237,7 @@ class SubjectEvalGroup {
   final String studentGroupName;
   int totalResponses;
   int totalScore;
-  final Map<int, _QScore> questionScores;
+  final Map<int, QScore> questionScores;
   final List<String> comments;
 
   SubjectEvalGroup({
@@ -257,10 +257,10 @@ class SubjectEvalGroup {
       totalResponses > 0 ? totalScore / totalResponses : 0;
 }
 
-class _QScore {
+class QScore {
   final String questionText;
   int totalScore;
   int count;
-  _QScore({required this.questionText, required this.totalScore, required this.count});
+  QScore({required this.questionText, required this.totalScore, required this.count});
   double get average => count > 0 ? totalScore / count : 0;
 }

@@ -1,294 +1,276 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:frontend/app/widgets/widget.dart';
 
 import '../controllers/schedules_controller.dart';
 
 class SchedulesView extends GetView<SchedulesController> {
   const SchedulesView({super.key});
 
-  static const _days = [
-    'All',
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
-  ];
-
-  static const _dayKeys = [
-    '',
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        title: const Text(
-          'My Schedule',
-          style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          Container(
-            margin: const EdgeInsets.only(right: 16, top: 12, bottom: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+    if (!Get.isRegistered<SchedulesController>()) {
+      Get.put(SchedulesController());
+    }
+
+    return GetBuilder<SchedulesController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return AppPageScaffold(
+            withBackground: true,
+            title: 'ຕາຕະລາງສອນ',
+            trailing: AppIconBubble(
+              icon: Icons.refresh_rounded,
+              onTap: controller.refreshData,
             ),
-            child: Center(
-              child: IconButton(
-                icon: const Icon(Icons.refresh_rounded,
-                    color: Colors.blue, size: 20),
-                onPressed: controller.refreshData,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-              ),
+            body: Column(
+              children: [
+                _buildSemesterBanner(controller),
+                _buildWeekSelector(controller),
+                const SizedBox(height: 12),
+                _buildDateRow(controller),
+                const SizedBox(height: 16),
+                Expanded(child: _buildScheduleList(controller)),
+              ],
             ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Day filter strip (matches student calendar strip style) ─────
-          _buildDayFilterStrip(),
-          const SizedBox(height: 8),
-
-          // ── Body ───────────────────────────────────────────────────────
-          Expanded(
-            child: Obx(() {
-              if (controller.isLoading.value) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              final err = controller.errorMessage.value;
-              if (err.isNotEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      err,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                );
-              }
-
-              // Filter by selected day
-              final dayKey = _dayKeys[controller.selectedDay.value];
-              final filtered = dayKey.isEmpty
-                  ? controller.schedules
-                  : controller.schedules
-                      .where((sp) =>
-                          (sp.dayOfWeek ?? '').toLowerCase() == dayKey)
-                      .toList();
-
-              if (filtered.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'No classes scheduled.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                );
-              }
-
-              return RefreshIndicator(
-                onRefresh: controller.refreshData,
-                color: Colors.blue,
-                child: ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 16),
-                  itemBuilder: (context, index) {
-                    final sp = filtered[index];
-                    final subject =
-                        sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'Subject';
-                    final code = sp.subject?.subjectCode ?? '';
-                    final room = sp.room?.roomCode ??
-                        (sp.roomId != null ? 'Room ${sp.roomId}' : '-');
-                    final time =
-                        '${sp.startTime ?? '-'} - ${sp.endTime ?? '-'}';
-                    final day = sp.dayOfWeek ?? '-';
-                    final group = sp.studentGroup?.stdGroupName ?? '';
-
-                    final palette = <Color>[
-                      Colors.purple,
-                      Colors.blue,
-                      Colors.green,
-                      Colors.orange,
-                      Colors.redAccent,
-                      Colors.teal,
-                    ];
-                    final color = palette[index % palette.length];
-
-                    return _buildScheduleCard(
-                      title:
-                          '$subject${code.isNotEmpty ? ' ($code)' : ''}',
-                      subtitle: group,
-                      time: time,
-                      day: day,
-                      location: room,
-                      color: color,
-                    );
-                  },
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Day filter strip (matches student _buildCalendarStrip style) ────────
-  Widget _buildDayFilterStrip() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: SizedBox(
-        height: 44,
-        child: Obx(() {
-          final currentSelected = controller.selectedDay.value;
-          return ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            separatorBuilder: (_, __) => const SizedBox(width: 8),
-            itemCount: _days.length,
-            itemBuilder: (context, index) {
-              final isSelected = currentSelected == index;
-              return GestureDetector(
-                onTap: () => controller.selectedDay.value = index,
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 250),
-                  curve: Curves.easeOut,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color:
-                        isSelected ? Colors.blue : Colors.transparent,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected
-                          ? Colors.blue
-                          : Colors.blue.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Center(
-                    child: Text(
-                      _days[index],
-                      style: TextStyle(
-                        color:
-                            isSelected ? Colors.white : Colors.blue,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
           );
-        }),
+        },
       ),
     );
   }
 
-  // ── Schedule Card (matches student _buildScheduleCard) ─────────────────
-  Widget _buildScheduleCard({
-    required String title,
-    required String subtitle,
-    required String time,
-    required String day,
-    required String location,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 10,
-            spreadRadius: 2,
+  Widget _buildSemesterBanner(SchedulesController controller) {
+    return Obx(() {
+      final label = controller.semesterLabel;
+      final range = controller.semesterDateRange;
+      if (label.isEmpty && range.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.statsBlue.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(AppColors.cardRadius),
           ),
-        ],
-        border: Border(left: BorderSide(color: color, width: 5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Row(
             children: [
+              Icon(Icons.event_note_rounded,
+                  size: 18, color: AppColors.statsBlue),
+              const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  title,
-                  style:
-                      TextStyle(color: color, fontWeight: FontWeight.bold),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (label.isNotEmpty)
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    if (range.isNotEmpty)
+                      Text(
+                        range,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              Text(
-                time,
-                style:
-                    const TextStyle(color: Colors.grey, fontSize: 10),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          if (subtitle.isNotEmpty)
-            Text(
-              subtitle,
-              style: const TextStyle(
-                  fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+      );
+    });
+  }
+
+  Widget _buildWeekSelector(SchedulesController controller) {
+    return Obx(() {
+      final canPrev = controller.canGoPrevWeek;
+      final canNext = controller.canGoNextWeek;
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Opacity(
+              opacity: canPrev ? 1 : 0.4,
+              child: AppIconBubble(
+                icon: Icons.chevron_left_rounded,
+                onTap: canPrev ? () => controller.changeWeek(-7) : null,
+              ),
             ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
+            Text(
+              controller.currentMonthYear,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            Opacity(
+              opacity: canNext ? 1 : 0.4,
+              child: AppIconBubble(
+                icon: Icons.chevron_right_rounded,
+                onTap: canNext ? () => controller.changeWeek(7) : null,
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+
+  Widget _buildDateRow(SchedulesController controller) {
+    const dayLabels = ['ອ', 'ຈ', 'ອ', 'ພ', 'ພຫ', 'ສ', 'ສ'];
+
+    return Obx(() {
+      final week = controller.currentWeek;
+      final selected = controller.selectedDate.value;
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: List.generate(7, (i) {
+            if (i >= week.length) return const SizedBox.shrink();
+            final date = week[i];
+            final isSelected = date.day == selected.day &&
+                date.month == selected.month &&
+                date.year == selected.year;
+            final isToday = date.day == DateTime.now().day &&
+                date.month == DateTime.now().month &&
+                date.year == DateTime.now().year;
+            final inRange = controller.isInSemester(date);
+
+            return GestureDetector(
+              onTap: inRange ? () => controller.selectDate(date) : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                constraints: const BoxConstraints(
+                  minWidth: AppColors.minTouchTarget,
+                  minHeight: 64,
                 ),
-                child: Text(
-                  day.toUpperCase(),
-                  style: TextStyle(
-                    color: color,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 10,
+                padding:
+                    const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.statsBlue
+                      : isToday && inRange
+                          ? AppColors.statsBlue.withValues(alpha: 0.1)
+                          : Colors.transparent,
+                  borderRadius: BorderRadius.circular(AppColors.buttonRadius),
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: AppColors.statsBlue.withValues(alpha: 0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Opacity(
+                  opacity: inRange ? 1 : 0.35,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        dayLabels[i],
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isSelected
+                              ? Colors.white70
+                              : AppColors.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${date.day}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(
-                Icons.location_on_outlined,
-                size: 14,
-                color: Colors.grey,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                location,
-                style:
-                    const TextStyle(color: Colors.grey, fontSize: 12),
+            );
+          }),
+        ),
+      );
+    });
+  }
+
+  Widget _buildScheduleList(SchedulesController controller) {
+    return Obx(() {
+      if (controller.isLoading.value) {
+        return const AppLoading.schedule();
+      }
+      if (controller.errorMessage.value.isNotEmpty &&
+          controller.schedules.isEmpty) {
+        return AppErrorState(
+          message: controller.errorMessage.value,
+          onRetry: controller.refreshData,
+        );
+      }
+
+      if (!controller.isInSemester(controller.selectedDate.value)) {
+        return RefreshIndicator(
+          onRefresh: controller.refreshData,
+          color: AppColors.primary,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: const [
+              SizedBox(height: 60),
+              AppEmptyState(
+                icon: Icons.event_busy_rounded,
+                title: 'ບໍ່ຢູ່ໃນຊ່ວງພາກຮຽນ',
+                subtitle: 'ກະລຸນາເລືອກວັນທີຢູ່ໃນຊ່ວງເລີ່ມ ແລະ ສຸດທ້າຍຂອງພາກຮຽນ',
               ),
             ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+
+      final filtered = controller.filteredSchedules;
+
+      if (filtered.isEmpty) {
+        return const AppEmptyState(
+          icon: Icons.event_available_rounded,
+          title: 'ບໍ່ມີຫ້ອງຮຽນໃນວັນນີ້',
+          subtitle: 'ເລືອກວັນອື່ນເພື່ອເບິ່ງຕາຕະລາງ',
+        );
+      }
+
+      return RefreshIndicator(
+        onRefresh: controller.refreshData,
+        color: AppColors.primary,
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          itemCount: filtered.length,
+          itemBuilder: (context, index) {
+            final item = filtered[index];
+            return AppClassCard(
+              title: item['title'] as String? ?? '',
+              subtitle: item['subtitle'] as String?,
+              time: item['time'] as String?,
+              instructor: item['instructor'] as String?,
+              location: item['location'] as String?,
+              color: item['color'] as Color? ?? AppColors.statsBlue,
+            );
+          },
+        ),
+      );
+    });
   }
 }

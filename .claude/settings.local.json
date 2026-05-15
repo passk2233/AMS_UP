@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter analyze *)",
+      "PowerShell(flutter analyze *)",
+      "Bash(go build *)"
+    ]
+  }
+}

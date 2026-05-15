@@ -6,7 +6,9 @@ class GradeNotiView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         leading: IconButton(
@@ -96,6 +98,8 @@ class GradeNotiView extends StatelessWidget {
           )
         ],
       ),
+    );
+      },
     );
   }
 }

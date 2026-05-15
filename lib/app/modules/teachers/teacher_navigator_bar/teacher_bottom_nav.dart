@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:frontend/app/widgets/widget.dart';
 
 import 'teacher_bottom_nav_controller.dart';
 
@@ -12,35 +13,17 @@ class TeacherBottomNavBar extends StatelessWidget {
         ? Get.find<TeacherBottomNavController>()
         : Get.put(TeacherBottomNavController(), permanent: true);
 
-    return Container(
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-        child: Obx(
-          () => BottomNavigationBar(
-            currentIndex: navCtrl.selectedIndex.value,
-            onTap: navCtrl.changeTab,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            selectedItemColor: Colors.blueAccent,
-            unselectedItemColor: Colors.grey,
-            items: const [
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.home), label: "Home"),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.calendar_month), label: "Schedule"),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.book), label: "Booking"),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.star), label: "Evaluation"),
-              BottomNavigationBarItem(
-                  icon: Icon(Icons.person), label: "Profile"),
-            ],
-          ),
-        ),
+    return Obx(
+      () => AppBottomNav(
+        selectedIndex: navCtrl.selectedIndex.value,
+        onTap: navCtrl.changeTab,
+        items: const [
+          AppNavItem(icon: Icons.home_rounded, label: 'ໜ້າຫຼັກ'),
+          AppNavItem(icon: Icons.calendar_month_rounded, label: 'ຕາຕະລາງ'),
+          AppNavItem(icon: Icons.meeting_room_rounded, label: 'ຈອງຫ້ອງ'),
+          AppNavItem(icon: Icons.bar_chart_rounded, label: 'ປະເມີນ'),
+          AppNavItem(icon: Icons.person_rounded, label: 'ໂປຣໄຟລ໌'),
+        ],
       ),
     );
   }

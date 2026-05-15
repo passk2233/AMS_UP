@@ -2,9 +2,9 @@ import 'package:get/get.dart';
 
 import '../teacher_home/controllers/teacher_home_controller.dart';
 import '../schedules/controllers/schedules_controller.dart';
-import '../../booking/controllers/booking_controller.dart';
+import '../booking/controllers/booking_controller.dart';
 import '../teacher_evaluation/controllers/teacher_evaluation_controller.dart';
-import '../../profiles/controllers/profiles_controller.dart';
+import '../teacher_profile/controllers/teacher_profile_controller.dart';
 
 class TeacherBottomNavController extends GetxController {
   final RxInt selectedIndex = 0.obs;
@@ -38,8 +38,8 @@ class TeacherBottomNavController extends GetxController {
         }
         break;
       case 4:
-        if (Get.isRegistered<ProfilesController>()) {
-          Get.find<ProfilesController>().refreshData();
+        if (Get.isRegistered<TeacherProfileController>()) {
+          Get.find<TeacherProfileController>().refreshData();
         }
         break;
     }

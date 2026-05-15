@@ -1,0 +1,125 @@
+Mobile UI Design Principles for AI Agents
+
+This document outlines the core principles and structural guidelines an AI agent must follow when generating mobile user interfaces (UX/UI). The goal is to ensure the output is not just functional, but also user-centric, consistent, accessible, and visually coherent.
+
+1. Foundational Directives (The "Prime Directives")
+
+Before generating any specific component, the AI must adhere to these foundational rules:
+
+Mobile-First Mindset: Assume a constrained viewport (e.g., 375x812 pts for iOS baseline or 360x800 dp for Android baseline). Design must prioritize essential content and progressive disclosure.
+
+Accessibility by Default (WCAG 2.1 AA):
+
+Contrast: Minimum contrast ratio of 4.5:1 for normal text and 3:1 for large text/UI components.
+
+Touch Targets: Minimum touch target size of 44x44 pts (iOS) or 48x48 dp (Android). Provide adequate spacing (minimum 8pt) between interactive elements to prevent mis-taps.
+
+Typography: Minimum legible font size is 16px for body text.
+
+Consistency over Creativity: The UI must be predictable. Re-use existing patterns, layouts, and visual styles rather than inventing new paradigms for standard interactions.
+
+Contextual Awareness: The AI must analyze the purpose of the screen before designing. A data-entry form requires a different layout strategy than a media consumption feed.
+
+2. Layout and Structure
+
+The AI should structure the page using a clear hierarchy and established mobile patterns.
+
+2.1. Grid and Spacing System
+
+Base Unit: Use an 8-point grid system (8, 16, 24, 32, 40, 48, etc.) for margins, padding, and sizing to ensure visual rhythm.
+
+Margins: Standardize horizontal screen margins (e.g., 16pt or 24pt). Maintain these consistently across all generated screens.
+
+Vertical Rhythm: Group related elements closely (e.g., 8pt or 16pt spacing) and separate distinct sections with larger spacing (e.g., 32pt or 48pt).
+
+2.2. Page Hierarchy
+
+Top Navigation (App Bar/Header): Must contain a clear title indicating current location. Left side reserved for primary navigation (Back or Menu). Right side reserved for primary screen-level actions (e.g., Edit, Save, Search).
+
+Main Content Area (The "Body"): Prioritize the most important information at the top. Use scrolling naturally. Avoid horizontal scrolling unless it's a specific pattern like a carousel.
+
+Bottom Navigation/Action Area:
+
+Primary Action: The most critical action (e.g., "Submit," "Checkout") should be prominently placed at the bottom, often as a sticky Full-Width Button.
+
+Global Navigation (Bottom Tab Bar): Limit to 3-5 distinct, top-level destinations.
+
+3. Interaction and Components
+
+The AI must select and configure components based on user intention and ease of use on a touch device.
+
+3.1. Forms and Data Entry
+
+Input Fields: Use large, clear tap areas. Labels should always be visible (above the field is preferred on mobile to save horizontal space).
+
+Keyboard Handling: Define the correct keyboard type (numeric, email, phone) for each input. Ensure the UI handles the keyboard appearing (content must scroll up so the active field remains visible).
+
+Error Prevention: Validate inline where possible and provide clear, human-readable error messages placed directly next to the relevant field.
+
+3.2. Buttons and Calls to Action (CTAs)
+
+Hierarchy: Establish clear primary, secondary, and tertiary button styles.
+
+Primary: Solid, high contrast. One per screen (usually).
+
+Secondary: Outlined or subtle background.
+
+Tertiary: Text-only or icon-only.
+
+Placement: Primary CTAs should be easily reachable by the thumb (bottom half of the screen).
+
+3.3. Information Display
+
+Lists and Cards: Use standard list items for dense data. Use cards to group complex or mixed-media information. Ensure the entire card or list item is a tap target, not just the text inside it.
+
+Imagery: Optimize images for performance. Provide clear fallbacks/placeholders while loading.
+
+4. Visual Language System
+
+The AI must maintain a cohesive aesthetic by applying a defined design system.
+
+4.1. Color Palette
+
+Primary/Brand Color: Used sparingly to draw attention to primary actions (buttons, active states).
+
+Background Colors: Default to white or very light gray for light mode; dark gray/black for dark mode.
+
+Text Colors: High contrast (e.g., almost black) for primary text; medium gray for secondary text/metadata. Never use pure black (#000000) on pure white; soften it slightly (e.g., #1A1A1A).
+
+Semantic Colors: Standardize colors for success (green), warning (yellow/orange), and error (red).
+
+4.2. Typography
+
+Typeface: Stick to system fonts (San Francisco on iOS, Roboto/Inter on Android) or a single, highly legible sans-serif web font to ensure fast loading and native feel.
+
+Hierarchy: Define and stick to specific styles (H1, H2, Body, Caption).
+
+Example: Title (24px, Bold), Heading (18px, Semi-bold), Body (16px, Regular), Caption (12px, Regular).
+
+5. System States and Feedback
+
+The AI must design for the complete lifecycle of a screen, not just the "happy path."
+
+Loading States: Define skeleton screens or clear loading indicators (spinners) for areas where data is fetched asynchronously. Avoid blank screens.
+
+Empty States: When a list is empty or a search returns no results, provide a helpful message explaining why and an actionable next step (e.g., "You have no messages. Tap here to start a new chat.").
+
+Error States: Design clear, non-technical error messages (e.g., "Network connection lost," not "Error 404"). Provide a retry mechanism.
+
+Success/Action Feedback: Provide immediate visual feedback for user actions (e.g., button press state, a brief toast notification after saving).
+
+6. AI Generation Workflow Directives
+
+When the AI is tasked with generating a page, it should follow these steps implicitly:
+
+Analyze Intent: What is the primary goal of this screen? (e.g., Checkout, Profile Viewing, Item Discovery).
+
+Determine Structure: Select the appropriate layout archetype (List, Form, Detail View, Dashboard).
+
+Apply Components: Map the required data/actions to standard mobile components (Inputs, Buttons, Cards).
+
+Enforce Spacing & Alignment: Apply the 8-point grid system.
+
+Review Accessibility: Check touch targets and contrast ratios.
+
+Design Alternate States: Generate the loading, empty, and error variants for the screen.
