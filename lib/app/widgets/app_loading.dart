@@ -1,6 +1,42 @@
 import 'package:flutter/material.dart';
 
+import 'app_colors.dart';
 import 'app_skeleton.dart';
+
+/// Wraps a loading skeleton in a pull-to-refresh shell so users can retry
+/// while data is still loading. Skeletons that internally use a
+/// `NeverScrollableScrollPhysics` ListView need a bounded height, so we use
+/// LayoutBuilder + SizedBox to give them one — `SliverFillRemaining` queries
+/// intrinsic height and viewports refuse to answer.
+class AppRefreshableLoader extends StatelessWidget {
+  final Future<void> Function() onRefresh;
+  final Widget child;
+
+  const AppRefreshableLoader({
+    super.key,
+    required this.onRefresh,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      color: AppColors.primary,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: SizedBox(
+              height: constraints.maxHeight,
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 /// Shared page-level loading indicator.
 ///

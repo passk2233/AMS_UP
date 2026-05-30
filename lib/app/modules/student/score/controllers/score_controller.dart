@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class ScoreController extends GetxController {
@@ -17,41 +16,18 @@ class ScoreController extends GetxController {
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final RxList<EnrollmentModel> enrollments = <EnrollmentModel>[].obs;
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
     fetchData();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> fetchData() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
-
       final me = await _dio.get('/auth/me');
       if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
         currentUser.value = UserModel.fromJson(me.data);
@@ -70,14 +46,10 @@ class ScoreController extends GetxController {
       enrollments.assignAll(items.map((j) => EnrollmentModel.fromJson(j)).toList());
     } on DioException catch (e) {
       debugPrint('ScoreController Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'Session expired. Please login again.';
-        Get.offAllNamed('/auth');
-        return;
-      }
-      errorMessage.value = 'Failed to load scores.';
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'Session expired. Please login again.'
+          : 'Failed to load scores.';
     } catch (e) {
       debugPrint('ScoreController error: $e');
       errorMessage.value = 'Failed to load scores.';
@@ -121,6 +93,36 @@ class ScoreController extends GetxController {
       sum += credit;
     }
     return sum;
+  }
+
+  /// GPA computed per semester (term-weighted average of grade points), in
+  /// chronological order by semesterId. Each entry is `(semesterId, gpa)`.
+  /// Semesters with no graded credits are skipped.
+  List<({int semesterId, double gpa})> get gpaTrend {
+    final acc = <int, ({double points, int credits})>{};
+    for (final e in enrollments) {
+      final semId = e.studyPlan?.semasterId;
+      if (semId == null) continue;
+      final grade = e.grade?.trim();
+      if (grade == null || grade.isEmpty) continue;
+      final credit = e.studyPlan?.subject?.credit ?? 0;
+      final gp = _gradePoint(grade);
+      if (gp == null || credit <= 0) continue;
+      final entry = acc[semId] ?? (points: 0.0, credits: 0);
+      acc[semId] = (
+        points: entry.points + gp * credit,
+        credits: entry.credits + credit,
+      );
+    }
+    final out = acc.entries
+        .where((e) => e.value.credits > 0)
+        .map((e) => (
+              semesterId: e.key,
+              gpa: e.value.points / e.value.credits,
+            ))
+        .toList();
+    out.sort((a, b) => a.semesterId.compareTo(b.semesterId));
+    return out;
   }
 
   static double? _gradePoint(String grade) {

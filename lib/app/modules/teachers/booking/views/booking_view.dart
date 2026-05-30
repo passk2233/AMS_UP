@@ -20,8 +20,9 @@ class BookingView extends GetView<BookingController> {
               centerTitle: true,
               actions: [
                 IconButton(
-                  onPressed: controller.refreshData,
-                  icon: const Icon(Icons.refresh),
+                  onPressed: () => Get.toNamed('/teacher-noti'),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  tooltip: 'ການແຈ້ງເຕືອນ',
                 )
               ],
             ),
@@ -34,42 +35,24 @@ class BookingView extends GetView<BookingController> {
             ),
             body: Obx(() {
               if (controller.isLoading.value) {
-                return const AppLoading.booking();
+                return AppRefreshableLoader(
+                  onRefresh: controller.refreshData,
+                  child: const AppLoading.booking(),
+                );
               }
               final err = controller.errorMessage.value;
               if (err.isNotEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_off,
-                            size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
-                        Text(
-                          err,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: controller.refreshData,
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
+                return AppErrorState(
+                  message: err,
+                  onRetry: controller.refreshData,
                 );
               }
 
-              final fixedList = controller.upcomingFixedBookings;
+              final fixedList = controller.filteredFixedBookings;
               final filtered = controller.filteredMyBookings;
+              final hasAnyFixed = controller.fixedBookings.isNotEmpty;
+              final isTeacher =
+                  controller.currentUser.value?.teacherId != null;
 
               return RefreshIndicator(
                 onRefresh: controller.refreshData,
@@ -79,31 +62,36 @@ class BookingView extends GetView<BookingController> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     _statsRow(controller),
-                    const SizedBox(height: 16),
-                    if (fixedList.isNotEmpty) ...[
-                      const Text(
-                        'ການຈອງປະຈຳ (ຈາກຕາຕະລາງຮຽນ)',
-                        style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w800),
-                      ),
-                      const SizedBox(height: 10),
-                      ...fixedList.map((fb) => _fixedCard(context, fb)),
-                      const SizedBox(height: 20),
+                    const SizedBox(height: AppSpacing.m),
+                    if (hasAnyFixed) ...[
+                      _fixedSectionHeader(controller),
+                      const SizedBox(height: AppSpacing.s),
+                      _fixedFilterChips(controller),
+                      const SizedBox(height: AppSpacing.s + 2),
+                      if (fixedList.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: AppEmptyState(
+                            icon: Icons.event_busy_outlined,
+                            title: 'ບໍ່ມີຄາບໃນຕົວກອງນີ້',
+                            subtitle: 'ລອງເລືອກຕົວກອງອື່ນ',
+                          ),
+                        )
+                      else
+                        ..._buildFixedList(context, fixedList),
+                      const SizedBox(height: AppSpacing.l),
+                    ] else if (isTeacher) ...[
+                      _fixedDiagnosticBanner(controller),
+                      const SizedBox(height: AppSpacing.l),
                     ],
                     Row(
                       children: [
                         const Expanded(
-                          child: Text(
-                            'ປະຫວັດການຈອງຂອງຂ້ອຍ',
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800),
-                          ),
+                          child: Text('ປະຫວັດການຈອງຂອງຂ້ອຍ',
+                              style: AppTypography.subheading),
                         ),
-                        Text(
-                          '${filtered.length} ລາຍການ',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                        ),
+                        Text('${filtered.length} ລາຍການ',
+                            style: AppTypography.caption),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -111,21 +99,24 @@ class BookingView extends GetView<BookingController> {
                     const SizedBox(height: 10),
                     if (filtered.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 40),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.inbox_outlined,
-                                  size: 48, color: Colors.grey.shade400),
-                              const SizedBox(height: 8),
-                              Text(
-                                controller.myBookings.isEmpty
-                                    ? 'ຍັງບໍ່ມີການຈອງ'
-                                    : 'ບໍ່ມີຂໍ້ມູນທີ່ກົງກັບຕົວກອງ',
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
+                        padding: const EdgeInsets.only(top: AppSpacing.xl),
+                        child: AppEmptyState(
+                          icon: Icons.inbox_outlined,
+                          title: controller.myBookings.isEmpty
+                              ? 'ຍັງບໍ່ມີການຈອງ'
+                              : 'ບໍ່ມີຂໍ້ມູນທີ່ກົງກັບຕົວກອງ',
+                          subtitle: controller.myBookings.isEmpty
+                              ? 'ກົດປຸ່ມ "ຈອງໃໝ່" ເພື່ອເລີ່ມຕົ້ນ'
+                              : 'ລອງເລືອກຕົວກອງອື່ນ',
+                          actionLabel: controller.myBookings.isEmpty
+                              ? 'ຈອງໃໝ່'
+                              : 'ລ້າງຕົວກອງ',
+                          actionIcon: controller.myBookings.isEmpty
+                              ? Icons.add_rounded
+                              : Icons.filter_alt_off_rounded,
+                          onAction: controller.myBookings.isEmpty
+                              ? () => _showCreateDialog(context)
+                              : () => controller.bookingFilter.value = 'all',
                         ),
                       )
                     else
@@ -316,14 +307,346 @@ class BookingView extends GetView<BookingController> {
     );
   }
 
+  Widget _fixedSectionHeader(BookingController c) {
+    return Row(
+      children: [
+        const Expanded(
+          child: Text('ການຈອງປະຈຳ (ຈາກຕາຕະລາງຮຽນ)',
+              style: AppTypography.subheading),
+        ),
+        if (c.countFixedCancelled > 0)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.rejectRed.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                'ຍົກເລີກ ${c.countFixedCancelled}',
+                style: const TextStyle(
+                  color: AppColors.rejectRed,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+        Text('${c.countFixedUpcoming} ຄາບ', style: AppTypography.caption),
+      ],
+    );
+  }
+
+  Widget _fixedFilterChips(BookingController c) {
+    const filters = <(String, String)>[
+      ('upcoming', 'ກຳລັງມາ'),
+      ('today', 'ມື້ນີ້'),
+      ('week', '7 ວັນ'),
+      ('cancelled', 'ຍົກເລີກ'),
+      ('all', 'ທັງໝົດ'),
+    ];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemBuilder: (_, i) {
+          final (key, label) = filters[i];
+          final selected = c.fixedFilter.value == key;
+          int? badge;
+          if (key == 'today') badge = c.countFixedToday;
+          if (key == 'cancelled') badge = c.countFixedCancelled;
+          return ChoiceChip(
+            label: Text(
+              badge != null && badge > 0 ? '$label ($badge)' : label,
+            ),
+            selected: selected,
+            onSelected: (_) => c.fixedFilter.value = key,
+            labelStyle: TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+            selectedColor: AppColors.bookingBlue,
+            backgroundColor: Colors.grey.shade100,
+            side: BorderSide(color: Colors.grey.shade300),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemCount: filters.length,
+      ),
+    );
+  }
+
+  /// Diagnostic banner shown when a teacher has no fixed bookings. Surfaces
+  /// the controller's persist-pipeline state so it's obvious whether the gap
+  /// is "no study plans assigned", "semester missing dates", or "backend
+  /// rejected the POST" — instead of an empty silent list.
+  Widget _fixedDiagnosticBanner(BookingController c) {
+    final sem = c.activeSemester.value;
+    final user = c.currentUser.value;
+    final bail = c.persistBailReason.value;
+    final lastErr = c.persistLastError.value;
+
+    String semLine;
+    if (sem == null) {
+      semLine = 'ບໍ່ມີ (none)';
+    } else if (sem.startDate == null || sem.endDate == null) {
+      semLine = '${sem.semasterCode} — ບໍ່ມີວັນທີ';
+    } else {
+      final s = sem.startDate!;
+      final e = sem.endDate!;
+      semLine = '${sem.semasterCode} '
+          '(${s.day}/${s.month}/${s.year} → ${e.day}/${e.month}/${e.year})';
+    }
+
+    Widget kv(String k, String v) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 130,
+                child: Text(
+                  k,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Text(
+                  v,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.m),
+      decoration: BoxDecoration(
+        color: AppColors.borderPending.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border:
+            Border.all(color: AppColors.borderPending.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.info_outline,
+                  color: AppColors.borderPending, size: 18),
+              const SizedBox(width: 8),
+              const Expanded(
+                child: Text(
+                  'ບໍ່ມີຄາບການຮຽນປະຈຳ',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'ຍັງບໍ່ມີ room_booking ທີ່ຕິດກັບ study_plan. ກວດສະຖານະຂ້າງລຸ່ມ ແລ້ວກົດ ດຶງຂໍ້ມູນຄືນ.',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade800),
+          ),
+          const SizedBox(height: AppSpacing.s),
+          kv('ພາກຮຽນ:', semLine),
+          kv('Teacher ID:',
+              user?.teacherId?.toString() ?? 'ບໍ່ມີ (not a teacher account)'),
+          kv('Study plans ໂຫລດ:', '${c.persistPlansConsidered.value}'),
+          kv('ຕົງກັບອາຈານ:', '${c.persistPlansForMe.value}'),
+          kv('ມີຫ້ອງ+ເວລາ:', '${c.persistPlansComplete.value}'),
+          kv('Marker rows ໃນ DB:', '${c.persistMarkerRowsInDb.value}'),
+          kv('ສ້າງລ່າສຸດ:',
+              '${c.persistRowsCreated.value} (ຂ້າມ existing ${c.persistSlotsSkippedExisting.value}, ຂ້າມ taken ${c.persistSlotsSkippedTaken.value})'),
+          if (bail.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.rejectRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.error_outline,
+                      color: AppColors.rejectRed, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'ສາເຫດ: $bail',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.rejectRed,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (lastErr.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.s),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.rejectRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'API error:',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.rejectRed,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    lastErr,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.rejectRed,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpacing.m),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton.icon(
+              onPressed: c.resyncFixedBookings,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('ດຶງຂໍ້ມູນຄືນ'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.m, vertical: AppSpacing.s),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Renders [list] grouped under date headers so a week's classes scan top to
+  /// bottom without the eye having to re-derive the date for each card.
+  List<Widget> _buildFixedList(BuildContext context, List<FixedBooking> list) {
+    final widgets = <Widget>[];
+    String? currentDateKey;
+    for (final fb in list) {
+      final key =
+          '${fb.date.year}-${fb.date.month.toString().padLeft(2, '0')}-${fb.date.day.toString().padLeft(2, '0')}';
+      if (key != currentDateKey) {
+        widgets.add(_fixedDateHeader(fb.date));
+        currentDateKey = key;
+      }
+      widgets.add(_fixedCard(context, fb));
+    }
+    return widgets;
+  }
+
+  Widget _fixedDateHeader(DateTime d) {
+    final weekday = _weekdayLao(d.weekday);
+    final dateStr = '${d.day}/${d.month}/${d.year}';
+    final today = dateOnly(DateTime.now());
+    final target = dateOnly(d);
+    String? hint;
+    if (sameDate(target, today)) {
+      hint = 'ມື້ນີ້';
+    } else if (sameDate(target, today.add(const Duration(days: 1)))) {
+      hint = 'ມື້ອື່ນ';
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 8, 2, 6),
+      child: Row(
+        children: [
+          Icon(Icons.calendar_today, size: 14, color: Colors.grey.shade600),
+          const SizedBox(width: 6),
+          Text(
+            '$weekday $dateStr',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.grey.shade700,
+              letterSpacing: 0.3,
+            ),
+          ),
+          if (hint != null) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(
+                hint,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _weekdayLao(int weekday) {
+    switch (weekday) {
+      case DateTime.monday:
+        return 'ວັນຈັນ';
+      case DateTime.tuesday:
+        return 'ວັນອັງຄານ';
+      case DateTime.wednesday:
+        return 'ວັນພຸດ';
+      case DateTime.thursday:
+        return 'ວັນພະຫັດ';
+      case DateTime.friday:
+        return 'ວັນສຸກ';
+      case DateTime.saturday:
+        return 'ວັນເສົາ';
+      case DateTime.sunday:
+        return 'ວັນອາທິດ';
+      default:
+        return '';
+    }
+  }
+
   Widget _fixedCard(BuildContext context, FixedBooking fb) {
     final room = fb.plan.room?.roomCode ?? 'Room ${fb.roomId}';
     final subject =
         fb.plan.subject?.nameLao ?? fb.plan.subject?.nameEng ?? 'ວິຊາ';
     final group = fb.plan.studentGroup?.stdGroupName ?? '-';
-    final dateStr = '${fb.date.day}/${fb.date.month}/${fb.date.year}';
-    final color = fb.cancelled ? Colors.grey : Colors.blueAccent;
-    final dayBadge = _dayBadge(fb.date);
+    final color = fb.cancelled ? Colors.grey : AppColors.bookingBlue;
+    final past = isPastSlot(fb.date, fb.startTime);
+    final canRestore = fb.cancelled && !past;
 
     return Card(
       elevation: 0,
@@ -332,52 +655,92 @@ class BookingView extends GetView<BookingController> {
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: color.withValues(alpha: 0.4)),
       ),
-      child: ListTile(
-        leading: Icon(
-          fb.cancelled ? Icons.event_busy : Icons.event_repeat,
-          color: color,
-        ),
-        title: Row(
-          children: [
-            Flexible(
-              child: Text(
-                '$subject • $room',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  decoration: fb.cancelled
-                      ? TextDecoration.lineThrough
-                      : TextDecoration.none,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
+      child: Opacity(
+        opacity: past ? 0.7 : 1.0,
+        child: ListTile(
+          leading: CircleAvatar(
+            radius: 18,
+            backgroundColor: color.withValues(alpha: 0.12),
+            child: Icon(
+              fb.cancelled ? Icons.event_busy : Icons.event_repeat,
+              color: color,
+              size: 20,
             ),
-            if (dayBadge != null) ...[
-              const SizedBox(width: 6),
-              dayBadge,
-            ],
-          ],
+          ),
+          title: Text(
+            '$subject • $room',
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              decoration: fb.cancelled
+                  ? TextDecoration.lineThrough
+                  : TextDecoration.none,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          subtitle: Text(
+            [
+              'ກຸ່ມ $group • ${fb.startTime}-${fb.endTime}',
+              if (fb.cancelled && (fb.cancelReason ?? '').isNotEmpty)
+                'ເຫດຜົນ: ${fb.cancelReason}',
+            ].join('\n'),
+          ),
+          isThreeLine: fb.cancelled && (fb.cancelReason ?? '').isNotEmpty,
+          trailing: fb.cancelled
+              ? Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.rejectRed.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'ຍົກເລີກ',
+                        style: TextStyle(
+                          color: AppColors.rejectRed,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (canRestore) ...[
+                      const SizedBox(height: 4),
+                      GestureDetector(
+                        onTap: () => controller.restoreFixedBooking(fb),
+                        child: const Text(
+                          'ກູ້ຄືນ',
+                          style: TextStyle(
+                            color: AppColors.successGreen,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                )
+              : past
+                  ? Text(
+                      'ສຳເລັດ',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    )
+                  : TextButton.icon(
+                      onPressed: () => _promptCancelReason(context, fb),
+                      icon: const Icon(Icons.cancel,
+                          color: AppColors.rejectRed, size: 18),
+                      label: const Text('ຍົກເລີກ',
+                          style: TextStyle(
+                              color: AppColors.rejectRed, fontSize: 12)),
+                    ),
         ),
-        subtitle: Text(
-          [
-            'ກຸ່ມ $group',
-            'ວັນທີ $dateStr • ${fb.startTime}-${fb.endTime}',
-            if (fb.cancelled && (fb.cancelReason ?? '').isNotEmpty)
-              'ເຫດຜົນ: ${fb.cancelReason}',
-          ].join('\n'),
-        ),
-        isThreeLine: true,
-        trailing: fb.cancelled
-            ? const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Text('ຍົກເລີກແລ້ວ',
-                    style: TextStyle(color: Colors.red, fontSize: 12)),
-              )
-            : TextButton.icon(
-                onPressed: () => _promptCancelReason(context, fb),
-                icon: const Icon(Icons.cancel, color: Colors.red, size: 18),
-                label: const Text('ຍົກເລີກ',
-                    style: TextStyle(color: Colors.red, fontSize: 12)),
-              ),
       ),
     );
   }
@@ -658,6 +1021,16 @@ class BookingView extends GetView<BookingController> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                _PurposeChips(
+                  presets: const [
+                    'ສອນຊົດເຊີຍ',
+                    'ສອບເສັງ',
+                    'ປະຊຸມ',
+                    'ກິດຈະກຳ',
+                  ],
+                  controller: purposeCtrl,
+                ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: purposeCtrl,
                   decoration: const InputDecoration(
@@ -673,33 +1046,23 @@ class BookingView extends GetView<BookingController> {
                   _inlineWarning(conflictNote.value, Colors.red),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: !canSubmit
-                        ? null
-                        : () async {
-                            Navigator.of(context).pop();
-                            await controller.createBooking(
-                              roomId: selectedRoomId.value!,
-                              bookingDate: date.value,
-                              startTime: startCtrl.text.trim(),
-                              endTime: endCtrl.text.trim(),
-                              purpose: purposeCtrl.text.trim().isEmpty
-                                  ? null
-                                  : purposeCtrl.text.trim(),
-                            );
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('ສົ່ງຄຳຂໍ'),
-                  ),
+                AppPrimaryButton(
+                  label: 'ສົ່ງຄຳຂໍ',
+                  icon: Icons.send_rounded,
+                  onPressed: !canSubmit
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          await controller.createBooking(
+                            roomId: selectedRoomId.value!,
+                            bookingDate: date.value,
+                            startTime: startCtrl.text.trim(),
+                            endTime: endCtrl.text.trim(),
+                            purpose: purposeCtrl.text.trim().isEmpty
+                                ? null
+                                : purposeCtrl.text.trim(),
+                          );
+                        },
                 ),
               ],
             );
@@ -730,6 +1093,36 @@ class BookingView extends GetView<BookingController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PurposeChips extends StatelessWidget {
+  final List<String> presets;
+  final TextEditingController controller;
+  const _PurposeChips({required this.presets, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final label = presets[i];
+          return ActionChip(
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            onPressed: () => controller.text = label,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+            side: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.25),
+            ),
+            visualDensity: VisualDensity.compact,
+          );
+        },
       ),
     );
   }

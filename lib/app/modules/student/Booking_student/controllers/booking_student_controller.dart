@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 import 'package:frontend/app/modules/teachers/booking/controllers/fixed_booking.dart';
 
@@ -24,41 +23,18 @@ class BookingStudentController extends GetxController {
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
     fetchData();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> fetchData() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
-
       final me = await _dio.get('/auth/me');
       if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
         currentUser.value = UserModel.fromJson(me.data);
@@ -91,15 +67,10 @@ class BookingStudentController extends GetxController {
       await _loadStudyPlans();
     } on DioException catch (e) {
       debugPrint('Booking Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)';
-        Get.offAllNamed('/auth');
-        return;
-      }
-      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດການຈອງໄດ້';
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)'
+          : 'ບໍ່ສາມາດໂຫຼດການຈອງໄດ້';
     } catch (e) {
       debugPrint('Booking error: $e');
       errorMessage.value = 'ບໍ່ສາມາດໂຫຼດການຈອງໄດ້';
@@ -213,9 +184,17 @@ class BookingStudentController extends GetxController {
           startTime, endTime, p.startTime ?? '', p.endTime ?? '')) {
         continue;
       }
-      final cancelled = _allBookings.any((b) =>
-          parseFixedCancelPurpose(b.purpose) == p.id &&
-          sameDate(b.bookingDate, date));
+      // Cancellation is signaled by status=cancelled on the marker row;
+      // backend has no partial-update endpoint for purpose, so the
+      // `__sp_fixed:<pid>` marker stays in place through cancel.
+      final cancelled = _allBookings.any((b) {
+        final pid = parseFixedActivePurpose(b.purpose) ??
+            parseFixedCancelPurpose(b.purpose);
+        if (pid != p.id) return false;
+        if (!sameDate(b.bookingDate, date)) return false;
+        final s = b.status.toLowerCase();
+        return s == 'cancelled' || s == 'rejected';
+      });
       if (!cancelled) {
         final code = p.room?.roomCode ?? 'Room $roomId';
         final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
@@ -272,7 +251,6 @@ class BookingStudentController extends GetxController {
   }) async {
     try {
       isLoading.value = true;
-      await _loadToken();
       final user = currentUser.value;
       if (user == null) return;
 
@@ -314,9 +292,11 @@ class BookingStudentController extends GetxController {
         return;
       }
 
+      // Note: user_id is NOT sent — the backend derives the booker from the
+      // JWT subject. Trusting a client-provided user_id would let any
+      // logged-in user book on behalf of someone else.
       final resp = await _dio.post('/room-bookings', data: {
         'room_id': roomId,
-        'user_id': user.id,
         'booking_date': bookingDate.toUtc().toIso8601String(),
         'start_time': startTime,
         'end_time': endTime,
@@ -376,7 +356,6 @@ class BookingStudentController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _loadToken();
       await _dio.patch('/room-bookings/${b.bookingId}/status',
           data: {'status': 'cancelled'});
       AppDialogs.showSuccess(

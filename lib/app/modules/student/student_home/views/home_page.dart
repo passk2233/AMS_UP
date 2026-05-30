@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:frontend/app/routes/app_pages.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/home_page_controller.dart';
@@ -19,7 +20,10 @@ class HomePage extends GetView<HomePageController> {
       withBackground: true,
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const AppLoading.dashboard();
+          return AppRefreshableLoader(
+            onRefresh: controller.fetchDashboard,
+            child: const AppLoading.dashboard(),
+          );
         }
         if (controller.errorMessage.value.isNotEmpty) {
           return AppErrorState(
@@ -86,16 +90,27 @@ class HomePage extends GetView<HomePageController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 25),
-              const Text(
-                "ຫ້ອງຮຽນມື້ນີ້",
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 14),
+              const SizedBox(height: AppSpacing.l + 2),
+              Obx(() {
+                if (!controller.isEvaluationWindowOpen.value) {
+                  return const SizedBox.shrink();
+                }
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.l + 2),
+                  child: AppPrimaryButton(
+                    label: 'ປະເມີນອາຈານ',
+                    icon: Icons.rate_review_rounded,
+                    // Refresh the gate after returning so the button hides
+                    // if admin closed the window while we were away.
+                    onPressed: () async {
+                      await Get.toNamed(Routes.FACULTY_FEEDBACK);
+                      await controller.refreshEvaluationWindow();
+                    },
+                  ),
+                );
+              }),
+              const Text("ຫ້ອງຮຽນມື້ນີ້", style: AppTypography.heading),
+              const SizedBox(height: AppSpacing.s + 6),
               if (controller.todayClasses.isEmpty)
                 const AppEmptyState(
                   icon: Icons.event_available_rounded,
@@ -120,3 +135,4 @@ class HomePage extends GetView<HomePageController> {
     );
   }
 }
+

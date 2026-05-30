@@ -71,6 +71,9 @@ class StudentNotiView extends GetView<StudentNotiController> {
                 itemBuilder: (context, index) {
                   final item = list[index];
 
+                  final id = item['id'] as int?;
+                  final unread = item['unread'] == true;
+
                   if (item['type'] == 'Urgent') {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 20),
@@ -92,7 +95,11 @@ class StudentNotiView extends GetView<StudentNotiController> {
                             item['sub']!,
                             item['status']!,
                             item['time']!,
-                            onTap: () => Get.to(() => const GradeNotiView()),
+                            unread: unread,
+                            onTap: () {
+                              if (id != null) controller.markAsRead(id);
+                              Get.to(() => const GradeNotiView());
+                            },
                           ),
                         ],
                       ),
@@ -109,7 +116,9 @@ class StudentNotiView extends GetView<StudentNotiController> {
                     title: item['title']!,
                     desc: item['desc']!,
                     time: item['time']!,
+                    unread: unread,
                     onTap: () {
+                      if (id != null) controller.markAsRead(id);
                       if (item['title'] == "Grade Released") {
                         Get.to(() => const GradeNotiView());
                       } else if (item['title'] == "Booking Confirmed") {
@@ -134,6 +143,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
     String sub,
     String status,
     String time, {
+    bool unread = false,
     VoidCallback? onTap,
   }) {
     return Material(
@@ -170,13 +180,30 @@ class StudentNotiView extends GetView<StudentNotiController> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Flexible(
-                          child: Text(
-                            title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 15,
-                              color: AppColors.textPrimary,
-                            ),
+                          child: Row(
+                            children: [
+                              if (unread) ...[
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.rejectRed,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         Text(
@@ -216,6 +243,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
     required String title,
     required String desc,
     required String time,
+    bool unread = false,
     VoidCallback? onTap,
   }) {
     return AppSurfaceCard(
@@ -242,13 +270,30 @@ class StudentNotiView extends GetView<StudentNotiController> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Flexible(
-                      child: Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppColors.textPrimary,
-                        ),
+                      child: Row(
+                        children: [
+                          if (unread) ...[
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppColors.rejectRed,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(

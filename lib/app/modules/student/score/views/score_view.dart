@@ -19,9 +19,16 @@ class ScoreView extends GetView<ScoreController> {
           return AppPageScaffold(
       withBackground: true,
       title: 'ຄະແນນ',
+      trailing: AppIconBubble(
+        icon: Icons.notifications_none_rounded,
+        onTap: () => Get.toNamed('/student-noti'),
+      ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const AppLoading.score();
+          return AppRefreshableLoader(
+            onRefresh: controller.fetchData,
+            child: const AppLoading.score(),
+          );
         }
         if (controller.errorMessage.value.isNotEmpty) {
           return AppErrorState(
@@ -66,16 +73,16 @@ class ScoreView extends GetView<ScoreController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              const Text(
-                "ຄະແນນແຕ່ລະພາກຮຽນ",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              if (controller.gpaTrend.length >= 2) ...[
+                const SizedBox(height: AppSpacing.m),
+                _GpaTrendCard(
+                  points: controller.gpaTrend.map((p) => p.gpa).toList(),
                 ),
-              ),
-              const SizedBox(height: 10),
+              ],
+              const SizedBox(height: AppSpacing.l),
+              const Text("ຄະແນນແຕ່ລະພາກຮຽນ",
+                  style: AppTypography.subheading),
+              const SizedBox(height: AppSpacing.s + 2),
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Obx(() => Row(
@@ -245,4 +252,145 @@ class ScoreView extends GetView<ScoreController> {
         return '-';
     }
   }
+}
+
+class _GpaTrendCard extends StatelessWidget {
+  final List<double> points;
+  const _GpaTrendCard({required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    final delta = points.last - points.first;
+    final improved = delta > 0.05;
+    final declined = delta < -0.05;
+    final color = improved
+        ? AppColors.borderApproved
+        : declined
+            ? AppColors.rejectRed
+            : AppColors.statsBlue;
+    final icon = improved
+        ? Icons.trending_up_rounded
+        : declined
+            ? Icons.trending_down_rounded
+            : Icons.trending_flat_rounded;
+    final sign = delta > 0 ? '+' : '';
+
+    return AppSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ແນວໂນ້ມ GPA',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$sign${delta.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              Text(
+                '${points.length} ພາກຮຽນ',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SizedBox(
+              height: 56,
+              child: CustomPaint(
+                painter: _SparklinePainter(points: points, color: color),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> points;
+  final Color color;
+  _SparklinePainter({required this.points, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+
+    const minGpa = 0.0;
+    const maxGpa = 4.0;
+    final dx = size.width / (points.length - 1);
+    final path = Path();
+    final fill = Path();
+
+    Offset offsetAt(int i) {
+      final v = points[i].clamp(minGpa, maxGpa);
+      final ratio = (v - minGpa) / (maxGpa - minGpa);
+      final y = size.height - (size.height * ratio);
+      return Offset(i * dx, y);
+    }
+
+    final first = offsetAt(0);
+    path.moveTo(first.dx, first.dy);
+    fill.moveTo(first.dx, size.height);
+    fill.lineTo(first.dx, first.dy);
+
+    for (var i = 1; i < points.length; i++) {
+      final o = offsetAt(i);
+      path.lineTo(o.dx, o.dy);
+      fill.lineTo(o.dx, o.dy);
+    }
+
+    fill.lineTo(size.width, size.height);
+    fill.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          color.withValues(alpha: 0.25),
+          color.withValues(alpha: 0.02),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawPath(fill, fillPaint);
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, linePaint);
+
+    final dotPaint = Paint()..color = color;
+    for (var i = 0; i < points.length; i++) {
+      canvas.drawCircle(offsetAt(i), 2.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.color != color;
 }

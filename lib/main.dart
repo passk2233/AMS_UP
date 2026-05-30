@@ -3,12 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:frontend/app/modules/student/student_home/bindings/home_student_binding.dart';
 import 'package:frontend/app/routes/app_pages.dart';
 import 'package:frontend/app/widgets/app_colors.dart';
+import 'package:frontend/app/widgets/app_typography.dart';
 import 'package:get/get.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:frontend/firebase_options.dart';
+import 'package:frontend/app/services/auth_storage.dart';
 import 'package:frontend/app/services/fcm_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -26,16 +29,44 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FCMService.init();
 
-  runApp(const MyApp());
+  final initialRoute = await _resolveInitialRoute();
+
+  runApp(MyApp(initialRoute: initialRoute));
+}
+
+Future<String> _resolveInitialRoute() async {
+  final token = await AuthStorage.readToken();
+  if (token == null || token.isEmpty) return Routes.AUTH;
+
+  final prefs = await SharedPreferences.getInstance();
+  final rememberUntil = prefs.getInt('remember_until');
+  if (rememberUntil == null ||
+      rememberUntil < DateTime.now().millisecondsSinceEpoch) {
+    // Treat stale remember window as a forced re-login; clear the token so
+    // the user lands on /auth with no auto-login resume.
+    await AuthStorage.clear();
+    return Routes.AUTH;
+  }
+
+  final roles = await AuthStorage.readRoles();
+  final lowered = roles.map((r) => r.toLowerCase()).toSet();
+  if (lowered.contains('administrator') || lowered.contains('admin')) {
+    return Routes.ADMIN_HOME;
+  }
+  if (lowered.contains('teacher')) return Routes.TEACHER_HOME;
+  if (lowered.contains('student')) return Routes.HOME_STUDENT;
+  return Routes.AUTH;
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, required this.initialRoute});
+
+  final String initialRoute;
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialRoute: AppPages.INITIAL,
+      initialRoute: initialRoute,
       getPages: AppPages.routes,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -43,6 +74,7 @@ class MyApp extends StatelessWidget {
         primaryColor: AppColors.primary,
         scaffoldBackgroundColor: AppColors.scaffoldBg,
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        textTheme: AppTypography.toMaterialTextTheme(),
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppColors.primary,
           brightness: Brightness.light,
@@ -51,11 +83,7 @@ class MyApp extends StatelessWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
+          titleTextStyle: AppTypography.heading,
           iconTheme: IconThemeData(color: AppColors.textPrimary),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(

@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class ScheduleStudentController extends GetxController {
@@ -17,42 +16,20 @@ class ScheduleStudentController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
   int? _stdGroupId;
 
   @override
   void onInit() {
     super.onInit();
     _generateWeek(DateTime.now());
-    _initDio();
     _bootstrap();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> _bootstrap() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
       await _loadActiveSemester();
       _initSelectionForSemester();
       await _loadStudentGroup();

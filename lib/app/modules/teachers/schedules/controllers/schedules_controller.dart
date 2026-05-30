@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../services/api_client.dart';
 import '../../../../widgets/widget.dart';
 import '../../../data/data_exporter.dart';
 
@@ -13,51 +12,28 @@ class SchedulesController extends GetxController {
   var selectedDate = DateTime.now().obs;
   var currentWeek = <DateTime>[].obs;
 
+  /// 'day' (default) shows just the selected date; 'week' shows all 7 days.
+  final RxString viewMode = 'day'.obs;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
   final RxList<StudyPlanModel> schedules = <StudyPlanModel>[].obs;
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
   int? _teacherId;
 
   @override
   void onInit() {
     super.onInit();
     _generateWeek(DateTime.now());
-    _initDio();
     _bootstrap();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> _bootstrap() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
-      if (_token.isEmpty) {
-        errorMessage.value = 'ບໍ່ພົບ token (ກະລຸນາ login ໃໝ່)';
-        return;
-      }
       await _loadActiveSemester();
       _initSelectionForSemester();
       await _loadTeacher();
@@ -70,16 +46,11 @@ class SchedulesController extends GetxController {
       final detail = AppDialogs.buildDioErrorDetail(e);
       debugPrint('Schedules Dio error:\n$detail');
 
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)';
-        Get.offAllNamed('/auth');
-        return;
-      }
-
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
       if (errorMessage.value.isEmpty) {
-        errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
+        errorMessage.value = e.response?.statusCode == 401
+            ? 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)'
+            : 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
       }
     } catch (e) {
       debugPrint('Schedules error: $e');
@@ -174,16 +145,10 @@ class SchedulesController extends GetxController {
     } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
       debugPrint('Schedules Dio error:\n$detail');
-
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)';
-        Get.offAllNamed('/auth');
-        return;
-      }
-
-      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
+      // 401 is handled centrally by ApiClient.
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)'
+          : 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
     } catch (e) {
       debugPrint('Schedules error: $e');
       errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້';
@@ -296,15 +261,6 @@ class SchedulesController extends GetxController {
   List<Map<String, dynamic>> get filteredSchedules {
     if (!isInSemester(selectedDate.value)) return const [];
 
-    final palette = <Color>[
-      Colors.purple,
-      AppColors.statsBlue,
-      AppColors.borderApproved,
-      AppColors.borderPending,
-      AppColors.rejectRed,
-      Colors.teal,
-    ];
-
     final selectedWeekday = selectedDate.value.weekday;
     final selected = schedules.where((p) {
       final planWeekday = _dayOfWeekToWeekday(p.dayOfWeek);
@@ -313,24 +269,73 @@ class SchedulesController extends GetxController {
       ..sort((a, b) =>
           _timeToMinutes(a.startTime).compareTo(_timeToMinutes(b.startTime)));
 
-    return List.generate(selected.length, (i) {
-      final sp = selected[i];
-      final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';
-      final code = sp.subject?.subjectCode ?? '';
-      final room = sp.room?.roomCode ??
-          (sp.roomId != null ? 'ຫ້ອງ ${sp.roomId}' : '-');
-      final time = '${_formatTime(sp.startTime)} - ${_formatTime(sp.endTime)}';
-      final group = sp.studentGroup?.stdGroupName ?? '';
+    return selected
+        .asMap()
+        .entries
+        .map((e) => _planToMap(e.value, e.key, selectedDate.value))
+        .toList();
+  }
 
-      return {
-        'date': selectedDate.value,
-        'title': '$subject${code.isNotEmpty ? ' ($code)' : ''}',
-        'subtitle': group.isNotEmpty ? group : null,
-        'time': time,
-        'location': room,
-        'color': palette[i % palette.length],
-      };
-    });
+  /// Schedules grouped by day for the current week. Each entry has a
+  /// `dateLabel` (e.g. "ຈັນ 12") and a list of class maps.
+  List<Map<String, dynamic>> get weekScheduleByDay {
+    if (currentWeek.isEmpty) return const [];
+    final dayLabels = <int, String>{
+      DateTime.monday: 'ຈັນ',
+      DateTime.tuesday: 'ອັງຄານ',
+      DateTime.wednesday: 'ພຸດ',
+      DateTime.thursday: 'ພະຫັດ',
+      DateTime.friday: 'ສຸກ',
+      DateTime.saturday: 'ເສົາ',
+      DateTime.sunday: 'ອາທິດ',
+    };
+    final out = <Map<String, dynamic>>[];
+    for (final day in currentWeek) {
+      if (!isInSemester(day)) continue;
+      final plans = schedules
+          .where((p) => _dayOfWeekToWeekday(p.dayOfWeek) == day.weekday)
+          .toList()
+        ..sort((a, b) => _timeToMinutes(a.startTime)
+            .compareTo(_timeToMinutes(b.startTime)));
+      if (plans.isEmpty) continue;
+      out.add({
+        'date': day,
+        'dateLabel': '${dayLabels[day.weekday] ?? ''} ${day.day}/${day.month}',
+        'classes': plans
+            .asMap()
+            .entries
+            .map((e) => _planToMap(e.value, e.key, day))
+            .toList(),
+      });
+    }
+    return out;
+  }
+
+  static const _palette = <Color>[
+    Colors.purple,
+    AppColors.statsBlue,
+    AppColors.borderApproved,
+    AppColors.borderPending,
+    AppColors.rejectRed,
+    Colors.teal,
+  ];
+
+  Map<String, dynamic> _planToMap(StudyPlanModel sp, int index, DateTime day) {
+    final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';
+    final code = sp.subject?.subjectCode ?? '';
+    final room = sp.room?.roomCode ??
+        (sp.roomId != null ? 'ຫ້ອງ ${sp.roomId}' : '-');
+    final time =
+        '${_formatTime(sp.startTime)} - ${_formatTime(sp.endTime)}';
+    final group = sp.studentGroup?.stdGroupName ?? '';
+    return {
+      'date': day,
+      'title': '$subject${code.isNotEmpty ? ' ($code)' : ''}',
+      'subtitle': group.isNotEmpty ? group : null,
+      'time': time,
+      'location': room,
+      'color': _palette[index % _palette.length],
+    };
   }
 
   String get currentMonthYear =>

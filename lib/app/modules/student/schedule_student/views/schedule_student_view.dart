@@ -18,6 +18,10 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
           return AppPageScaffold(
             withBackground: true,
             title: 'ຕາຕະລາງຮຽນ',
+            trailing: AppIconBubble(
+              icon: Icons.notifications_none_rounded,
+              onTap: () => Get.toNamed('/student-noti'),
+            ),
             body: Column(
               children: [
                 _buildSemesterBanner(),
@@ -209,7 +213,10 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
   Widget _buildScheduleList() {
     return Obx(() {
       if (controller.isLoading.value) {
-        return const AppLoading.schedule();
+        return AppRefreshableLoader(
+          onRefresh: controller.refreshData,
+          child: const AppLoading.schedule(),
+        );
       }
       if (controller.errorMessage.value.isNotEmpty &&
           controller.studyPlans.isEmpty) {
@@ -230,10 +237,13 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
       final schedules = controller.filteredSchedules;
 
       if (schedules.isEmpty) {
-        return const AppEmptyState(
+        return AppEmptyState(
           icon: Icons.event_available_rounded,
           title: 'ບໍ່ມີຫ້ອງຮຽນໃນວັນນີ້',
           subtitle: 'ເລືອກວັນອື່ນເພື່ອເບິ່ງຕາຕະລາງ',
+          actionLabel: 'ກັບໄປວັນນີ້',
+          actionIcon: Icons.today_rounded,
+          onAction: () => controller.selectDate(DateTime.now()),
         );
       }
 

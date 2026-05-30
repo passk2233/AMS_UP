@@ -1,10 +1,9 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
 import 'package:frontend/app/modules/student/faculty_feedback/views/faculty_model.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class FacultyFeedbackController extends GetxController {
@@ -14,8 +13,17 @@ class FacultyFeedbackController extends GetxController {
   final RxString errorMessage = ''.obs;
   final RxString query = ''.obs;
 
-  late final Dio _dio;
-  String _token = '';
+  /// `true` once admin has opened the evaluation window and the current
+  /// moment falls inside it. Drives the empty/closed state of the page.
+  final RxBool isEvaluationOpen = false.obs;
+
+  /// Active window row (latest `open_evalu`). Used so the closed-state UI
+  /// can show the next opening time when admin has scheduled a future
+  /// window.
+  final Rx<OpenEvaluationModel?> activeWindow =
+      Rx<OpenEvaluationModel?>(null);
+
+  Dio get _dio => ApiClient.dio;
   int? _studentId;
   int? _stdGroupId;
 
@@ -25,34 +33,13 @@ class FacultyFeedbackController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initDio();
     fetchData();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> fetchData() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
       final me = await _dio.get('/auth/me');
       final user = UserModel.fromJson(me.data);
       _studentId = user.stdId ?? user.student?.id;
@@ -60,6 +47,13 @@ class FacultyFeedbackController extends GetxController {
 
       if (_studentId == null || _stdGroupId == null) {
         errorMessage.value = 'Student account is not linked.';
+        return;
+      }
+
+      await _fetchEvaluationWindow();
+      if (!isEvaluationOpen.value) {
+        facultyList.clear();
+        questions.clear();
         return;
       }
 
@@ -103,14 +97,44 @@ class FacultyFeedbackController extends GetxController {
     }
   }
 
+  /// GET `/open-evalu` and update [activeWindow] + [isEvaluationOpen].
+  /// Public so the form view's poll timer can re-check the gate without
+  /// going through a full [fetchData].
+  Future<void> refreshEvaluationWindow() => _fetchEvaluationWindow();
+
+  Future<void> _fetchEvaluationWindow() async {
+    try {
+      final resp = await _dio.get(
+        '/open-evalu',
+        queryParameters: {'limit': 1, 'inactive': 0},
+      );
+      final items = _extractList(resp.data);
+      if (items.isEmpty) {
+        activeWindow.value = null;
+        isEvaluationOpen.value = false;
+        return;
+      }
+      final window = OpenEvaluationModel.fromJson(items.first);
+      activeWindow.value = window;
+      isEvaluationOpen.value = window.inactive == 0;
+    } on DioException catch (e) {
+      activeWindow.value = null;
+      isEvaluationOpen.value = false;
+      Get.log('fetchEvaluationWindow error: ${e.message}');
+    }
+  }
+
   Future<bool> _hasSubmitted(int studyPlanId, int studentId) async {
     final r = await _dio.get('/evaluation-results', queryParameters: {
       'study_plan_id': studyPlanId,
       'student_id': studentId,
-      'limit': 1,
+      'limit': 200,
     });
     final items = _extractList(r.data);
-    return items.isNotEmpty;
+    // Only consider fully submitted when every active question has a result.
+    // A partial submission (some POSTs failed mid-loop) must not lock the
+    // student out — they should be able to re-open the form and re-submit.
+    return questions.isNotEmpty && items.length >= questions.length;
   }
 
   List<Faculty> get filteredFacultyList {
@@ -127,6 +151,10 @@ class FacultyFeedbackController extends GetxController {
 
   Future<void> submitFeedback(Faculty faculty) async {
     if (_studentId == null) return;
+    if (!isEvaluationOpen.value) {
+      Get.snackbar('Warning', 'ໄລຍະການປະເມີນຍັງບໍ່ໄດ້ເປີດ.');
+      return;
+    }
     if (questions.isEmpty) {
       Get.snackbar('Warning', 'No evaluation questions found.');
       return;
@@ -164,7 +192,9 @@ class FacultyFeedbackController extends GetxController {
       ratings.assignAll(List.filled(questions.length, 0));
       comment.value = '';
       Get.back();
-      Get.snackbar('Success', 'Feedback submitted.');
+      Future.delayed(const Duration(milliseconds: 150), () {
+        Get.snackbar('ສຳເລັດ', 'ສົ່ງການປະເມີນສຳເລັດ.');
+      });
     } on DioException catch (e) {
       Get.snackbar('Error', 'Failed to submit feedback.');
       Get.log(AppDialogs.buildDioErrorDetail(e));

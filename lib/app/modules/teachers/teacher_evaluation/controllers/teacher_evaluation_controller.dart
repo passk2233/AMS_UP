@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../data/data_exporter.dart';
 import '../../../../widgets/app_dialogs.dart';
+import '../../../../services/api_client.dart';
 
 class TeacherEvaluationController extends GetxController {
   final RxBool isLoading = false.obs;
@@ -19,38 +18,18 @@ class TeacherEvaluationController extends GetxController {
   final Rx<TeacherModel?> currentTeacher = Rx<TeacherModel?>(null);
   int? _currentTeacherId;
 
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: dotenv.env['API_URL'] ?? '',
-    connectTimeout: const Duration(seconds: 10),
-    receiveTimeout: const Duration(seconds: 10),
-    headers: {
-      'Content-Type': 'application/json',
-      'ngrok-skip-browser-warning': 'true',
-    },
-  ));
-
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _loadToken().then((_) => _loadData());
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
+    _loadData();
   }
 
   Future<void> _loadData() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      if (_token.isEmpty) {
-        errorMessage.value = 'ບໍ່ພົບ token (ກະລຸນາ login ໃໝ່)';
-        return;
-      }
       // 1. Get current user to find teacher ID
       final meResp = await _dio.get('/auth/me');
       if (meResp.statusCode == 200 && meResp.data is Map<String, dynamic>) {
@@ -93,8 +72,13 @@ class TeacherEvaluationController extends GetxController {
         }
       }
 
-      // 4. Fetch evaluation results
+      // 4. Fetch evaluation results — server filters by teacher_id so the
+      //    response only contains evaluations of THIS teacher (and, by
+      //    contract, with student_id stripped). The client-side spMap
+      //    intersect below is belt-and-braces in case the backend ignores
+      //    the filter.
       final evalResp = await _dio.get('/evaluation-results', queryParameters: {
+        'teacher_id': _currentTeacherId,
         'limit': 500,
       });
       if (evalResp.statusCode == 200) {
@@ -108,7 +92,8 @@ class TeacherEvaluationController extends GetxController {
         final allResults =
             items.map((j) => EvaluationResultModel.fromJson(j)).toList();
 
-        // Filter: only results for this teacher's study plans
+        // Only keep results for this teacher's study plans — last line of
+        // defence if the backend hasn't applied teacher_id.
         final myResults = allResults.where((r) {
           return spMap.containsKey(r.studyPlanId);
         }).toList();
@@ -142,21 +127,31 @@ class TeacherEvaluationController extends GetxController {
       final detail = AppDialogs.buildDioErrorDetail(e);
       debugPrint('TeacherEvaluation Dio error:\n$detail');
 
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)';
-        Get.offAllNamed('/auth');
-        return;
-      }
-
-      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້';
+      // 401 is handled centrally by ApiClient — only set the error string.
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'ການເຂົ້າລະບົບບໍ່ຖືກຕ້ອງ (ກະລຸນາ login ໃໝ່)'
+          : 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້';
     } finally {
       isLoading.value = false;
     }
   }
 
   void _buildSubjectGroups(Map<int, StudyPlanModel> spMap) {
+    // Build a fast lookup so question text never depends on the preloaded
+    // relation (which may be absent from the API response).
+    final Map<int, String> questionTextMap = {
+      for (final q in questions) q.evaQuestionId: q.question.trim(),
+    };
+
+    // Also pull question text from each result's preloaded evaQuestion
+    // relation — covers inactive/deleted questions not in the questions list.
+    for (final r in results) {
+      final eq = r.evaQuestion;
+      if (eq != null && eq.question.trim().isNotEmpty && !questionTextMap.containsKey(eq.evaQuestionId)) {
+        questionTextMap[eq.evaQuestionId] = eq.question.trim();
+      }
+    }
+
     final Map<int, SubjectEvalGroup> groups = {};
 
     for (final r in results) {
@@ -190,7 +185,7 @@ class TeacherEvaluationController extends GetxController {
       g.questionScores.putIfAbsent(
         qId,
         () => QScore(
-          questionText: r.evaQuestion?.question ?? 'ຄຳຖາມ #$qId',
+          questionText: questionTextMap[qId] ?? 'ຄຳຖາມ #$qId',
           totalScore: 0,
           count: 0,
         ),
@@ -220,9 +215,58 @@ class TeacherEvaluationController extends GetxController {
     return total / results.length;
   }
 
-  int get totalEvaluations => results.length;
+  /// Number of distinct students who submitted an evaluation.
+  /// Each student submits one row per question, so we divide total rows by
+  /// the number of distinct questions that appear in the results.
+  int get totalEvaluations => subjectGroups.fold<int>(0, (s, g) => s + g.numRespondents);
 
   int get totalSubjects => subjectGroups.length;
+
+  /// Sum + count of scores per semesterId, ordered by id descending so the
+  /// most recent semester comes first. Only semesters with ≥1 response are
+  /// included.
+  List<({int semesterId, double average, int count})>
+      get _semesterAverages {
+    final acc = <int, ({int sum, int count})>{};
+    for (final r in results) {
+      final semId = r.studyPlan?.semasterId;
+      if (semId == null) continue;
+      final entry = acc[semId] ?? (sum: 0, count: 0);
+      acc[semId] =
+          (sum: entry.sum + (r.score ?? 0), count: entry.count + 1);
+    }
+    final list = acc.entries
+        .map((e) => (
+              semesterId: e.key,
+              average: e.value.count > 0 ? e.value.sum / e.value.count : 0.0,
+              count: e.value.count,
+            ))
+        .toList();
+    list.sort((a, b) => b.semesterId.compareTo(a.semesterId));
+    return list;
+  }
+
+  /// Average score for the most recent semester with data.
+  double? get currentSemesterAverage {
+    final list = _semesterAverages;
+    return list.isEmpty ? null : list.first.average;
+  }
+
+  /// Average score for the previous semester with data, or null when there
+  /// is no prior semester to compare against.
+  double? get previousSemesterAverage {
+    final list = _semesterAverages;
+    return list.length < 2 ? null : list[1].average;
+  }
+
+  /// Signed difference current − previous; null when there is no prior
+  /// semester to compare.
+  double? get semesterTrendDelta {
+    final cur = currentSemesterAverage;
+    final prev = previousSemesterAverage;
+    if (cur == null || prev == null) return null;
+    return cur - prev;
+  }
 
   Future<void> refreshData() => _loadData();
 }
@@ -255,6 +299,14 @@ class SubjectEvalGroup {
 
   double get averageScore =>
       totalResponses > 0 ? totalScore / totalResponses : 0;
+
+  /// Number of students who responded.
+  /// Each student submits exactly one row per question, so:
+  /// respondents = totalResponses ÷ distinct questions answered.
+  int get numRespondents {
+    final uniqueQ = questionScores.length;
+    return uniqueQ > 0 ? totalResponses ~/ uniqueQ : 0;
+  }
 }
 
 class QScore {

@@ -1,15 +1,15 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
+import 'package:frontend/app/services/auth_storage.dart';
+import 'package:frontend/app/services/fcm_service.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class ProfileStudentController extends GetxController {
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = false.obs;
@@ -18,48 +18,25 @@ class ProfileStudentController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initDio();
-    _loadToken().then((_) => fetchProfile());
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
+    fetchProfile();
   }
 
   Future<void> fetchProfile() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
       final response = await _dio.get('/auth/me');
       if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
         user.value = UserModel.fromJson(response.data);
       }
     } on DioException catch (e) {
-      debugPrint('ProfileStudent fetchProfile Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'Session expired. Please login again.';
-        Get.offAllNamed('/auth');
-        return;
-      }
-      errorMessage.value = 'Failed to load profile.';
+      debugPrint(
+        'ProfileStudent fetchProfile Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
+      );
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'Session expired. Please login again.'
+          : 'Failed to load profile.';
     } catch (e) {
       debugPrint('ProfileStudent fetchProfile error: $e');
       errorMessage.value = 'Failed to load profile.';
@@ -70,17 +47,18 @@ class ProfileStudentController extends GetxController {
 
   Future<void> logout() async {
     final confirmed = await AppDialogs.showConfirmation(
-      title: 'Sign out',
-      message: 'Do you want to sign out?',
-      confirmText: 'Sign out',
-      cancelText: 'Cancel',
+      title: 'ອອກຈາກລະບົບ',
+      message: 'ຕ້ອງການອອກຈາກລະບົບບໍ່?',
+      confirmText: 'ອອກຈາກລະບົບ',
+      cancelText: 'ຍົກເລີກ',
       confirmColor: const Color(0xFFE53935),
     );
     if (confirmed != true) return;
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
-    await prefs.remove('user');
+    // Unregister this device with the backend BEFORE clearing the JWT,
+    // otherwise the DELETE request can't authenticate.
+    await FCMService.clearTokenOnLogout();
+    await AuthStorage.clear();
     Get.offAllNamed('/auth');
   }
 
@@ -90,10 +68,19 @@ class ProfileStudentController extends GetxController {
   String get displayName {
     final s = student;
     if (s == null) return _u?.username ?? '';
-    final surname = (s.surnameEng ?? '').trim();
+    final title = s.nameTitle.trim();
+    final name = s.nameLao.trim();
+    final surname = (s.surnameLao ?? '').trim();
+    final fullName = surname.isEmpty ? name : '$name $surname';
+    return title.isNotEmpty ? '$title $fullName' : fullName;
+  }
+
+  String get nameEng {
+    final s = student;
+    if (s == null) return '-';
     final name = s.nameEng.trim();
-    if (surname.isEmpty) return name;
-    return '$name $surname';
+    final surname = (s.surnameEng ?? '').trim();
+    return surname.isEmpty ? name : '$name $surname';
   }
 
   String get studentCode => student?.stdCode ?? '-';
@@ -102,7 +89,26 @@ class ProfileStudentController extends GetxController {
   String get phone => student?.telephone ?? '-';
   DateTime? get dob => student?.dateofbirth;
   String get nationality => student?.nationality ?? '-';
-  String get address => '-';
+  String get ethnic => student?.ethnic ?? '-';
+  String get race => student?.race ?? '-';
+  String get tribe => student?.tribe ?? '-';
+  String get religion => student?.religion ?? '-';
+  String get maritalStatus => student?.maritalStatus ?? '-';
+  String get healthStatus => student?.healthStatus ?? '-';
+  String get jobTitle => student?.jobTitle ?? '-';
+  String get school => student?.school ?? '-';
+  String get studentTypeName {
+    final name = student?.studentType?.stdTypeNameLao ?? '';
+    return name.isNotEmpty ? name : '-';
+  }
+
+  String get studentGroupName {
+    final name = student?.studentGroup?.stdGroupName ?? '';
+    return name.isNotEmpty
+        ? name
+        : (student?.studentGroup?.stdGroupCode ?? '-');
+  }
+
   String get program {
     final cur = student?.curriculum;
     if (cur == null) return '-';

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:frontend/app/widgets/widget.dart';
 
+import '../../../widgets/widget.dart';
 import 'teacher_bottom_nav_controller.dart';
 
+/// Teacher-specific wrapper around [AppBottomNav].
+///
+/// Wires the five teacher destinations to [TeacherBottomNavController].
+/// The controller is resolved (or registered) via GetX so this bar is safe
+/// to drop into any teacher Scaffold's `bottomNavigationBar`.
 class TeacherBottomNavBar extends StatelessWidget {
   const TeacherBottomNavBar({super.key});
 

@@ -22,12 +22,15 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
           return AppPageScaffold(
       title: 'ການປະເມີນ',
       trailing: AppIconBubble(
-        icon: Icons.refresh_rounded,
-        onTap: controller.refreshData,
+        icon: Icons.notifications_none_rounded,
+        onTap: () => Get.toNamed('/teacher-noti'),
       ),
       body: Obx(() {
         if (controller.isLoading.value) {
-          return const AppLoading.evaluation();
+          return AppRefreshableLoader(
+            onRefresh: controller.refreshData,
+            child: const AppLoading.evaluation(),
+          );
         }
 
         final err = controller.errorMessage.value;
@@ -69,17 +72,19 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
-              const Padding(
-                padding: EdgeInsets.only(left: 4, bottom: 12),
-                child: Text(
-                  'ການປະເມີນແຕ່ລະວິຊາ',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
+              if (controller.semesterTrendDelta != null) ...[
+                const SizedBox(height: 12),
+                _SemesterTrendCard(
+                  current: controller.currentSemesterAverage ?? 0,
+                  previous: controller.previousSemesterAverage ?? 0,
+                  delta: controller.semesterTrendDelta!,
                 ),
+              ],
+              const SizedBox(height: AppSpacing.l),
+              const Padding(
+                padding: EdgeInsets.only(left: 4, bottom: AppSpacing.s + 4),
+                child:
+                    Text('ການປະເມີນແຕ່ລະວິຊາ', style: AppTypography.heading),
               ),
               ...controller.subjectGroups.map((g) => _SubjectEvalCard(group: g)),
               if (controller.subjectGroups.isEmpty)
@@ -193,6 +198,89 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
   }
 }
 
+class _SemesterTrendCard extends StatelessWidget {
+  final double current;
+  final double previous;
+  final double delta;
+  const _SemesterTrendCard({
+    required this.current,
+    required this.previous,
+    required this.delta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final improved = delta > 0.05;
+    final declined = delta < -0.05;
+    final color = improved
+        ? AppColors.borderApproved
+        : declined
+            ? AppColors.rejectRed
+            : AppColors.textSecondary;
+    final icon = improved
+        ? Icons.trending_up_rounded
+        : declined
+            ? Icons.trending_down_rounded
+            : Icons.trending_flat_rounded;
+    final label = improved
+        ? 'ດີຂຶ້ນ'
+        : declined
+            ? 'ຫຼຸດລົງ'
+            : 'ບໍ່ປ່ຽນ';
+    final sign = delta > 0 ? '+' : '';
+
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(14),
+      borderLeftColor: color,
+      borderLeftWidth: 5,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ທຽບກັບພາກຮຽນກ່ອນ — $label',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ກ່ອນ ${previous.toStringAsFixed(2)} → ປັດຈຸບັນ ${current.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            '$sign${delta.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SubjectEvalCard extends StatelessWidget {
   final SubjectEvalGroup group;
   const _SubjectEvalCard({required this.group});
@@ -287,7 +375,7 @@ class _SubjectEvalCard extends StatelessWidget {
                         size: 13, color: Colors.grey.shade400),
                     const SizedBox(width: 4),
                     Text(
-                      '${group.totalResponses} ຄຳຕອບ',
+                      '${group.numRespondents} ຄົນ',
                       style: TextStyle(
                           color: Colors.grey.shade600,
                           fontWeight: FontWeight.w600,

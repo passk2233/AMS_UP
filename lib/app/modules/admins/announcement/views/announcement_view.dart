@@ -1,138 +1,182 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/app/utilities/assets.dart';
 import 'package:get/get.dart';
 
+import '../../../../utilities/assets.dart';
 import '../../../../widgets/widget.dart';
+import '../../../data/models/department_model.dart';
+import '../../../data/models/student_group_model.dart';
+import '../../../data/models/student_type_model.dart';
 import '../controllers/announcement_controller.dart';
 import 'announcement_history_view.dart';
 
+/// Announcement composer (the "Announcements" admin tab).
+///
+/// Toggles between the compose form and the [AnnouncementHistoryView] based
+/// on [AnnouncementController.showHistory]. All form state lives in the
+/// controller; this view is composition only.
 class AnnouncementView extends GetView<AnnouncementController> {
   const AnnouncementView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return GetBuilder<AnnouncementController>(
-      builder: (controller) => LayoutBuilder(
-        builder: (context, constraints) {
-          return Scaffold(
-            body: Obx(() => controller.showHistory.value
-                ? const AnnouncementHistoryView()
-                : _buildComposePage(controller)),
-          );
-        },
+    return Scaffold(
+      body: Obx(
+        () => controller.showHistory.value
+            ? const AnnouncementHistoryView()
+            : _ComposePage(controller: controller),
       ),
     );
   }
+}
 
-  Widget _buildComposePage(AnnouncementController controller) {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
+/// Composer page with header + compose card + target-audience card + send
+/// button.
+class _ComposePage extends StatelessWidget {
+  /// Source of reactive state.
+  final AnnouncementController controller;
+
+  const _ComposePage({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
       decoration: const BoxDecoration(
         image: DecorationImage(
           image: AssetImage(AssetImages.dashboardBg),
           fit: BoxFit.cover,
         ),
       ),
+      child: Column(
+        children: [
+          const AdminAppBar(),
+          _ComposeHeader(onHistory: controller.openHistory),
+          Expanded(
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.m),
               child: Column(
                 children: [
-                  const AdminAppBar(),
-                  // ── Page Header ───────────────────────────────────
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.laoBlue.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.campaign_rounded,
-                              color: AppColors.laoBlue, size: 22),
-                        ),
-                        const SizedBox(width: 10),
-                        const Text(
-                          'ສົ່ງການແຈ້ງເຕືອນ',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const Spacer(),
-                        GestureDetector(
-                          onTap: controller.openHistory,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: AppColors.laoBlue.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.history_rounded,
-                                    color: AppColors.laoBlue, size: 16),
-                                SizedBox(width: 4),
-                                Text(
-                                  'ປະຫວັດ',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.laoBlue,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // ── Content ───────────────────────────────────────
-                  Expanded(
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        children: [
-                          _buildComposeCard(),
-                          const SizedBox(height: 14),
-                          _buildTargetAudienceCard(),
-                          const SizedBox(height: 14),
-                          _buildSendButton(),
-                          const SizedBox(height: 20),
-                        ],
-                      ),
-                    ),
-                  ),
+                  _ComposeCard(controller: controller),
+                  const SizedBox(height: 14),
+                  _TargetAudienceCard(controller: controller),
+                  const SizedBox(height: 14),
+                  _SendButton(controller: controller),
+                  const SizedBox(height: AppSpacing.l),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // COMPOSE MESSAGE CARD
-  // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildComposeCard() {
-    return _card(
+/// Top header row — title (with icon) on the left, history shortcut on the
+/// right.
+class _ComposeHeader extends StatelessWidget {
+  /// Tap callback for the history shortcut.
+  final VoidCallback onHistory;
+
+  const _ComposeHeader({required this.onHistory});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.laoBlue.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.campaign_rounded,
+              color: AppColors.laoBlue,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 10),
+          const Text(
+            'ສົ່ງການແຈ້ງເຕືອນ',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Spacer(),
+          _HistoryShortcut(onTap: onHistory),
+        ],
+      ),
+    );
+  }
+}
+
+/// Indigo pill that opens the [AnnouncementHistoryView].
+class _HistoryShortcut extends StatelessWidget {
+  /// Tap handler.
+  final VoidCallback onTap;
+
+  const _HistoryShortcut({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: AppColors.laoBlue.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.history_rounded, color: AppColors.laoBlue, size: 16),
+            SizedBox(width: 4),
+            Text(
+              'ປະຫວັດ',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.laoBlue,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Card containing the title + message fields.
+class _ComposeCard extends StatelessWidget {
+  /// Source of reactive state.
+  final AnnouncementController controller;
+
+  const _ComposeCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
       icon: Icons.edit_note_rounded,
       title: 'ຂຽນຂໍ້ຄວາມ',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _label('ຫົວຂໍ້'),
+          const _FieldLabel('ຫົວຂໍ້'),
           const SizedBox(height: 6),
-          _inputField(
+          _FilledTextField(
             controller: controller.titleCtrl,
             hint: 'ຕົວຢ່າງ: ແຈ້ງປ່ຽນຕາຕະລາງສອບເສັງ',
           ),
           const SizedBox(height: 14),
-          _label('ເນື້ອຫາ'),
+          const _FieldLabel('ເນື້ອຫາ'),
           const SizedBox(height: 6),
-          _inputField(
+          _FilledTextField(
             controller: controller.messageCtrl,
             hint: 'ພິມລາຍລະອຽດການແຈ້ງເຕືອນ...',
             maxLines: 5,
@@ -141,12 +185,18 @@ class AnnouncementView extends GetView<AnnouncementController> {
       ),
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // TARGET AUDIENCE CARD
-  // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildTargetAudienceCard() {
-    return _card(
+/// Target-audience selector + audience-specific filters.
+class _TargetAudienceCard extends StatelessWidget {
+  /// Source of reactive audience state.
+  final AnnouncementController controller;
+
+  const _TargetAudienceCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
       icon: Icons.groups_rounded,
       title: 'ກຸ່ມເປົ້າໝາຍ',
       child: Obx(() {
@@ -154,85 +204,101 @@ class AnnouncementView extends GetView<AnnouncementController> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Audience chips ──────────────────────────────────
-            _label('ສົ່ງຫາ'),
+            const _FieldLabel('ສົ່ງຫາ'),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              children: List.generate(
-                controller.audienceLabels.length,
-                (i) {
-                  final selected = audience == i;
-                  return ChoiceChip(
-                    label: Text(controller.audienceLabels[i]),
-                    selected: selected,
-                    onSelected: (_) {
-                      controller.selectedAudience.value = i;
-                      // Clear individual search when switching away
-                      if (i != 3) {
-                        controller.foundStudent.value = null;
-                        controller.individualIdCtrl.clear();
-                      }
-                    },
-                    selectedColor: AppColors.laoBlue,
-                    backgroundColor: const Color(0xFFF5F7FA),
-                    labelStyle: TextStyle(
-                      color:
-                          selected ? Colors.white : AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      side: BorderSide(
-                        color: selected
-                            ? AppColors.laoBlue
-                            : Colors.grey.shade300,
-                      ),
-                    ),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 4),
-                    showCheckmark: false,
-                  );
-                },
-              ),
-            ),
-
-            // ── Individual student search ──────────────────────
-            if (audience == 3) ...[
+            _AudienceChips(controller: controller, selected: audience),
+            if (audience == AnnouncementAudience.individual) ...[
               const SizedBox(height: 14),
-              _buildIndividualSearch(),
+              _IndividualSearchSection(controller: controller),
             ],
-
-            // ── Student filters (audience == 1) ────────────────
-            if (audience == 1) ...[
+            if (audience == AnnouncementAudience.students) ...[
               const SizedBox(height: 14),
-              _buildStudentFilters(),
+              _StudentFiltersGrid(controller: controller),
             ],
-
-            // ── Teacher/All department filter ──────────────────
-            if (audience == 0 || audience == 2) ...[
+            if (audience == AnnouncementAudience.all ||
+                audience == AnnouncementAudience.teachers) ...[
               const SizedBox(height: 14),
-              _buildDepartmentRow(),
+              _DepartmentSelector(controller: controller),
             ],
           ],
         );
       }),
     );
   }
+}
 
-  // ── Individual Student Search ─────────────────────────────────────────────
-  Widget _buildIndividualSearch() {
+/// Wrap of [ChoiceChip]s — one per audience option.
+class _AudienceChips extends StatelessWidget {
+  /// Source of reactive audience state.
+  final AnnouncementController controller;
+
+  /// Currently selected audience index.
+  final int selected;
+
+  const _AudienceChips({
+    required this.controller,
+    required this.selected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        for (var i = 0; i < controller.audienceLabels.length; i++)
+          ChoiceChip(
+            label: Text(controller.audienceLabels[i]),
+            selected: selected == i,
+            onSelected: (_) => _onSelect(i),
+            selectedColor: AppColors.laoBlue,
+            backgroundColor: AppColors.scaffoldBg,
+            labelStyle: TextStyle(
+              color:
+                  selected == i ? Colors.white : AppColors.textSecondary,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(AppColors.chipRadius),
+              side: BorderSide(
+                color: selected == i ? AppColors.laoBlue : Colors.grey.shade300,
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+            showCheckmark: false,
+          ),
+      ],
+    );
+  }
+
+  void _onSelect(int i) {
+    controller.selectedAudience.value = i;
+    if (i != AnnouncementAudience.individual) {
+      controller.foundStudent.value = null;
+      controller.individualIdCtrl.clear();
+    }
+  }
+}
+
+/// Individual-student lookup field + lookup result card.
+class _IndividualSearchSection extends StatelessWidget {
+  /// Source of reactive search state.
+  final AnnouncementController controller;
+
+  const _IndividualSearchSection({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label('ຄົ້ນຫານັກສຶກສາ (ໃສ່ ID)'),
+        const _FieldLabel('ຄົ້ນຫານັກສຶກສາ (ໃສ່ ID)'),
         const SizedBox(height: 6),
         Row(
           children: [
             Expanded(
-              child: _inputField(
+              child: _FilledTextField(
                 controller: controller.individualIdCtrl,
                 hint: 'ເຊັ່ນ: 123',
                 keyboardType: TextInputType.number,
@@ -241,7 +307,7 @@ class AnnouncementView extends GetView<AnnouncementController> {
             const SizedBox(width: 8),
             Obx(
               () => SizedBox(
-                height: 48,
+                height: AppColors.minTouchTarget,
                 child: ElevatedButton.icon(
                   onPressed: controller.isSearching.value
                       ? null
@@ -256,7 +322,8 @@ class AnnouncementView extends GetView<AnnouncementController> {
                           ),
                         )
                       : const Icon(Icons.search, size: 18),
-                  label: const Text('ຄົ້ນຫາ', style: TextStyle(fontSize: 13)),
+                  label:
+                      const Text('ຄົ້ນຫາ', style: TextStyle(fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.laoBlue,
                     foregroundColor: Colors.white,
@@ -269,307 +336,364 @@ class AnnouncementView extends GetView<AnnouncementController> {
             ),
           ],
         ),
-        // ── Found student card ──
         Obx(() {
           final s = controller.foundStudent.value;
           if (s == null) return const SizedBox.shrink();
-          return Container(
-            margin: const EdgeInsets.only(top: 10),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF10B981).withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.person_rounded,
-                      color: Color(0xFF10B981), size: 20),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${s.nameLao} ${s.surnameLao ?? ''}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'ID: ${s.id}  •  ${s.stdCode}',
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600),
-                      ),
-                      Text(
-                        'ກຸ່ມ: ${s.studentGroup?.stdGroupName ?? '-'}  •  ປະເພດ: ${s.studentType?.stdTypeNameLao ?? '-'}',
-                        style: TextStyle(
-                            fontSize: 11, color: Colors.grey.shade500),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  onPressed: () {
-                    controller.foundStudent.value = null;
-                    controller.individualIdCtrl.clear();
-                  },
-                  icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
+          return Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: _FoundStudentCard(
+              student: s,
+              onClear: () {
+                controller.foundStudent.value = null;
+                controller.individualIdCtrl.clear();
+              },
             ),
           );
         }),
       ],
     );
   }
+}
 
-  // ── Student-specific filters (group, type, year, department) ──────────────
-  Widget _buildStudentFilters() {
+/// Green-tinted card summarizing the looked-up student.
+class _FoundStudentCard extends StatelessWidget {
+  /// The matched student.
+  final dynamic student;
+
+  /// Tap handler for the close button.
+  final VoidCallback onClear;
+
+  const _FoundStudentCard({required this.student, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = student;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.borderApproved.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+        border:
+            Border.all(color: AppColors.borderApproved.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.borderApproved.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.person_rounded,
+              color: AppColors.borderApproved,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${s.nameLao} ${s.surnameLao ?? ''}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'ID: ${s.id}  •  ${s.stdCode}',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                ),
+                Text(
+                  'ກຸ່ມ: ${s.studentGroup?.stdGroupName ?? '-'}  •  ປະເພດ: ${s.studentType?.stdTypeNameLao ?? '-'}',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onClear,
+            icon: Icon(Icons.close, size: 18, color: Colors.grey.shade500),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Two-row grid of department / year / group / type dropdowns shown only
+/// when [AnnouncementAudience.students] is active.
+class _StudentFiltersGrid extends StatelessWidget {
+  /// Source of reactive filter state.
+  final AnnouncementController controller;
+
+  const _StudentFiltersGrid({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Row 1: Department + Year
         Row(
           children: [
-            Expanded(
-              child: _dropdownColumn<int?>(
-                label: 'ພາກວິຊາ',
-                value: controller.selectedDepartment.value?.id,
-                items: [
-                  const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13))),
-                  ...controller.departments.map((d) => DropdownMenuItem<int?>(
-                        value: d.id,
-                        child: Text(d.deptNameLao,
-                            style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis),
-                      )),
-                ],
-                onChanged: (val) {
-                  controller.selectedDepartment.value = val == null
-                      ? null
-                      : controller.departments
-                          .firstWhereOrNull((d) => d.id == val);
-                },
-              ),
-            ),
+            Expanded(child: _DepartmentSelector(controller: controller)),
             const SizedBox(width: 12),
-            Expanded(
-              child: _dropdownColumn<int>(
-                label: 'ຊັ້ນປີ',
-                value: controller.selectedYear.value,
-                items: List.generate(
-                  controller.yearLabels.length,
-                  (i) => DropdownMenuItem<int>(
-                    value: i,
-                    child: Text(controller.yearLabels[i],
-                        style: const TextStyle(fontSize: 13)),
-                  ),
-                ),
-                onChanged: (val) {
-                  if (val != null) controller.selectedYear.value = val;
-                },
-              ),
-            ),
+            Expanded(child: _YearSelector(controller: controller)),
           ],
         ),
         const SizedBox(height: 12),
-        // Row 2: Student Group + Student Type
         Row(
           children: [
-            Expanded(
-              child: _dropdownColumn<int?>(
-                label: 'ກຸ່ມນັກສຶກສາ',
-                value: controller.selectedStudentGroup.value?.id,
-                items: [
-                  const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13))),
-                  ...controller.studentGroups.map((g) =>
-                      DropdownMenuItem<int?>(
-                        value: g.id,
-                        child: Text(g.stdGroupName,
-                            style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis),
-                      )),
-                ],
-                onChanged: (val) {
-                  controller.selectedStudentGroup.value = val == null
-                      ? null
-                      : controller.studentGroups
-                          .firstWhereOrNull((g) => g.id == val);
-                },
-              ),
-            ),
+            Expanded(child: _StudentGroupSelector(controller: controller)),
             const SizedBox(width: 12),
-            Expanded(
-              child: _dropdownColumn<int?>(
-                label: 'ປະເພດນັກສຶກສາ',
-                value: controller.selectedStudentType.value?.id,
-                items: [
-                  const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13))),
-                  ...controller.studentTypes.map((t) =>
-                      DropdownMenuItem<int?>(
-                        value: t.id,
-                        child: Text(t.stdTypeNameLao,
-                            style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis),
-                      )),
-                ],
-                onChanged: (val) {
-                  controller.selectedStudentType.value = val == null
-                      ? null
-                      : controller.studentTypes
-                          .firstWhereOrNull((t) => t.id == val);
-                },
-              ),
-            ),
+            Expanded(child: _StudentTypeSelector(controller: controller)),
           ],
         ),
       ],
     );
   }
+}
 
-  // ── Department-only row (for All / Teachers) ──────────────────────────────
-  Widget _buildDepartmentRow() {
-    return _dropdownColumn<int?>(
+/// Department dropdown — used standalone for All/Teachers, and inside the
+/// student-filters grid for Students.
+class _DepartmentSelector extends StatelessWidget {
+  /// Source of reactive department selection.
+  final AnnouncementController controller;
+
+  const _DepartmentSelector({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabeledDropdown<int?>(
       label: 'ພາກວິຊາ',
       value: controller.selectedDepartment.value?.id,
       items: [
         const DropdownMenuItem<int?>(
-            value: null,
-            child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13))),
-        ...controller.departments.map((d) => DropdownMenuItem<int?>(
-              value: d.id,
-              child: Text(d.deptNameLao,
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis),
-            )),
+          value: null,
+          child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13)),
+        ),
+        for (final d in controller.departments)
+          DropdownMenuItem<int?>(
+            value: d.id,
+            child: Text(
+              d.deptNameLao,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (val) => controller.selectedDepartment.value = val == null
+          ? null
+          : controller.departments
+              .firstWhereOrNull((DepartmentModel d) => d.id == val),
+    );
+  }
+}
+
+/// Year-level dropdown (1..4 / all).
+class _YearSelector extends StatelessWidget {
+  /// Source of reactive year selection.
+  final AnnouncementController controller;
+
+  const _YearSelector({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabeledDropdown<int>(
+      label: 'ຊັ້ນປີ',
+      value: controller.selectedYear.value,
+      items: [
+        for (var i = 0; i < controller.yearLabels.length; i++)
+          DropdownMenuItem<int>(
+            value: i,
+            child: Text(
+              controller.yearLabels[i],
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
       ],
       onChanged: (val) {
-        controller.selectedDepartment.value = val == null
-            ? null
-            : controller.departments.firstWhereOrNull((d) => d.id == val);
+        if (val != null) controller.selectedYear.value = val;
       },
     );
   }
+}
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SEND BUTTON
-  // ═══════════════════════════════════════════════════════════════════════════
-  Widget _buildSendButton() {
-    return Obx(
-      () => SizedBox(
-        width: double.infinity,
-        height: 50,
-        child: ElevatedButton.icon(
-          onPressed:
-              controller.isSending.value ? null : controller.sendNotification,
-          icon: controller.isSending.value
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white),
-                )
-              : const Icon(Icons.send_rounded, size: 20),
-          label: Text(
-            controller.isSending.value ? 'ກຳລັງສົ່ງ...' : 'ສົ່ງການແຈ້ງເຕືອນ',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.laoBlue,
-            foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.laoBlue.withValues(alpha: 0.6),
-            disabledForegroundColor: Colors.white70,
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14)),
-            elevation: 2,
-          ),
+/// Student-group dropdown.
+class _StudentGroupSelector extends StatelessWidget {
+  /// Source of reactive group selection.
+  final AnnouncementController controller;
+
+  const _StudentGroupSelector({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabeledDropdown<int?>(
+      label: 'ກຸ່ມນັກສຶກສາ',
+      value: controller.selectedStudentGroup.value?.id,
+      items: [
+        const DropdownMenuItem<int?>(
+          value: null,
+          child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13)),
         ),
+        for (final g in controller.studentGroups)
+          DropdownMenuItem<int?>(
+            value: g.id,
+            child: Text(
+              g.stdGroupName,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (val) => controller.selectedStudentGroup.value = val == null
+          ? null
+          : controller.studentGroups
+              .firstWhereOrNull((StudentGroupModel g) => g.id == val),
+    );
+  }
+}
+
+/// Student-type dropdown.
+class _StudentTypeSelector extends StatelessWidget {
+  /// Source of reactive type selection.
+  final AnnouncementController controller;
+
+  const _StudentTypeSelector({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return _LabeledDropdown<int?>(
+      label: 'ປະເພດນັກສຶກສາ',
+      value: controller.selectedStudentType.value?.id,
+      items: [
+        const DropdownMenuItem<int?>(
+          value: null,
+          child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13)),
+        ),
+        for (final t in controller.studentTypes)
+          DropdownMenuItem<int?>(
+            value: t.id,
+            child: Text(
+              t.stdTypeNameLao,
+              style: const TextStyle(fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: (val) => controller.selectedStudentType.value = val == null
+          ? null
+          : controller.studentTypes
+              .firstWhereOrNull((StudentTypeModel t) => t.id == val),
+    );
+  }
+}
+
+/// Primary "Send announcement" button.
+class _SendButton extends StatelessWidget {
+  /// Source of reactive sending state.
+  final AnnouncementController controller;
+
+  const _SendButton({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(
+      () => AppPrimaryButton(
+        label:
+            controller.isSending.value ? 'ກຳລັງສົ່ງ...' : 'ສົ່ງການແຈ້ງເຕືອນ',
+        icon: Icons.send_rounded,
+        isLoading: controller.isSending.value,
+        onPressed: controller.sendNotification,
+        backgroundColor: AppColors.laoBlue,
       ),
     );
   }
+}
 
+// ─────────────────────────────────────────── reusable building blocks ──
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // REUSABLE HELPERS
-  // ═══════════════════════════════════════════════════════════════════════════
+/// White rounded card with an indigo icon-headed title row above the [child].
+class _SectionCard extends StatelessWidget {
+  /// Leading icon next to the title.
+  final IconData icon;
 
-  Widget _card({
-    required IconData icon,
-    required String title,
-    required Widget child,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4)),
-        ],
-      ),
+  /// Card heading.
+  final String title;
+
+  /// Body slot.
+  final Widget child;
+
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(AppSpacing.m + 2),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               Icon(icon, color: AppColors.laoBlue, size: 22),
-              const SizedBox(width: 8),
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary)),
+              const SizedBox(width: AppSpacing.s),
+              Text(title, style: AppTypography.subheading),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: AppSpacing.m),
           child,
         ],
       ),
     );
   }
+}
 
-  Widget _label(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textSecondary,
-        letterSpacing: 0.5,
-      ),
-    );
+/// Small all-caps caption used as a label above a field or dropdown.
+class _FieldLabel extends StatelessWidget {
+  /// Caption text.
+  final String text;
+
+  const _FieldLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(text, style: AppTypography.captionStrong);
   }
+}
 
-  Widget _inputField({
-    required TextEditingController controller,
-    required String hint,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
+/// Filled, rounded text field shared by the title / message / search inputs.
+class _FilledTextField extends StatelessWidget {
+  /// Backing controller.
+  final TextEditingController controller;
+
+  /// Placeholder text.
+  final String hint;
+
+  /// Vertical line count.
+  final int maxLines;
+
+  /// Optional keyboard hint (numeric for ID lookup, etc.).
+  final TextInputType? keyboardType;
+
+  const _FilledTextField({
+    required this.controller,
+    required this.hint,
+    this.maxLines = 1,
+    this.keyboardType,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return TextField(
       controller: controller,
       maxLines: maxLines,
@@ -578,38 +702,58 @@ class AnnouncementView extends GetView<AnnouncementController> {
         hintText: hint,
         hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
         filled: true,
-        fillColor: const Color(0xFFF5F7FA),
+        fillColor: AppColors.scaffoldBg,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
         enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: Colors.grey.shade200)),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.grey.shade200),
+        ),
         focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide:
-                const BorderSide(color: AppColors.laoBlue, width: 1.5)),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.laoBlue, width: 1.5),
+        ),
       ),
     );
   }
+}
 
-  Widget _dropdownColumn<T>({
-    required String label,
-    required T value,
-    required List<DropdownMenuItem<T>> items,
-    required ValueChanged<T?> onChanged,
-  }) {
+/// Label + boxed dropdown column, used by every selector on this page.
+class _LabeledDropdown<T> extends StatelessWidget {
+  /// Caption rendered above the dropdown.
+  final String label;
+
+  /// Current value.
+  final T value;
+
+  /// Available options.
+  final List<DropdownMenuItem<T>> items;
+
+  /// Invoked when the user picks a different option.
+  final ValueChanged<T?> onChanged;
+
+  const _LabeledDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label(label),
+        _FieldLabel(label),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF5F7FA),
+            color: AppColors.scaffoldBg,
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: Colors.grey.shade200),
           ),

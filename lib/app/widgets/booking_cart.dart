@@ -2,10 +2,24 @@ import 'package:flutter/material.dart';
 
 import '../modules/data/models/room_booking_model.dart';
 import 'app_colors.dart';
+import 'app_spacing.dart';
+import 'app_typography.dart';
 
+/// Card that summarizes one [RoomBookingModel] and exposes approve / reject
+/// actions when the booking is pending.
+///
+/// The card is intentionally dumb — it takes a pre-loaded booking plus two
+/// callbacks. Filtering, persistence, and FCM are the caller's job. All
+/// display-side derivations (formatting names, dates, time ranges) live in
+/// the private [_BookingDisplay] adapter so the build method stays flat.
 class BookingCard extends StatelessWidget {
+  /// The booking to render.
   final RoomBookingModel booking;
+
+  /// Invoked when the user taps "Approve" (only shown while pending).
   final VoidCallback onApprove;
+
+  /// Invoked when the user taps "Reject" (only shown while pending).
   final VoidCallback onReject;
 
   const BookingCard({
@@ -15,76 +29,16 @@ class BookingCard extends StatelessWidget {
     required this.onReject,
   });
 
-  // ── Status helpers ──────────────────────────────────────────────────────
-  bool get _isPending => booking.status.toLowerCase() == 'pending';
-  bool get _isApproved => booking.status.toLowerCase() == 'approved';
-  bool get _isRejected => booking.status.toLowerCase() == 'rejected';
-
-  Color get _borderColor => _isApproved
-      ? AppColors.borderApproved
-      : _isPending
-          ? AppColors.borderPending
-          : AppColors.rejectRed;
-
-  /// Derive a display name from the nested User (teacher or student name).
-  String get _displayName {
-    final user = booking.user;
-    if (user == null) return 'Unknown User';
-
-    // Prefer teacher name
-    if (user.teacher != null) {
-      final t = user.teacher!;
-      return '${t.nameLao} ${t.surnameLao}'.trim();
-    }
-
-    // Fall back to student name
-    if (user.student != null) {
-      final s = user.student!;
-      return '${s.nameLao} ${s.surnameLao ?? ''}'.trim();
-    }
-
-    return user.username;
-  }
-
-  /// Whether the booker is a student
-  bool get _isStudent => booking.user?.stdId != null;
-
-  /// Room display name
-  String get _roomName => booking.room?.roomCode ?? 'Room ${booking.roomId}';
-
-  /// Format time display (start_time – end_time)
-  String get _timeDisplay {
-    if (booking.startTime.isEmpty && booking.endTime.isEmpty) {
-      return '';
-    }
-    return '${booking.startTime} - ${booking.endTime}';
-  }
-
-  /// Format booking date
-  String get _dateDisplay {
-    final d = booking.bookingDate;
-    const weekdays = [
-      'ວັນຈັນ', 'ວັນອັງຄານ', 'ວັນພຸດ', 'ວັນພະຫັດ',
-      'ວັນສຸກ', 'ວັນເສົາ', 'ວັນອາທິດ'
-    ];
-    const months = [
-      'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ',
-      'ພຶດສະພາ', 'ມິຖຸນາ', 'ກໍລະກົດ', 'ສິງຫາ',
-      'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ'
-    ];
-    return '${weekdays[d.weekday - 1]}, ${months[d.month - 1]} ${d.day}';
-  }
-
   @override
   Widget build(BuildContext context) {
+    final display = _BookingDisplay(booking);
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: AppSpacing.s + 4),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border(
-          left: BorderSide(color: _borderColor, width: 4),
-        ),
+        borderRadius: BorderRadius.circular(AppSpacing.s + 4),
+        border: Border(left: BorderSide(color: display.borderColor, width: 4)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -94,11 +48,11 @@ class BookingCard extends StatelessWidget {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(AppSpacing.s + 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _buildHeader(),
+            _BookingHeader(display: display),
             const SizedBox(height: 6),
             if (booking.purpose != null && booking.purpose!.isNotEmpty) ...[
               Text(
@@ -107,26 +61,102 @@ class BookingCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
             ],
-            _buildUserRow(),
+            _BookingUserRow(display: display),
             const SizedBox(height: 6),
-            _buildRoomDateRow(),
-            const SizedBox(height: 12),
-            _buildActionButtons(),
+            _BookingMetaRow(display: display),
+            const SizedBox(height: AppSpacing.s + 4),
+            _BookingActions(
+              display: display,
+              onApprove: onApprove,
+              onReject: onReject,
+            ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader() {
+/// Adapter that turns a [RoomBookingModel] into the display primitives the
+/// card's child widgets need. Keeps every formatting decision in one place.
+class _BookingDisplay {
+  final RoomBookingModel booking;
+
+  const _BookingDisplay(this.booking);
+
+  bool get isPending => booking.status.toLowerCase() == 'pending';
+  bool get isApproved => booking.status.toLowerCase() == 'approved';
+  bool get isRejected => booking.status.toLowerCase() == 'rejected';
+
+  Color get borderColor {
+    if (isApproved) return AppColors.borderApproved;
+    if (isPending) return AppColors.borderPending;
+    return AppColors.rejectRed;
+  }
+
+  /// Whether the booker is a student — used to switch the role pill color.
+  bool get isStudent => booking.user?.stdId != null;
+
+  /// Room code if the relation is populated, otherwise `Room <id>`.
+  String get roomName => booking.room?.roomCode ?? 'Room ${booking.roomId}';
+
+  /// Formatted `HH:mm - HH:mm` time range. Empty when both ends are missing.
+  String get timeDisplay {
+    if (booking.startTime.isEmpty && booking.endTime.isEmpty) return '';
+    return '${booking.startTime} - ${booking.endTime}';
+  }
+
+  /// Lao-localized weekday + month + day, e.g. "ວັນຈັນ, ມັງກອນ 5".
+  String get dateDisplay {
+    final d = booking.bookingDate;
+    return '${_weekdays[d.weekday - 1]}, ${_months[d.month - 1]} ${d.day}';
+  }
+
+  /// Preferred display name: teacher → student → username fallback.
+  String get displayName {
+    final user = booking.user;
+    if (user == null) return 'Unknown User';
+
+    final teacher = user.teacher;
+    if (teacher != null) {
+      return '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+    }
+    final student = user.student;
+    if (student != null) {
+      return '${student.nameLao} ${student.surnameLao ?? ''}'.trim();
+    }
+    return user.username;
+  }
+
+  static const _weekdays = <String>[
+    'ວັນຈັນ', 'ວັນອັງຄານ', 'ວັນພຸດ', 'ວັນພະຫັດ',
+    'ວັນສຸກ', 'ວັນເສົາ', 'ວັນອາທິດ',
+  ];
+
+  static const _months = <String>[
+    'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ',
+    'ພຶດສະພາ', 'ມິຖຸນາ', 'ກໍລະກົດ', 'ສິງຫາ',
+    'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ',
+  ];
+}
+
+/// Header row: status circle + room title (left), time range (right).
+class _BookingHeader extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  const _BookingHeader({required this.display});
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildStatusIcon(),
-        const SizedBox(width: 8),
+        _BookingStatusIcon(display: display),
+        const SizedBox(width: AppSpacing.s),
         Expanded(
           child: Text(
-            _roomName,
+            display.roomName,
             style: const TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.bold,
@@ -134,44 +164,60 @@ class BookingCard extends StatelessWidget {
             ),
           ),
         ),
-        if (_timeDisplay.isNotEmpty)
-          Text(
-            _timeDisplay,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
+        if (display.timeDisplay.isNotEmpty)
+          Text(display.timeDisplay, style: AppTypography.caption),
       ],
     );
   }
+}
 
-  Widget _buildStatusIcon() {
+/// Small circular badge that reflects the booking's status: filled blue
+/// check when approved, gray X when rejected, empty when pending.
+class _BookingStatusIcon extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  const _BookingStatusIcon({required this.display});
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = display.isApproved;
+    final rejected = display.isRejected;
     return Container(
       width: 22,
       height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: _isApproved ? AppColors.laoBlue : Colors.transparent,
+        color: approved ? AppColors.laoBlue : Colors.transparent,
         border: Border.all(
-          color: _isApproved ? AppColors.laoBlue : Colors.grey.shade400,
+          color: approved ? AppColors.laoBlue : Colors.grey.shade400,
           width: 2,
         ),
       ),
-      child: _isApproved
+      child: approved
           ? const Icon(Icons.check, color: Colors.white, size: 14)
-          : _isRejected
+          : rejected
               ? Icon(Icons.close, color: Colors.grey.shade400, size: 14)
               : null,
     );
   }
+}
 
-  Widget _buildUserRow() {
+/// Booker name + role pill (Student / Teacher).
+class _BookingUserRow extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  const _BookingUserRow({required this.display});
+
+  @override
+  Widget build(BuildContext context) {
+    final isStudent = display.isStudent;
     return Row(
       children: [
         Flexible(
           child: Text(
-            _displayName,
+            display.displayName,
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.laoBlue,
@@ -181,77 +227,88 @@ class BookingCard extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: _isStudent ? Colors.blue.shade50 : Colors.orange.shade50,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            _isStudent ? '(Student)' : '(Teacher)',
-            style: TextStyle(
-              fontSize: 11,
-              color:
-                  _isStudent ? Colors.blue.shade700 : Colors.orange.shade700,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
+        _RolePill(isStudent: isStudent),
       ],
     );
   }
+}
 
-  Widget _buildRoomDateRow() {
+/// Small role chip rendered next to the booker's name.
+class _RolePill extends StatelessWidget {
+  /// `true` when the booker is a student, `false` for a teacher.
+  final bool isStudent;
+
+  const _RolePill({required this.isStudent});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isStudent ? Colors.blue.shade50 : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        isStudent ? '(Student)' : '(Teacher)',
+        style: TextStyle(
+          fontSize: 11,
+          color: isStudent ? Colors.blue.shade700 : Colors.orange.shade700,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
+/// Date + room meta row rendered below the user row.
+class _BookingMetaRow extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  const _BookingMetaRow({required this.display});
+
+  @override
+  Widget build(BuildContext context) {
+    const labelStyle = TextStyle(
+      fontSize: 13,
+      color: AppColors.textSecondary,
+    );
     return Row(
       children: [
         const Icon(Icons.calendar_today_outlined,
             size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(
-          _dateDisplay,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
-        ),
+        Text(display.dateDisplay, style: labelStyle),
         const Spacer(),
         const Icon(Icons.location_on_outlined,
             size: 14, color: AppColors.textSecondary),
         const SizedBox(width: 4),
-        Text(
-          _roomName,
-          style: const TextStyle(
-            fontSize: 13,
-            color: AppColors.textSecondary,
-          ),
-        ),
+        Text(display.roomName, style: labelStyle),
       ],
     );
   }
+}
 
-  Widget _buildActionButtons() {
-    if (!_isPending) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(
-            color: _isApproved
-                ? AppColors.borderApproved.withValues(alpha: 0.1)
-                : AppColors.rejectRed.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Text(
-            _isApproved ? 'Approved' : 'Rejected',
-            style: TextStyle(
-              color:
-                  _isApproved ? AppColors.borderApproved : AppColors.rejectRed,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
-          ),
-        ),
-      );
-    }
+/// Pending → approve/reject buttons row.  Resolved → status pill.
+class _BookingActions extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  /// Approve callback (only invoked when [display.isPending]).
+  final VoidCallback onApprove;
+
+  /// Reject callback (only invoked when [display.isPending]).
+  final VoidCallback onReject;
+
+  const _BookingActions({
+    required this.display,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (!display.isPending) return _ResolvedPill(display: display);
 
     return Row(
       children: [
@@ -264,13 +321,13 @@ class BookingCard extends StatelessWidget {
               foregroundColor: AppColors.rejectRed,
               side: const BorderSide(color: AppColors.rejectRed),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppSpacing.s),
               ),
               padding: const EdgeInsets.symmetric(vertical: 10),
             ),
           ),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: AppSpacing.s + 4),
         Expanded(
           child: ElevatedButton.icon(
             onPressed: onApprove,
@@ -280,7 +337,7 @@ class BookingCard extends StatelessWidget {
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(AppSpacing.s),
               ),
               padding: const EdgeInsets.symmetric(vertical: 10),
               elevation: 0,
@@ -288,6 +345,38 @@ class BookingCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Read-only status pill rendered in place of the action buttons when the
+/// booking has already been approved or rejected.
+class _ResolvedPill extends StatelessWidget {
+  /// Pre-built display adapter.
+  final _BookingDisplay display;
+
+  const _ResolvedPill({required this.display});
+
+  @override
+  Widget build(BuildContext context) {
+    final approved = display.isApproved;
+    final tint = approved ? AppColors.borderApproved : AppColors.rejectRed;
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: tint.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppColors.chipRadius),
+        ),
+        child: Text(
+          approved ? 'Approved' : 'Rejected',
+          style: TextStyle(
+            color: tint,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
+      ),
     );
   }
 }

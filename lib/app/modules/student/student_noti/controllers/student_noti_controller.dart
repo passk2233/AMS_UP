@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class StudentNotiController extends GetxController {
@@ -15,53 +14,27 @@ class StudentNotiController extends GetxController {
   final RxString errorMessage = ''.obs;
   final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
     fetchNotifications();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
   }
 
   Future<void> fetchNotifications() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
       final resp = await _dio.get('/notifications', queryParameters: {'limit': 100});
       final items = _extractList(resp.data);
       notifications.assignAll(items.map((j) => NotificationModel.fromJson(j)).toList());
     } on DioException catch (e) {
       debugPrint('StudentNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'Session expired. Please login again.';
-        Get.offAllNamed('/auth');
-        return;
-      }
-      errorMessage.value = 'Failed to load notifications.';
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'Session expired. Please login again.'
+          : 'Failed to load notifications.';
     } finally {
       isLoading.value = false;
     }
@@ -75,6 +48,27 @@ class StudentNotiController extends GetxController {
     return all.where((n) => n['category'] == category).toList();
   }
 
+  /// Count of items the user hasn't tapped yet. Drives badges.
+  int get unreadCount =>
+      notifications.where((n) => n.isRead == 0).length;
+
+  /// Optimistically marks an item read in the local list and tells the
+  /// backend. Falls back silently — the local list will resync on next
+  /// fetch if the PUT fails.
+  Future<void> markAsRead(int notiId) async {
+    final idx = notifications.indexWhere((n) => n.notiId == notiId);
+    if (idx == -1 || notifications[idx].isRead == 1) return;
+
+    notifications[idx].isRead = 1;
+    notifications.refresh();
+
+    try {
+      await _dio.put('/notifications/$notiId/read');
+    } on DioException catch (e) {
+      debugPrint('markAsRead failed for $notiId: ${e.message}');
+    }
+  }
+
   Map<String, dynamic> _toViewItem(NotificationModel n) {
     final typeRaw = (n.type ?? '').toLowerCase();
     final isUrgent = typeRaw == 'urgent';
@@ -85,6 +79,8 @@ class StudentNotiController extends GetxController {
 
     if (isUrgent) {
       return {
+        'id': n.notiId,
+        'unread': n.isRead == 0,
         'type': 'Urgent',
         'category': category,
         'title': n.title,
@@ -95,6 +91,8 @@ class StudentNotiController extends GetxController {
     }
 
     return {
+      'id': n.notiId,
+      'unread': n.isRead == 0,
       'type': 'Normal',
       'category': category,
       'title': n.title,

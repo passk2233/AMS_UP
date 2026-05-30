@@ -23,8 +23,9 @@ class BookingStudentView extends GetView<BookingStudentController> {
               centerTitle: true,
               actions: [
                 IconButton(
-                  onPressed: controller.refreshData,
-                  icon: const Icon(Icons.refresh),
+                  onPressed: () => Get.toNamed('/student-noti'),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  tooltip: 'ການແຈ້ງເຕືອນ',
                 )
               ],
             ),
@@ -37,37 +38,16 @@ class BookingStudentView extends GetView<BookingStudentController> {
             ),
             body: Obx(() {
               if (controller.isLoading.value) {
-                return const AppLoading.booking();
+                return AppRefreshableLoader(
+                  onRefresh: controller.refreshData,
+                  child: const AppLoading.booking(),
+                );
               }
               final err = controller.errorMessage.value;
               if (err.isNotEmpty) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_off,
-                            size: 48, color: Colors.grey.shade400),
-                        const SizedBox(height: 12),
-                        Text(
-                          err,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton.icon(
-                          onPressed: controller.refreshData,
-                          icon: const Icon(Icons.refresh, size: 18),
-                          label: const Text('Retry'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
+                return AppErrorState(
+                  message: err,
+                  onRetry: controller.refreshData,
                 );
               }
 
@@ -81,43 +61,40 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   padding: const EdgeInsets.all(16),
                   children: [
                     _statsRow(controller),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: AppSpacing.m),
                     Row(
                       children: [
                         const Expanded(
-                          child: Text(
-                            'ປະຫວັດການຈອງຂອງຂ້ອຍ',
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w800),
-                          ),
+                          child: Text('ປະຫວັດການຈອງຂອງຂ້ອຍ',
+                              style: AppTypography.subheading),
                         ),
-                        Text(
-                          '${filtered.length} ລາຍການ',
-                          style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                        ),
+                        Text('${filtered.length} ລາຍການ',
+                            style: AppTypography.caption),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: AppSpacing.s),
                     _filterChips(controller),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: AppSpacing.s + 2),
                     if (filtered.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 40),
-                        child: Center(
-                          child: Column(
-                            children: [
-                              Icon(Icons.inbox_outlined,
-                                  size: 48, color: Colors.grey.shade400),
-                              const SizedBox(height: 8),
-                              Text(
-                                controller.myBookings.isEmpty
-                                    ? 'ຍັງບໍ່ມີການຈອງ'
-                                    : 'ບໍ່ມີຂໍ້ມູນທີ່ກົງກັບຕົວກອງ',
-                                style: TextStyle(color: Colors.grey.shade600),
-                              ),
-                            ],
-                          ),
+                        padding: const EdgeInsets.only(top: AppSpacing.xl),
+                        child: AppEmptyState(
+                          icon: Icons.inbox_outlined,
+                          title: controller.myBookings.isEmpty
+                              ? 'ຍັງບໍ່ມີການຈອງ'
+                              : 'ບໍ່ມີຂໍ້ມູນທີ່ກົງກັບຕົວກອງ',
+                          subtitle: controller.myBookings.isEmpty
+                              ? 'ກົດປຸ່ມ "ຈອງໃໝ່" ເພື່ອເລີ່ມຕົ້ນ'
+                              : 'ລອງເລືອກຕົວກອງອື່ນ',
+                          actionLabel: controller.myBookings.isEmpty
+                              ? 'ຈອງໃໝ່'
+                              : 'ລ້າງຕົວກອງ',
+                          actionIcon: controller.myBookings.isEmpty
+                              ? Icons.add_rounded
+                              : Icons.filter_alt_off_rounded,
+                          onAction: controller.myBookings.isEmpty
+                              ? () => _showCreateDialog(context)
+                              : () => controller.bookingFilter.value = 'all',
                         ),
                       )
                     else
@@ -527,6 +504,16 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   ],
                 ),
                 const SizedBox(height: 12),
+                _PurposeChips(
+                  presets: const [
+                    'ອ່ານປຶ້ມ',
+                    'ໂປຣເຈັກກຸ່ມ',
+                    'ປະຊຸມຊົມຮົມ',
+                    'ກິດຈະກຳ',
+                  ],
+                  controller: purposeCtrl,
+                ),
+                const SizedBox(height: 8),
                 TextField(
                   controller: purposeCtrl,
                   decoration: const InputDecoration(
@@ -542,33 +529,23 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   _inlineWarning(conflictNote.value, Colors.red),
                 ],
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: !canSubmit
-                        ? null
-                        : () async {
-                            Navigator.of(context).pop();
-                            await controller.createBooking(
-                              roomId: selectedRoomId.value!,
-                              bookingDate: date.value,
-                              startTime: startCtrl.text.trim(),
-                              endTime: endCtrl.text.trim(),
-                              purpose: purposeCtrl.text.trim().isEmpty
-                                  ? null
-                                  : purposeCtrl.text.trim(),
-                            );
-                          },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text('ສົ່ງຄຳຂໍ'),
-                  ),
+                AppPrimaryButton(
+                  label: 'ສົ່ງຄຳຂໍ',
+                  icon: Icons.send_rounded,
+                  onPressed: !canSubmit
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          await controller.createBooking(
+                            roomId: selectedRoomId.value!,
+                            bookingDate: date.value,
+                            startTime: startCtrl.text.trim(),
+                            endTime: endCtrl.text.trim(),
+                            purpose: purposeCtrl.text.trim().isEmpty
+                                ? null
+                                : purposeCtrl.text.trim(),
+                          );
+                        },
                 ),
               ],
             );
@@ -599,6 +576,36 @@ class BookingStudentView extends GetView<BookingStudentController> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PurposeChips extends StatelessWidget {
+  final List<String> presets;
+  final TextEditingController controller;
+  const _PurposeChips({required this.presets, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final label = presets[i];
+          return ActionChip(
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            onPressed: () => controller.text = label,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+            side: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.25),
+            ),
+            visualDensity: VisualDensity.compact,
+          );
+        },
       ),
     );
   }

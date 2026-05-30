@@ -20,15 +20,18 @@ class SchedulesView extends GetView<SchedulesController> {
             withBackground: true,
             title: 'ຕາຕະລາງສອນ',
             trailing: AppIconBubble(
-              icon: Icons.refresh_rounded,
-              onTap: controller.refreshData,
+              icon: Icons.notifications_none_rounded,
+              onTap: () => Get.toNamed('/teacher-noti'),
             ),
             body: Column(
               children: [
                 _buildSemesterBanner(controller),
+                _buildViewModeToggle(controller),
                 _buildWeekSelector(controller),
                 const SizedBox(height: 12),
-                _buildDateRow(controller),
+                Obx(() => controller.viewMode.value == 'day'
+                    ? _buildDateRow(controller)
+                    : const SizedBox.shrink()),
                 const SizedBox(height: 16),
                 Expanded(child: _buildScheduleList(controller)),
               ],
@@ -81,6 +84,63 @@ class SchedulesView extends GetView<SchedulesController> {
                   ],
                 ),
               ),
+            ],
+          ),
+        ),
+      );
+    });
+  }
+
+  Widget _buildViewModeToggle(SchedulesController controller) {
+    return Obx(() {
+      Widget seg(String mode, String label, IconData icon) {
+        final selected = controller.viewMode.value == mode;
+        return Expanded(
+          child: GestureDetector(
+            onTap: () => controller.viewMode.value = mode,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              decoration: BoxDecoration(
+                color: selected ? AppColors.statsBlue : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(icon,
+                      size: 16,
+                      color: selected ? Colors.white : AppColors.textSecondary),
+                  const SizedBox(width: 6),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color:
+                          selected ? Colors.white : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+        child: Container(
+          padding: const EdgeInsets.all(4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.grey.shade200),
+          ),
+          child: Row(
+            children: [
+              seg('day', 'ມື້ດຽວ', Icons.today_rounded),
+              seg('week', 'ທັງອາທິດ', Icons.view_week_rounded),
             ],
           ),
         ),
@@ -214,7 +274,10 @@ class SchedulesView extends GetView<SchedulesController> {
   Widget _buildScheduleList(SchedulesController controller) {
     return Obx(() {
       if (controller.isLoading.value) {
-        return const AppLoading.schedule();
+        return AppRefreshableLoader(
+          onRefresh: controller.refreshData,
+          child: const AppLoading.schedule(),
+        );
       }
       if (controller.errorMessage.value.isNotEmpty &&
           controller.schedules.isEmpty) {
@@ -222,6 +285,10 @@ class SchedulesView extends GetView<SchedulesController> {
           message: controller.errorMessage.value,
           onRetry: controller.refreshData,
         );
+      }
+
+      if (controller.viewMode.value == 'week') {
+        return _buildWeekList(controller);
       }
 
       if (!controller.isInSemester(controller.selectedDate.value)) {
@@ -245,10 +312,13 @@ class SchedulesView extends GetView<SchedulesController> {
       final filtered = controller.filteredSchedules;
 
       if (filtered.isEmpty) {
-        return const AppEmptyState(
+        return AppEmptyState(
           icon: Icons.event_available_rounded,
           title: 'ບໍ່ມີຫ້ອງຮຽນໃນວັນນີ້',
           subtitle: 'ເລືອກວັນອື່ນເພື່ອເບິ່ງຕາຕະລາງ',
+          actionLabel: 'ກັບໄປວັນນີ້',
+          actionIcon: Icons.today_rounded,
+          onAction: () => controller.selectDate(DateTime.now()),
         );
       }
 
@@ -272,5 +342,57 @@ class SchedulesView extends GetView<SchedulesController> {
         ),
       );
     });
+  }
+
+  Widget _buildWeekList(SchedulesController controller) {
+    final groups = controller.weekScheduleByDay;
+    if (groups.isEmpty) {
+      return AppEmptyState(
+        icon: Icons.event_available_rounded,
+        title: 'ບໍ່ມີຫ້ອງຮຽນໃນອາທິດນີ້',
+        subtitle: 'ລອງເປີດອາທິດອື່ນ',
+        actionLabel: 'ກັບໄປວັນນີ້',
+        actionIcon: Icons.today_rounded,
+        onAction: () => controller.selectDate(DateTime.now()),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: controller.refreshData,
+      color: AppColors.primary,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        itemCount: groups.length,
+        itemBuilder: (context, index) {
+          final group = groups[index];
+          final classes = group['classes'] as List<Map<String, dynamic>>;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(
+                  group['dateLabel'] as String? ?? '',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
+              ...classes.map((item) => AppClassCard(
+                    title: item['title'] as String? ?? '',
+                    subtitle: item['subtitle'] as String?,
+                    time: item['time'] as String?,
+                    instructor: item['instructor'] as String?,
+                    location: item['location'] as String?,
+                    color: item['color'] as Color? ?? AppColors.statsBlue,
+                  )),
+              const SizedBox(height: 8),
+            ],
+          );
+        },
+      ),
+    );
   }
 }

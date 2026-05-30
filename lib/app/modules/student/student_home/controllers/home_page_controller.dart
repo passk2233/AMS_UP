@@ -1,11 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
+import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 /// Controller for the student dashboard / home page.
@@ -17,41 +16,24 @@ class HomePageController extends GetxController {
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final RxList<EnrollmentModel> enrollments = <EnrollmentModel>[].obs;
   final RxList<StudyPlanModel> studyPlans = <StudyPlanModel>[].obs;
+  final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
-  late final Dio _dio;
+  /// `true` while the admin-controlled `open_evalu` window is active and
+  /// `now` falls within it. Drives the home page's "ປະເມີນອາຈານ" button.
+  final RxBool isEvaluationWindowOpen = false.obs;
+
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
     fetchDashboard();
-  }
-
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
   Future<void> fetchDashboard() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      await _loadToken();
-
       // ── ດຶງຂໍ້ມູນຜູ້ໃຊ້ ──
       final me = await _dio.get('/auth/me');
       if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
@@ -63,6 +45,9 @@ class HomePageController extends GetxController {
         errorMessage.value = 'ບັນຊີນັກສຶກສາບໍ່ໄດ້ເຊື່ອມຕໍ່.';
         return;
       }
+
+      await _loadActiveSemester();
+      await _loadEvaluationWindow();
 
       // ── ດຶງ enrollments (ສຳລັບ GPA + ຈຳນວນວິຊາ) ──
       final enrollResp = await _dio.get('/enrollments', queryParameters: {
@@ -89,19 +74,64 @@ class HomePageController extends GetxController {
     } on DioException catch (e) {
       debugPrint(
           'HomePageController Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-      if (e.response?.statusCode == 401) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.remove('token');
-        errorMessage.value = 'Session ໝົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.';
-        Get.offAllNamed('/auth');
-        return;
-      }
-      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້.';
+      // 401 is handled centrally by ApiClient (it clears auth + redirects).
+      errorMessage.value = e.response?.statusCode == 401
+          ? 'Session ໝົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.'
+          : 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້.';
     } catch (e) {
       debugPrint('HomePageController error: $e');
       errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນໄດ້.';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> _loadActiveSemester() async {
+    try {
+      final resp =
+          await _dio.get('/semasters', queryParameters: {'limit': 20});
+      final items = _extractList(resp.data);
+      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
+      if (all.isEmpty) return;
+      final now = DateTime.now();
+      final containing = all.where((s) {
+        if (s.startDate == null || s.endDate == null) return false;
+        return !now.isBefore(s.startDate!) &&
+            !now.isAfter(s.endDate!.add(const Duration(days: 1)));
+      });
+      if (containing.isNotEmpty) {
+        activeSemester.value = containing.first;
+        return;
+      }
+      final active = all.where((s) => s.status == 1);
+      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+    } catch (_) {}
+  }
+
+  /// Public wrapper around [_loadEvaluationWindow] so the home view can
+  /// refresh the gate (e.g. after the student returns from the feedback
+  /// flow) without paying for a full [fetchDashboard].
+  Future<void> refreshEvaluationWindow() => _loadEvaluationWindow();
+
+  /// GET `/open-evalu?inactive=0&limit=1` and set [isEvaluationWindowOpen]
+  /// according to the row's `isOpenNow`. Mirrors the same gate used by the
+  /// faculty-feedback page so the home CTA and that page stay in sync.
+  Future<void> _loadEvaluationWindow() async {
+    try {
+      final resp = await _dio.get('/open-evalu', queryParameters: {
+        'inactive': 0,
+        'limit': 1,
+      });
+      final items = _extractList(resp.data);
+      if (items.isEmpty) {
+        isEvaluationWindowOpen.value = false;
+        return;
+      }
+      final window = OpenEvaluationModel.fromJson(items.first);
+      isEvaluationWindowOpen.value = window.inactive == 0;
+    } on DioException catch (e) {
+      isEvaluationWindowOpen.value = false;
+      debugPrint('loadEvaluationWindow error: ${e.message}');
     }
   }
 
