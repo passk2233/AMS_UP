@@ -10,16 +10,16 @@ class HomeStudentController extends GetxController {
   final selectedIndex = 0.obs;
 
   final List<String> appBarTitles = [
-    "Home",
-    "Schedule",
-    "Booking",
-    "Score",
-    "Profile",
+    "ໜ້າຫຼັກ",
+    "ຕາຕະລາງ",
+    "ຈອງຫ້ອງ",
+    "ຄະແນນ",
+    "ໂປຣໄຟລ໌",
   ];
 
-  // แก้ไขตรงนี้: เปลี่ยนจาก HomeStudentView เป็น StudentHomeView
+  // ໜ້າທັງໝົດທີ່ຈະສະແດງໃນ IndexedStack
   final List<Widget> pages = [
-    const HomePage(), // หน้าที่โชว์แบนเนอร์ หรือเมนูต่างๆ
+    const HomePage(), // ໜ້າແບນເນີ ແລະ ເມນູ
     const ScheduleStudentView(),
     const BookingStudentView(),
     const ScoreView(),
@@ -34,43 +34,7 @@ class HomeStudentController extends GetxController {
   }
 
   void onLogout() {
-    print("Logout clicked");
+    debugPrint("Logout clicked");
     // Get.offAllNamed('/login');
-  }
-
-  // ฟังก์ชันสร้าง BottomBar ที่คุณต้องการ
-  Widget buildBottomNavigation() {
-    return Container(
-      decoration: const BoxDecoration(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(10)),
-        boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 10)],
-      ),
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(10)),
-        child: Obx(
-          () => BottomNavigationBar(
-            currentIndex: selectedIndex.value,
-            onTap: changePage,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: Colors.white,
-            selectedItemColor: Colors.blueAccent,
-            unselectedItemColor: Colors.grey,
-            items: const [
-              BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.calendar_month),
-                label: "Schedule",
-              ),
-              BottomNavigationBarItem(icon: Icon(Icons.book), label: "Booking"),
-              BottomNavigationBarItem(icon: Icon(Icons.star), label: "Score"),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.person),
-                label: "Profile",
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/app/utilities/assets.dart';
+import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/score_controller.dart';
 
@@ -8,301 +9,388 @@ class ScoreView extends GetView<ScoreController> {
 
   @override
   Widget build(BuildContext context) {
-    Get.put(ScoreController());
-    return Scaffold(
-      body: Stack(
-        children: [
-          // 1. Background Image (ໃຊ້ຮູບດຽວກັນກັບໜ້າ Home ເພື່ອໃຫ້ Theme ຄືກັນ)
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(AssetImages.login2),
-                fit: BoxFit.cover,
+    if (!Get.isRegistered<ScoreController>()) {
+      Get.put(ScoreController());
+    }
+
+    return GetBuilder<ScoreController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return AppPageScaffold(
+      withBackground: true,
+      title: 'ຄະແນນ',
+      trailing: AppIconBubble(
+        icon: Icons.notifications_none_rounded,
+        onTap: () => Get.toNamed('/student-noti'),
+      ),
+      body: Obx(() {
+        if (controller.isLoading.value) {
+          return AppRefreshableLoader(
+            onRefresh: controller.fetchData,
+            child: const AppLoading.score(),
+          );
+        }
+        if (controller.errorMessage.value.isNotEmpty) {
+          return AppErrorState(
+            message: controller.errorMessage.value,
+            onRetry: controller.fetchData,
+          );
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AppProfileHeader(
+                name: controller.displayName,
+                subtitle: controller.studentCode,
+                caption: controller
+                        .currentUser.value?.student?.curriculum?.curriNameEng ??
+                    controller
+                        .currentUser.value?.student?.curriculum?.curriNameLao ??
+                    '-',
+                avatarImage: const AssetImage(AssetImages.profile2),
               ),
-            ),
-          ),
-
-          // 2. Content
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  const SizedBox(height: 20),
-                  // Header Title
-                  const Text(
-                    "ຄະແນນ (Score)",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              const SizedBox(height: 20),
+              AppStatsBanner(
+                items: [
+                  AppStatItem(
+                    label: "GPA",
+                    value: controller.gpa.toStringAsFixed(2),
+                    suffix: "/4.00",
+                    icon: Icons.bar_chart_rounded,
                   ),
-                  const SizedBox(height: 20),
-
-                  // Profile Summary
-                  _buildProfileSummary(),
-
-                  const SizedBox(height: 20),
-
-                  // Blue Stat Cards (GPA, Credits, Terms)
-                  _buildScoreStats(),
-
-                  const SizedBox(height: 25),
-
-                  // Tab Selection (Terms)
-                  _buildTermSelector(),
-
-                  const SizedBox(height: 20),
-
-                  // List of Subject Scores
-                  _buildScoreList(),
-
-                  const SizedBox(height: 100), // ເພື່ອບໍ່ໃຫ້ Bottom Bar ບັງ
+                  AppStatItem(
+                    label: "ໜ່ວຍກິດ",
+                    value: controller.earnedCredits.toString(),
+                    icon: Icons.credit_card_rounded,
+                  ),
+                  AppStatItem(
+                    label: "ວິຊາ",
+                    value: controller.enrollments.length.toString(),
+                    icon: Icons.grid_view_rounded,
+                  ),
                 ],
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // --- Widgets ສ່ວນຕ່າງໆ ---
-
-  Widget _buildProfileSummary() {
-    return Row(
-      children: [
-        const CircleAvatar(
-          radius: 35,
-          backgroundImage: AssetImage(AssetImages.profile2),
-        ),
-        const SizedBox(width: 15),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
-            Text(
-              "Souksakhone SAYYAVONG",
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-            Text("225Q006922", style: TextStyle(color: Colors.blueAccent)),
-            Text(
-              "Computer Science • Junior",
-              style: TextStyle(color: Colors.green, fontSize: 13),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildScoreStats() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFF4A68FF),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _statItem("GPA", "3.69", "/4.00", Icons.bar_chart),
-          _statItem("Credits", "36", "/160", Icons.credit_card),
-          _statItem("Terms", "7", "/8", Icons.grid_view),
-        ],
-      ),
-    );
-  }
-
-  Widget _statItem(String title, String value, String total, IconData icon) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-            const SizedBox(width: 4),
-            Icon(icon, color: Colors.white70, size: 14),
-          ],
-        ),
-        RichText(
-          text: TextSpan(
-            children: [
-              TextSpan(
-                text: value,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              if (controller.gpaTrend.length >= 2) ...[
+                const SizedBox(height: AppSpacing.m),
+                _GpaTrendCard(
+                  points: controller.gpaTrend.map((p) => p.gpa).toList(),
                 ),
+              ],
+              const SizedBox(height: AppSpacing.l),
+              const Text("ຄະແນນແຕ່ລະພາກຮຽນ",
+                  style: AppTypography.subheading),
+              const SizedBox(height: AppSpacing.s + 2),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Obx(() => Row(
+                      children: List.generate(8, (index) {
+                        final selected =
+                            controller.selectedTermIndex.value == index;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: OutlinedButton(
+                            onPressed: () => controller.changeTerm(index),
+                            style: OutlinedButton.styleFrom(
+                              backgroundColor: selected
+                                  ? AppColors.statsBlue
+                                  : AppColors.cardBg,
+                              side: BorderSide(
+                                color: selected
+                                    ? AppColors.statsBlue
+                                    : Colors.grey.shade300,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(
+                                    AppColors.chipRadius),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 10),
+                              elevation: selected ? 4 : 0,
+                            ),
+                            child: Text(
+                              "ພາກ ${index + 1}",
+                              style: TextStyle(
+                                color: selected
+                                    ? Colors.white
+                                    : AppColors.textSecondary,
+                                fontWeight: selected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    )),
               ),
-              TextSpan(
-                text: total,
-                style: const TextStyle(color: Colors.white70, fontSize: 12),
-              ),
+              const Divider(),
+              const SizedBox(height: 12),
+              _buildScoreList(),
             ],
           ),
-        ),
-      ],
+        );
+      }),
     );
-  }
-
-  Widget _buildTermSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          "Current Semester Scores",
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Obx(
-            () => Row(
-              children: List.generate(8, (index) {
-                return _termButton(
-                  "Term ${index + 1}",
-                  controller.selectedTermIndex.value == index,
-                  // ເຊັກວ່າແມ່ນ Index ທີ່ເລືອກບໍ່
-                  index,
-                );
-              }),
-            ),
-          ),
-        ),
-        const Divider(),
-      ],
-    );
-  }
-
-  Widget _termButton(String label, bool isSelected, int index) {
-    return Container(
-      margin: const EdgeInsets.only(right: 10),
-      child: OutlinedButton(
-        onPressed: () {
-          controller.changeTerm(index); // ສັ່ງປ່ຽນຄ່າໃນ Controller ເວລາຖືກກົດ
         },
-        style: OutlinedButton.styleFrom(
-          // ປ່ຽນສີຕາມຄ່າ isSelected
-          backgroundColor: isSelected ? const Color(0xFF4A68FF) : Colors.white,
-          side: BorderSide(
-            color: isSelected ? const Color(0xFF4A68FF) : Colors.grey.shade300,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          elevation: isSelected ? 4 : 0, // ເພີ່ມເງົາໜ້ອຍໜຶ່ງເວລາເລືອກ
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.grey,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          ),
-        ),
       ),
     );
   }
 
   Widget _buildScoreList() {
+    final items = controller.enrollments;
+    if (items.isEmpty) {
+      return const AppEmptyState(
+        icon: Icons.school_outlined,
+        title: 'ບໍ່ພົບຄະແນນ',
+        subtitle: 'ຄະແນນຈະສະແດງຢູ່ບ່ອນນີ້',
+      );
+    }
+
     return Column(
-      children: [
-        _scoreCard(
-          "115LS101",
-          "3 Credits",
-          "Database System 2",
-          "ຣສ ຫາ ບຸນທັນ",
-          "A",
-          Colors.blue,
-        ),
-        _scoreCard(
-          "225WT111",
-          "3 Credits",
-          "Web Programming",
-          "ຣສ ແສງລັດສະໝີ ຈັນທະມານີວົງ",
-          "B",
-          Colors.orange,
-        ),
-        _scoreCard(
-          "224T665L",
-          "2 Credits",
-          "ການເປັນຜູ້ປະກອບການ",
-          "ອຈ ເກສອນ ແບບສະຖານ",
-          "B+",
-          Colors.green,
-        ),
-      ],
+      children: items.map((e) {
+        final sub = e.studyPlan?.subject;
+        final teacher = e.studyPlan?.teacher;
+        final code = sub?.subjectCode ?? '-';
+        final credit = sub?.credit ?? 0;
+        final title = sub?.nameLao ?? sub?.nameEng ?? '-';
+        final teacherName = teacher?.nameLao ?? teacher?.nameEng ?? '-';
+        final grade = e.grade ?? '-';
+        final color = grade == 'A'
+            ? AppColors.statsBlue
+            : (grade == 'B+' || grade == 'B')
+                ? AppColors.borderApproved
+                : AppColors.borderPending;
+
+        return AppSurfaceCard(
+          margin: const EdgeInsets.only(bottom: 15),
+          padding: const EdgeInsets.all(15),
+          borderLeftColor: color,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$code  ~ $credit ໜ່ວຍກິດ",
+                      style: const TextStyle(
+                          color: AppColors.primary, fontSize: 12),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      teacherName,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      grade,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    _gradeLabel(grade),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      }).toList(),
     );
   }
 
-  Widget _scoreCard(
-    String code,
-    String credits,
-    String title,
-    String teacher,
-    String grade,
-    Color color,
-  ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border(left: BorderSide(color: color, width: 5)),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
-      ),
+  String _gradeLabel(String grade) {
+    switch (grade.toUpperCase()) {
+      case 'A':
+        return 'ດີເລີດ';
+      case 'B+':
+      case 'B':
+        return 'ດີ';
+      case 'C+':
+      case 'C':
+        return 'ປານກາງ';
+      case 'D+':
+      case 'D':
+        return 'ພໍຜ່ານ';
+      case 'F':
+        return 'ຕົກ';
+      default:
+        return '-';
+    }
+  }
+}
+
+class _GpaTrendCard extends StatelessWidget {
+  final List<double> points;
+  const _GpaTrendCard({required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    final delta = points.last - points.first;
+    final improved = delta > 0.05;
+    final declined = delta < -0.05;
+    final color = improved
+        ? AppColors.borderApproved
+        : declined
+            ? AppColors.rejectRed
+            : AppColors.statsBlue;
+    final icon = improved
+        ? Icons.trending_up_rounded
+        : declined
+            ? Icons.trending_down_rounded
+            : Icons.trending_flat_rounded;
+    final sign = delta > 0 ? '+' : '';
+
+    return AppSurfaceCard(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  "$code  ~ $credits",
-                  style: const TextStyle(color: Colors.blue, fontSize: 12),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  teacher,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
           Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Text(
-                  grade,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'ແນວໂນ້ມ GPA',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$sign${delta.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              const SizedBox(height: 5),
-              const Text(
-                "EXCELLENT",
-                style: TextStyle(color: Colors.grey, fontSize: 10),
+              Text(
+                '${points.length} ພາກຮຽນ',
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary,
+                ),
               ),
             ],
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: SizedBox(
+              height: 56,
+              child: CustomPaint(
+                painter: _SparklinePainter(points: points, color: color),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> points;
+  final Color color;
+  _SparklinePainter({required this.points, required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+
+    const minGpa = 0.0;
+    const maxGpa = 4.0;
+    final dx = size.width / (points.length - 1);
+    final path = Path();
+    final fill = Path();
+
+    Offset offsetAt(int i) {
+      final v = points[i].clamp(minGpa, maxGpa);
+      final ratio = (v - minGpa) / (maxGpa - minGpa);
+      final y = size.height - (size.height * ratio);
+      return Offset(i * dx, y);
+    }
+
+    final first = offsetAt(0);
+    path.moveTo(first.dx, first.dy);
+    fill.moveTo(first.dx, size.height);
+    fill.lineTo(first.dx, first.dy);
+
+    for (var i = 1; i < points.length; i++) {
+      final o = offsetAt(i);
+      path.lineTo(o.dx, o.dy);
+      fill.lineTo(o.dx, o.dy);
+    }
+
+    fill.lineTo(size.width, size.height);
+    fill.close();
+
+    final fillPaint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          color.withValues(alpha: 0.25),
+          color.withValues(alpha: 0.02),
+        ],
+      ).createShader(Offset.zero & size);
+    canvas.drawPath(fill, fillPaint);
+
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 2.4
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(path, linePaint);
+
+    final dotPaint = Paint()..color = color;
+    for (var i = 0; i < points.length; i++) {
+      canvas.drawCircle(offsetAt(i), 2.5, dotPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter oldDelegate) =>
+      oldDelegate.points != points || oldDelegate.color != color;
 }

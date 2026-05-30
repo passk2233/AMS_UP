@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/app/modules/student/student_noti/views/booking_detail.dart';
 import 'package:frontend/app/modules/student/student_noti/views/grade_noti.dart';
+import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/student_noti_controller.dart';
 
@@ -9,19 +10,25 @@ class StudentNotiView extends GetView<StudentNotiController> {
 
   @override
   Widget build(BuildContext context) {
-    // ໃຊ້ Get.put ເພື່ອໂຫຼດ Controller ເຂົ້າ Memory
-    Get.put(StudentNotiController());
+    if (!Get.isRegistered<StudentNotiController>()) {
+      Get.put(StudentNotiController());
+    }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF4F7FA),
+    return GetBuilder<StudentNotiController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Scaffold(
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black, size: 20),
+          icon: const Icon(Icons.arrow_back_ios,
+              color: AppColors.textPrimary, size: 20),
           onPressed: () => Get.back(),
         ),
         title: const Text(
-          'Alerts Center',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          'ສູນແຈ້ງເຕືອນ',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -29,32 +36,44 @@ class StudentNotiView extends GetView<StudentNotiController> {
       ),
       body: Column(
         children: [
-          // 1. Filter Tabs
-          _buildFilterTabs(),
-
-          // 2. Notification List
+          Obx(() => AppFilterChipRow(
+                items: const [
+                  AppFilterChip(label: 'ທັງໝົດ'),
+                  AppFilterChip(label: 'ການສຶກສາ'),
+                  AppFilterChip(label: 'ຈອງຫ້ອງ'),
+                ],
+                selectedIndex: controller.selectedFilterIndex.value,
+                onSelected: (i) => controller.selectedFilterIndex.value = i,
+              )),
           Expanded(
             child: Obx(() {
+              if (controller.isLoading.value) {
+                return const AppLoading.notifications();
+              }
+              if (controller.errorMessage.value.isNotEmpty) {
+                return AppErrorState(
+                  message: controller.errorMessage.value,
+                  onRetry: () => controller.onInit(),
+                );
+              }
               final list = controller.filteredNotifications;
-
               if (list.isEmpty) {
-                return const Center(child: Text("No notifications found"));
+                return const AppEmptyState(
+                  icon: Icons.notifications_off_outlined,
+                  title: 'ບໍ່ມີການແຈ້ງເຕືອນ',
+                );
               }
 
-              // ພາຍໃນ Obx ຂອງ Notification List
               return ListView.builder(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                itemCount: list.length, // ໃຊ້ຈຳນວນຕາມຂໍ້ມູນທີ່ມີແທ້ໆ
+                    horizontal: 20, vertical: 10),
+                itemCount: list.length,
                 itemBuilder: (context, index) {
-                  // ຕ້ອງກວດເຊັກກ່ອນສະເໝີວ່າ index ບໍ່ເກີນຂະໜາດຂອງ list
-                  if (index >= list.length) return const SizedBox.shrink();
-
                   final item = list[index];
 
-                  // 1. ສໍາລັບ Urgent Card
+                  final id = item['id'] as int?;
+                  final unread = item['unread'] == true;
+
                   if (item['type'] == 'Urgent') {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 20),
@@ -62,49 +81,48 @@ class StudentNotiView extends GetView<StudentNotiController> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           const Text(
-                            "URGENT ALERTS",
+                            "ແຈ້ງເຕືອນດ່ວນ",
                             style: TextStyle(
-                              color: Colors.redAccent,
+                              color: AppColors.rejectRed,
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
                             ),
                           ),
                           const SizedBox(height: 10),
-                          GestureDetector(
-                            onTap: () => Get.to(
-                              () => const GradeNotiView(),
-                            ), // ລິ້ງໄປໜ້າ Grade
-                            child: _buildUrgentCard(
-                              item['title']!,
-                              item['sub']!,
-                              item['status']!,
-                              item['time']!,
-                            ),
+                          _buildUrgentCard(
+                            item['title']!,
+                            item['sub']!,
+                            item['status']!,
+                            item['time']!,
+                            unread: unread,
+                            onTap: () {
+                              if (id != null) controller.markAsRead(id);
+                              Get.to(() => const GradeNotiView());
+                            },
                           ),
                         ],
                       ),
                     );
                   }
 
-                  // 2. ສໍາລັບ Normal Card
                   return _buildRecentCard(
                     icon: item['category'] == 'Academic'
                         ? Icons.stars_outlined
                         : Icons.assignment_turned_in_outlined,
                     iconColor: item['category'] == 'Academic'
-                        ? Colors.blue
-                        : Colors.green,
+                        ? AppColors.statsBlue
+                        : AppColors.borderApproved,
                     title: item['title']!,
                     desc: item['desc']!,
                     time: item['time']!,
+                    unread: unread,
                     onTap: () {
-                      // ກວດເຊັກ Title ໃຫ້ກົງກັບຂໍ້ມູນໃນ Controller ຂອງເຈົ້າ
+                      if (id != null) controller.markAsRead(id);
                       if (item['title'] == "Grade Released") {
-                        Get.to(() => const GradeNotiView()); // ໄປໜ້າ Grade
+                        Get.to(() => const GradeNotiView());
                       } else if (item['title'] == "Booking Confirmed") {
-                        Get.to(
-                          () => const BookingDetailView(),
-                        ); // ໄປໜ້າ Booking
+                        Get.to(() => const BookingDetailView());
                       }
                     },
                   );
@@ -115,74 +133,133 @@ class StudentNotiView extends GetView<StudentNotiController> {
         ],
       ),
     );
-  }
-
-  // ສ່ວນເລືອກ Filter
-  Widget _buildFilterTabs() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-      child: Obx(
-        () => Row(
-          children: [
-            _filterItem("All", 0),
-            _filterItem("Academic", 1),
-            _filterItem("Room Booking", 2),
-          ],
-        ),
+        },
       ),
     );
   }
 
-  Widget _filterItem(String label, int index) {
-    bool isSelected = controller.selectedFilterIndex.value == index;
-    return GestureDetector(
-      onTap: () => controller.selectedFilterIndex.value = index,
-      child: Container(
-        margin: const EdgeInsets.only(right: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF4A68FF) : Colors.white,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: isSelected
-              ? null
-              : [const BoxShadow(color: Colors.black12, blurRadius: 4)],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: isSelected ? Colors.white : Colors.black87,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+  Widget _buildUrgentCard(
+    String title,
+    String sub,
+    String status,
+    String time, {
+    bool unread = false,
+    VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppColors.cardRadius),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(15),
+          decoration: BoxDecoration(
+            color: AppColors.rejectRed.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(AppColors.cardRadius),
+            border:
+                Border.all(color: AppColors.rejectRed.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.rejectRed.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.warning_amber_rounded,
+                    color: AppColors.rejectRed),
+              ),
+              const SizedBox(width: 15),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Flexible(
+                          child: Row(
+                            children: [
+                              if (unread) ...[
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.rejectRed,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                              ],
+                              Flexible(
+                                child: Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          time,
+                          style: const TextStyle(
+                              color: AppColors.rejectRed, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      sub,
+                      style: const TextStyle(
+                          color: AppColors.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      status,
+                      style: const TextStyle(
+                        color: AppColors.rejectRed,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  // Card ແຈ້ງເຕືອນດ່ວນ (ສີແດງ)
-  Widget _buildUrgentCard(
-    String title,
-    String sub,
-    String status,
-    String time,
-  ) {
-    return Container(
+  Widget _buildRecentCard({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String desc,
+    required String time,
+    bool unread = false,
+    VoidCallback? onTap,
+  }) {
+    return AppSurfaceCard(
+      margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFF5F5),
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.red.shade100),
-      ),
+      onTap: onTap,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.red.shade50,
-              borderRadius: BorderRadius.circular(10),
+              color: iconColor.withValues(alpha: 0.1),
+              shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.copy_all_outlined, color: Colors.redAccent),
+            child: Icon(icon, color: iconColor, size: 22),
           ),
           const SizedBox(width: 15),
           Expanded(
@@ -192,110 +269,53 @@ class StudentNotiView extends GetView<StudentNotiController> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                    Flexible(
+                      child: Row(
+                        children: [
+                          if (unread) ...[
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: AppColors.rejectRed,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                     Text(
                       time,
                       style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 11,
-                      ),
+                          color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
-                Text(
-                  sub,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13),
-                ),
                 const SizedBox(height: 5),
                 Text(
-                  status,
+                  desc,
                   style: const TextStyle(
-                    color: Colors.redAccent,
-                    fontWeight: FontWeight.w500,
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  // Card ແຈ້ງເຕືອນທົ່ວໄປ
-  Widget _buildRecentCard({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String desc,
-    required String time,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 15),
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 5)],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: iconColor),
-            ),
-            const SizedBox(width: 15),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                        ),
-                      ),
-                      Text(
-                        time,
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 11,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    desc,
-                    style: const TextStyle(
-                      color: Colors.black87,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

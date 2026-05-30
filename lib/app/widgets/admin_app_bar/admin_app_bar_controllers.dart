@@ -1,92 +1,67 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../modules/data/data_exporter.dart';
+import '../../services/api_client.dart';
 
+/// Reactive state owner for [AdminAppBar].
+///
+/// Loads three independent pieces of state on init:
+/// 1. The active [semester] (priority: date-range → status flag → newest).
+/// 2. The count of pending room bookings ([pendingRequestCount]).
+/// 3. The count of unread notifications ([unreadNotiCount]).
+///
+/// Each fetch is best-effort — a failure logs and leaves the corresponding
+/// observable at its last value, so the UI never blocks on networking.
 class AdminAppBarControllers extends GetxController {
+  /// Active-semester display label (e.g. `S1 (2025-2026)`).
   final RxString semester = ''.obs;
+
+  /// `true` while [_fetchActiveSemester] is in flight.
   final RxBool semesterLoading = true.obs;
+
+  /// Count of `status = pending` room bookings.
   final RxInt pendingRequestCount = 0.obs;
-  late final Dio _dio;
-  String _token = '';
+
+  /// Count of `is_read = 0` notifications addressed to this user.
+  final RxInt unreadNotiCount = 0.obs;
+
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
-    _loadToken().then((_) {
-      _fetchActiveSemester();
-      _fetchPendingRequests();
-    });
+    _fetchActiveSemester();
+    _fetchPendingRequests();
+    _fetchUnreadNotifications();
   }
 
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
-
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
+  /// Refresh all three observables in parallel.
+  ///
+  /// Call from screens that need an up-to-date bar after a write — e.g.
+  /// after the admin approves a booking or marks a notification read.
+  Future<void> refreshData() {
+    return Future.wait([
+      _fetchActiveSemester(),
+      _fetchPendingRequests(),
+      _fetchUnreadNotifications(),
+    ]);
   }
 
   Future<void> _fetchActiveSemester() async {
     semesterLoading.value = true;
     try {
-      final response = await _dio.get('/semasters', queryParameters: {
-        'limit': 10,
-      });
+      final response = await _dio.get(
+        '/semasters',
+        queryParameters: {'limit': 10},
+      );
+      if (response.statusCode != 200) return;
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-
-        final allSemesters = items.map((json) => SemasterModel.fromJson(json)).toList();
-        final now = DateTime.now();
-
-        // 1. Try to find semester matching current time
-        final currentSemesters = allSemesters.where((s) {
-          if (s.startDate != null && s.endDate != null) {
-            return now.compareTo(s.startDate!) >= 0 && now.compareTo(s.endDate!) <= 0;
-          }
-          return false;
-        }).toList();
-
-        if (currentSemesters.isNotEmpty) {
-          final s = currentSemesters.first;
-          semester.value = '${s.semasterCode} (${s.year})';
-        } else {
-          // 2. Fallback to active semester (status == 1)
-          final activeSemesters = allSemesters.where((s) => s.status == 1).toList();
-          if (activeSemesters.isNotEmpty) {
-            final s = activeSemesters.first;
-            semester.value = '${s.semasterCode} (${s.year})';
-          } else if (allSemesters.isNotEmpty) {
-            // 3. Fallback to latest semester
-            final s = allSemesters.first;
-            semester.value = '${s.semasterCode} (${s.year})';
-          } else {
-            semester.value = 'No active semester';
-          }
-        }
-      }
+      final all = _extractList(response.data)
+          .map((json) => SemasterModel.fromJson(json))
+          .toList();
+      semester.value = _pickActiveSemester(all);
     } on DioException catch (e) {
       debugPrint('Failed to fetch semester: ${e.message}');
       semester.value = 'Semester';
@@ -97,36 +72,66 @@ class AdminAppBarControllers extends GetxController {
 
   Future<void> _fetchPendingRequests() async {
     try {
-      final response = await _dio.get('/room-bookings', queryParameters: {
-        'limit': 100,
-      });
+      final response = await _dio.get(
+        '/room-bookings',
+        queryParameters: {'limit': 100},
+      );
+      if (response.statusCode != 200) return;
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-
-        final pending = items
-            .map((json) => RoomBookingModel.fromJson(json))
-            .where((b) => b.status == 'pending')
-            .length;
-
-        pendingRequestCount.value = pending;
-      }
+      pendingRequestCount.value = _extractList(response.data)
+          .map((json) => RoomBookingModel.fromJson(json))
+          .where((b) => b.status == 'pending')
+          .length;
     } on DioException catch (e) {
       debugPrint('Failed to fetch pending requests: ${e.message}');
     }
   }
 
-  /// Call this to refresh both semester and pending count (e.g. on tab switch).
-  Future<void> refreshData() async {
-    await Future.wait([
-      _fetchActiveSemester(),
-      _fetchPendingRequests(),
-    ]);
+  Future<void> _fetchUnreadNotifications() async {
+    try {
+      final response = await _dio.get(
+        '/notifications',
+        queryParameters: {'limit': 200},
+      );
+      if (response.statusCode != 200) return;
+
+      unreadNotiCount.value = _extractList(response.data)
+          .map((json) => NotificationModel.fromJson(json))
+          .where((n) => n.isRead == 0)
+          .length;
+    } on DioException catch (e) {
+      debugPrint('Failed to fetch unread notifications: ${e.message}');
+    }
   }
+
+  /// Normalize the server's two response shapes — raw array or
+  /// `{ "data": [...] }` envelope — into a `List<dynamic>`.
+  List<dynamic> _extractList(dynamic raw) {
+    if (raw is List) return raw;
+    if (raw is Map && raw['data'] is List) return raw['data'] as List;
+    return const <dynamic>[];
+  }
+
+  /// Pick the semester to display from the full list using a three-tier
+  /// fallback strategy. Returns the formatted label, or a sentinel when the
+  /// list is empty.
+  String _pickActiveSemester(List<SemasterModel> all) {
+    if (all.isEmpty) return 'No active semester';
+
+    final now = DateTime.now();
+    final byDate = all.where((s) {
+      final start = s.startDate;
+      final end = s.endDate;
+      if (start == null || end == null) return false;
+      return !now.isBefore(start) && !now.isAfter(end);
+    }).toList();
+    if (byDate.isNotEmpty) return _format(byDate.first);
+
+    final active = all.where((s) => s.status == 1).toList();
+    if (active.isNotEmpty) return _format(active.first);
+
+    return _format(all.first);
+  }
+
+  String _format(SemasterModel s) => '${s.semasterCode} (${s.year})';
 }

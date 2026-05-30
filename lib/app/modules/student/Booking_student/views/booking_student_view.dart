@@ -1,428 +1,611 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/app/utilities/assets.dart';
+
 import 'package:get/get.dart';
-import 'package:intl/intl.dart';
+
 import '../controllers/booking_student_controller.dart';
+import '../../../data/data_exporter.dart';
+import '../../../../widgets/widget.dart';
+import '../../../teachers/booking/controllers/fixed_booking.dart';
 
 class BookingStudentView extends GetView<BookingStudentController> {
   const BookingStudentView({super.key});
-
   @override
   Widget build(BuildContext context) {
-    // ป้องกัน Error หากลืมฉีด Controller เข้ามาในระบบ
     if (!Get.isRegistered<BookingStudentController>()) {
       Get.put(BookingStudentController());
     }
-
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: Stack(
-        children: [
-          // 1. Background Image
-          Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage(AssetImages.login2),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 2. Title ตรงกลาง
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Center(
-                    child: Text(
-                      'CEIT Room Booking',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // 3. ส่วนแสดงเดือน และปุ่ม View Calendar
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 5,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF4A80F0),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Obx(
-                          () => Text(
-                            DateFormat(
-                              'MMMM yyyy',
-                            ).format(controller.selectedDate.value),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () {},
-                        child: const Text(
-                          'View Calendar',
-                          style: TextStyle(
-                            color: Color(0xFF4A80F0),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // 4. แถบปฏิทิน 7 วัน (พอดีหน้าจอ)
-                _buildCalendarSection(),
-
-                // 5. ปุ่มเลือกตึก
-                _buildBuildingFilters(),
-
-                const Padding(
-                  padding: EdgeInsets.only(left: 16, top: 15, bottom: 10),
-                  child: Text(
-                    'Available Rooms',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                ),
-
-                // 6. รายการห้อง
-                Expanded(child: _buildRoomList()),
+    return GetBuilder<BookingStudentController>(
+      builder: (controller) => LayoutBuilder(
+        builder: (context, constraints) {
+          return Scaffold(
+            appBar: AppBar(
+              title: const Text('ຈອງຫ້ອງ'),
+              centerTitle: true,
+              actions: [
+                IconButton(
+                  onPressed: () => Get.toNamed('/student-noti'),
+                  icon: const Icon(Icons.notifications_none_rounded),
+                  tooltip: 'ການແຈ້ງເຕືອນ',
+                )
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCalendarSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left, color: Color(0xFF4A80F0)),
-            onPressed: () => controller.generateWeek(
-              controller.selectedDate.value.subtract(const Duration(days: 7)),
+            floatingActionButton: FloatingActionButton.extended(
+              onPressed: () => _showCreateDialog(context),
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('ຈອງໃໝ່'),
             ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // คำนวณความกว้าง: (พื้นที่ทั้งหมด - ช่องว่างรวม) / 7 วัน
-                double bubbleWidth = (constraints.maxWidth - (6 * 4)) / 7;
-                return Obx(
-                  () => Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: controller.currentWeek.map((date) {
-                      bool isSelected =
-                          date.day == controller.selectedDate.value.day &&
-                          date.month == controller.selectedDate.value.month;
-                      return GestureDetector(
-                        onTap: () => controller.selectDate(date),
-                        child: _DateBubble(
-                          width: bubbleWidth,
-                          day: DateFormat('EEE').format(date),
-                          date: date.day.toString(),
-                          isSelected: isSelected,
-                        ),
-                      );
-                    }).toList(),
-                  ),
+            body: Obx(() {
+              if (controller.isLoading.value) {
+                return AppRefreshableLoader(
+                  onRefresh: controller.refreshData,
+                  child: const AppLoading.booking(),
                 );
-              },
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right, color: Color(0xFF4A80F0)),
-            onPressed: () => controller.generateWeek(
-              controller.selectedDate.value.add(const Duration(days: 7)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+              }
+              final err = controller.errorMessage.value;
+              if (err.isNotEmpty) {
+                return AppErrorState(
+                  message: err,
+                  onRetry: controller.refreshData,
+                );
+              }
 
-  Widget _buildBuildingFilters() {
-    return Obx(
-      () => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: ['All Rooms', 'ตึก CEIT', 'ตึก A'].map((label) {
-            bool isActive = controller.selectedBuilding.value == label;
-            return GestureDetector(
-              onTap: () => controller.changeBuilding(label),
-              child: Container(
-                margin: const EdgeInsets.only(right: 10, top: 10),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 15,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFF1A1C2E) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: isActive ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ),
-    );
-  }
+              final filtered = controller.filteredMyBookings;
 
-  Widget _buildRoomList() {
-    return Obx(
-      () => ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: controller.filteredRooms.length,
-        itemBuilder: (context, index) {
-          var room = controller.filteredRooms[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-              side: BorderSide(color: Colors.grey.shade100),
-            ),
-            elevation: 2,
-            child: Column(
-              children: [
-                ListTile(
-                  leading: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      borderRadius: BorderRadius.circular(10),
+              return RefreshIndicator(
+                onRefresh: controller.refreshData,
+                color: AppColors.primary,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    _statsRow(controller),
+                    const SizedBox(height: AppSpacing.m),
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text('ປະຫວັດການຈອງຂອງຂ້ອຍ',
+                              style: AppTypography.subheading),
+                        ),
+                        Text('${filtered.length} ລາຍການ',
+                            style: AppTypography.caption),
+                      ],
                     ),
-                    child: const Icon(Icons.meeting_room, color: Colors.grey),
-                  ),
-                  title: Text(
-                    room['name'],
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'Capacity: ${room['capacity']}\n${room['facilities']}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
+                    const SizedBox(height: AppSpacing.s),
+                    _filterChips(controller),
+                    const SizedBox(height: AppSpacing.s + 2),
+                    if (filtered.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xl),
+                        child: AppEmptyState(
+                          icon: Icons.inbox_outlined,
+                          title: controller.myBookings.isEmpty
+                              ? 'ຍັງບໍ່ມີການຈອງ'
+                              : 'ບໍ່ມີຂໍ້ມູນທີ່ກົງກັບຕົວກອງ',
+                          subtitle: controller.myBookings.isEmpty
+                              ? 'ກົດປຸ່ມ "ຈອງໃໝ່" ເພື່ອເລີ່ມຕົ້ນ'
+                              : 'ລອງເລືອກຕົວກອງອື່ນ',
+                          actionLabel: controller.myBookings.isEmpty
+                              ? 'ຈອງໃໝ່'
+                              : 'ລ້າງຕົວກອງ',
+                          actionIcon: controller.myBookings.isEmpty
+                              ? Icons.add_rounded
+                              : Icons.filter_alt_off_rounded,
+                          onAction: controller.myBookings.isEmpty
+                              ? () => _showCreateDialog(context)
+                              : () => controller.bookingFilter.value = 'all',
+                        ),
+                      )
+                    else
+                      ...filtered.map((b) => _bookingCard(b)),
+                    const SizedBox(height: 80),
+                  ],
                 ),
-                const Divider(indent: 16, endIndent: 16),
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: (room['slots'] as List).map((slot) {
-                      bool isBooked = slot['status'] == 'booked';
-                      return Obx(() {
-                        bool isSelected =
-                            controller.selectedSlots[room['name']] ==
-                            slot['time'];
-                        return ChoiceChip(
-                          label: Text(
-                            slot['time'],
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: isBooked
-                                  ? Colors.grey
-                                  : (isSelected ? Colors.white : Colors.black),
-                              decoration: isBooked
-                                  ? TextDecoration.lineThrough
-                                  : null,
-                            ),
-                          ),
-                          selected: isSelected,
-                          onSelected: isBooked
-                              ? null
-                              : (val) {
-                                  controller.selectSlot(
-                                    room['name'],
-                                    slot['time'],
-                                  );
-                                  _showConfirmDialog(
-                                    context,
-                                    room['name'],
-                                    slot['time'],
-                                  );
-                                },
-                          selectedColor: const Color(0xFF4A80F0),
-                          backgroundColor: isBooked
-                              ? Colors.grey[100]
-                              : Colors.white,
-                        );
-                      });
-                    }).toList(),
-                  ),
-                ),
-              ],
-            ),
+              );
+            }),
           );
         },
       ),
     );
   }
 
-  void _showConfirmDialog(BuildContext context, String roomName, String time) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "ຕ້ອງການຈອງຫ້ອງ $roomName\nວັນທີ ${DateFormat('dd MMM').format(controller.selectedDate.value)}\nເວລາ $time",
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            const SizedBox(height: 20),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                "Section",
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              decoration: InputDecoration(
-                hintText: "ກະລຸນາກອກເຫດຜົນທີ່ຈອງ",
-                hintStyle: const TextStyle(fontSize: 12),
-                filled: true,
-                fillColor: Colors.blue[50],
-                contentPadding: const EdgeInsets.symmetric(horizontal: 15),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+  Widget _statsRow(BookingStudentController c) {
+    Widget tile(String label, int value, Color color, IconData icon) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(height: 6),
+              Text(
+                '$value',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: const TextStyle(fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        tile('ກຳລັງມາ', c.countUpcoming, AppColors.primary,
+            Icons.event_available),
+        const SizedBox(width: 8),
+        tile('ລໍຖ້າ', c.countPending, AppColors.borderPending,
+            Icons.hourglass_top),
+        const SizedBox(width: 8),
+        tile('ອະນຸມັດ', c.countApproved, AppColors.borderApproved,
+            Icons.check_circle),
+        const SizedBox(width: 8),
+        tile('ຜ່ານໄປແລ້ວ', c.countPast, Colors.grey, Icons.history),
+      ],
+    );
+  }
+
+  Widget _filterChips(BookingStudentController c) {
+    const filters = <(String, String)>[
+      ('all', 'ທັງໝົດ'),
+      ('upcoming', 'ກຳລັງມາ'),
+      ('pending', 'ລໍຖ້າ'),
+      ('approved', 'ອະນຸມັດ'),
+      ('cancelled', 'ຍົກເລີກ'),
+      ('past', 'ຜ່ານໄປແລ້ວ'),
+    ];
+    return SizedBox(
+      height: 36,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemBuilder: (_, i) {
+          final (key, label) = filters[i];
+          final selected = c.bookingFilter.value == key;
+          return ChoiceChip(
+            label: Text(label),
+            selected: selected,
+            onSelected: (_) => c.bookingFilter.value = key,
+            labelStyle: TextStyle(
+              fontSize: 12,
+              color: selected ? Colors.white : AppColors.textPrimary,
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 25),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Get.back(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      "Cancel",
-                      style: TextStyle(color: Colors.white),
-                    ),
+            selectedColor: AppColors.primary,
+            backgroundColor: Colors.grey.shade100,
+            side: BorderSide(color: Colors.grey.shade300),
+            visualDensity: VisualDensity.compact,
+          );
+        },
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemCount: filters.length,
+      ),
+    );
+  }
+
+  Widget _bookingCard(RoomBookingModel b) {
+    final room = b.room?.roomCode ?? 'Room ${b.roomId}';
+    final date =
+        '${b.bookingDate.day}/${b.bookingDate.month}/${b.bookingDate.year}';
+    final status = b.status;
+    final s = status.toLowerCase();
+    final past = controller.isBookingPast(b);
+    final color = s == 'approved'
+        ? Colors.green
+        : s == 'rejected' || s == 'cancelled'
+            ? Colors.red
+            : Colors.orange;
+    final canCancel = (s == 'pending' || s == 'approved') && !past;
+    final dayBadge = _dayBadge(b.bookingDate);
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Opacity(
+        opacity: past ? 0.65 : 1.0,
+        child: ListTile(
+          title: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  '$room • ${b.startTime} - ${b.endTime}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (dayBadge != null) ...[
+                const SizedBox(width: 6),
+                dayBadge,
+              ],
+            ],
+          ),
+          subtitle: Text(
+            [
+              'ວັນທີ $date',
+              if (b.purpose != null && b.purpose!.isNotEmpty)
+                'ເປົ້າໝາຍ: ${b.purpose}',
+            ].join('\n'),
+          ),
+          isThreeLine: true,
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      controller.bookSlot(roomName, time);
-                      Get.back();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF27AE60),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    child: const Text(
-                      "Confirm",
-                      style: TextStyle(color: Colors.white),
+              ),
+              if (canCancel) ...[
+                const SizedBox(height: 4),
+                GestureDetector(
+                  onTap: () => controller.cancelBooking(b),
+                  child: const Text(
+                    'ຍົກເລີກ',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// "ມື້ນີ້" / "ມື້ອື່ນ" pill for today/tomorrow; null otherwise.
+  Widget? _dayBadge(DateTime d) {
+    final today = dateOnly(DateTime.now());
+    final target = dateOnly(d);
+    String? label;
+    Color? color;
+    if (sameDate(target, today)) {
+      label = 'ມື້ນີ້';
+      color = AppColors.primary;
+    } else if (sameDate(target, today.add(const Duration(days: 1)))) {
+      label = 'ມື້ອື່ນ';
+      color = AppColors.bookingBlue;
+    }
+    if (label == null || color == null) return null;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickTime(
+    BuildContext context,
+    TextEditingController target,
+  ) async {
+    final raw = target.text.trim();
+    final parts = raw.split(':');
+    final initial = TimeOfDay(
+      hour: int.tryParse(parts.isNotEmpty ? parts[0] : '') ?? 8,
+      minute: int.tryParse(parts.length > 1 ? parts[1] : '') ?? 0,
+    );
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: initial,
+      builder: (ctx, child) => MediaQuery(
+        data: MediaQuery.of(ctx).copyWith(alwaysUse24HourFormat: true),
+        child: child ?? const SizedBox.shrink(),
+      ),
+    );
+    if (picked == null) return;
+    final hh = picked.hour.toString().padLeft(2, '0');
+    final mm = picked.minute.toString().padLeft(2, '0');
+    target.text = '$hh:$mm';
+  }
+
+  Future<void> _showCreateDialog(BuildContext context) async {
+    final selectedRoomId = RxnInt();
+    final date = Rx<DateTime>(DateTime.now());
+    final startCtrl = TextEditingController(text: '08:30');
+    final endCtrl = TextEditingController(text: '10:00');
+    final purposeCtrl = TextEditingController();
+    final conflictNote = ''.obs;
+    final pastNote = ''.obs;
+
+    void recomputeConflict() {
+      pastNote.value =
+          controller.pastSlotReason(date.value, startCtrl.text.trim()) ?? '';
+      final id = selectedRoomId.value;
+      if (id == null) {
+        conflictNote.value = '';
+        return;
+      }
+      final reason = controller.conflictReason(
+        roomId: id,
+        bookingDate: date.value,
+        startTime: startCtrl.text.trim(),
+        endTime: endCtrl.text.trim(),
+      );
+      conflictNote.value = reason ?? '';
+    }
+
+    startCtrl.addListener(recomputeConflict);
+    endCtrl.addListener(recomputeConflict);
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            top: 12,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+          ),
+          child: Obx(() {
+            final isPast = pastNote.value.isNotEmpty;
+            final available = isPast
+                ? const <RoomModel>[]
+                : controller.availableRoomsFor(
+                    bookingDate: date.value,
+                    startTime: startCtrl.text.trim(),
+                    endTime: endCtrl.text.trim(),
+                  );
+            if (selectedRoomId.value != null &&
+                !available.any((r) => r.id == selectedRoomId.value)) {
+              selectedRoomId.value = null;
+            }
+            final canSubmit = !isPast &&
+                selectedRoomId.value != null &&
+                conflictNote.value.isEmpty;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Center(
+                  child: SizedBox(
+                    width: 40,
+                    height: 4,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFDDDDDD),
+                        borderRadius: BorderRadius.all(Radius.circular(99)),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'ຈອງຫ້ອງໃໝ່',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue: selectedRoomId.value,
+                  items: available
+                      .map(
+                        (r) => DropdownMenuItem<int>(
+                          value: r.id,
+                          child: Text('${r.roomCode} (${r.capacity})'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: isPast
+                      ? null
+                      : (v) {
+                          selectedRoomId.value = v;
+                          recomputeConflict();
+                        },
+                  decoration: InputDecoration(
+                    labelText: isPast
+                        ? 'ບໍ່ມີຫ້ອງ (ເວລາຜ່ານໄປແລ້ວ)'
+                        : 'ຫ້ອງ (ມີ ${available.length} ຫ້ອງວ່າງ)',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final today = DateTime.now();
+                          final picked = await showDatePicker(
+                            context: context,
+                            firstDate: DateTime(
+                                today.year, today.month, today.day),
+                            lastDate: today.add(const Duration(days: 365)),
+                            initialDate: date.value.isBefore(today)
+                                ? today
+                                : date.value,
+                          );
+                          if (picked != null) {
+                            date.value = picked;
+                            recomputeConflict();
+                          }
+                        },
+                        icon: const Icon(Icons.calendar_today, size: 18),
+                        label: Text(
+                          '${date.value.day}/${date.value.month}/${date.value.year}',
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: startCtrl,
+                        readOnly: true,
+                        onTap: () => _pickTime(context, startCtrl),
+                        decoration: const InputDecoration(
+                          labelText: 'ເລີ່ມ (HH:mm)',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.access_time, size: 18),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextField(
+                        controller: endCtrl,
+                        readOnly: true,
+                        onTap: () => _pickTime(context, endCtrl),
+                        decoration: const InputDecoration(
+                          labelText: 'ສິ້ນສຸດ (HH:mm)',
+                          border: OutlineInputBorder(),
+                          suffixIcon: Icon(Icons.access_time, size: 18),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _PurposeChips(
+                  presets: const [
+                    'ອ່ານປຶ້ມ',
+                    'ໂປຣເຈັກກຸ່ມ',
+                    'ປະຊຸມຊົມຮົມ',
+                    'ກິດຈະກຳ',
+                  ],
+                  controller: purposeCtrl,
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: purposeCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'ເປົ້າໝາຍ (ບໍ່ບັງຄັບ)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                if (pastNote.value.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _inlineWarning(pastNote.value, Colors.red),
+                ] else if (conflictNote.value.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  _inlineWarning(conflictNote.value, Colors.red),
+                ],
+                const SizedBox(height: 16),
+                AppPrimaryButton(
+                  label: 'ສົ່ງຄຳຂໍ',
+                  icon: Icons.send_rounded,
+                  onPressed: !canSubmit
+                      ? null
+                      : () async {
+                          Navigator.of(context).pop();
+                          await controller.createBooking(
+                            roomId: selectedRoomId.value!,
+                            bookingDate: date.value,
+                            startTime: startCtrl.text.trim(),
+                            endTime: endCtrl.text.trim(),
+                            purpose: purposeCtrl.text.trim().isEmpty
+                                ? null
+                                : purposeCtrl.text.trim(),
+                          );
+                        },
+                ),
+              ],
+            );
+          }),
+        );
+      },
+    );
+
+    startCtrl.removeListener(recomputeConflict);
+    endCtrl.removeListener(recomputeConflict);
+  }
+
+  Widget _inlineWarning(String message, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontSize: 12),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _DateBubble extends StatelessWidget {
-  final String day, date;
-  final bool isSelected;
-  final double width;
-
-  const _DateBubble({
-    required this.day,
-    required this.date,
-    required this.isSelected,
-    required this.width,
-  });
+class _PurposeChips extends StatelessWidget {
+  final List<String> presets;
+  final TextEditingController controller;
+  const _PurposeChips({required this.presets, required this.controller});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF4A80F0) : const Color(0xFFF0F5FF),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: isSelected
-            ? [
-                BoxShadow(
-                  color: Colors.blue.withOpacity(0.3),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : null,
-      ),
-      child: Column(
-        children: [
-          Text(
-            day,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.blue.shade400,
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
+    return SizedBox(
+      height: 32,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: presets.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (_, i) {
+          final label = presets[i];
+          return ActionChip(
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            onPressed: () => controller.text = label,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.08),
+            side: BorderSide(
+              color: AppColors.primary.withValues(alpha: 0.25),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            date,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.blue.shade900,
-              fontWeight: FontWeight.bold,
-              fontSize: 15,
-            ),
-          ),
-        ],
+            visualDensity: VisualDensity.compact,
+          );
+        },
       ),
     );
   }

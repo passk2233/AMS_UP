@@ -11,7 +11,8 @@ abstract class Routes {
   static const ANNOUNCEMENT = _Paths.ANNOUNCEMENT;
   static const APPROVE = _Paths.APPROVE;
   static const EVALUTION = _Paths.EVALUTION;
-  static const PROFILES = _Paths.PROFILES;
+  static const ADMIN_PROFILE = _Paths.ADMIN_PROFILE;
+  static const TEACHER_PROFILE = _Paths.TEACHER_PROFILE;
   static const SCHEDULES = _Paths.SCHEDULES;
   static const BOOKING = _Paths.BOOKING;
   static const FEEDBACKS = _Paths.FEEDBACKS;
@@ -23,6 +24,8 @@ abstract class Routes {
   static const FACULTY_FEEDBACK = _Paths.FACULTY_FEEDBACK;
   static const EVALUATION_FORM = _Paths.EVALUATION_FORM;
   static const STUDENT_NOTI = _Paths.STUDENT_NOTI;
+  static const ADMIN_NOTI = _Paths.ADMIN_NOTI;
+  static const TEACHER_NOTI = _Paths.TEACHER_NOTI;
 }
 
 abstract class _Paths {
@@ -35,7 +38,8 @@ abstract class _Paths {
   static const ANNOUNCEMENT = '/announcement';
   static const APPROVE = '/approve';
   static const EVALUTION = '/evalution';
-  static const PROFILES = '/profiles';
+  static const ADMIN_PROFILE = '/admin-profile';
+  static const TEACHER_PROFILE = '/teacher-profile';
   static const SCHEDULES = '/schedules';
   static const BOOKING = '/booking';
   static const FEEDBACKS = '/feedbacks';
@@ -48,4 +52,6 @@ abstract class _Paths {
   static const FACULTY_FEEDBACK = '/faculty-feedback';
   static const EVALUATION_FORM = '/evaluation-form';
   static const STUDENT_NOTI = '/student-noti';
+  static const ADMIN_NOTI = '/admin-noti';
+  static const TEACHER_NOTI = '/teacher-noti';
 }

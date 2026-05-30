@@ -8,8 +8,10 @@ import '../modules/admins/approve/bindings/approve_binding.dart';
 import '../modules/admins/approve/views/approve_view.dart';
 import '../modules/admins/evalutions/bindings/evalutions_binding.dart';
 import '../modules/admins/evalutions/views/evalutions_view.dart';
-import '../modules/profiles/bindings/profiles_binding.dart';
-import '../modules/profiles/views/profiles_view.dart';
+import '../modules/admins/admin_profile/bindings/admin_profile_binding.dart';
+import '../modules/admins/admin_profile/views/admin_profile_view.dart';
+import '../modules/teachers/teacher_profile/bindings/teacher_profile_binding.dart';
+import '../modules/teachers/teacher_profile/views/teacher_profile_view.dart';
 import '../modules/auth/bindings/auth_binding.dart';
 import '../modules/auth/views/auth_view.dart';
 import '../modules/student/Booking_student/bindings/booking_student_binding.dart';
@@ -27,14 +29,17 @@ import '../modules/student/student_home/bindings/home_student_binding.dart';
 import '../modules/student/student_home/views/student_home_view.dart';
 import '../modules/student/student_noti/bindings/student_noti_binding.dart';
 import '../modules/student/student_noti/views/student_noti_view.dart';
-import '../modules/booking/bindings/booking_binding.dart';
-import '../modules/booking/views/booking_view.dart';
+import '../modules/admins/admin_noti/bindings/admin_noti_binding.dart';
+import '../modules/admins/admin_noti/views/admin_noti_view.dart';
+import '../modules/teachers/teacher_noti/bindings/teacher_noti_binding.dart';
+import '../modules/teachers/teacher_noti/views/teacher_noti_view.dart';
+import '../modules/teachers/booking/bindings/booking_binding.dart';
+import '../modules/teachers/booking/views/booking_view.dart';
 import '../modules/teachers/feedbacks/bindings/feedbacks_binding.dart';
 import '../modules/teachers/feedbacks/views/feedbacks_view.dart';
 import '../modules/teachers/schedules/bindings/schedules_binding.dart';
 import '../modules/teachers/schedules/views/schedules_view.dart';
-import '../modules/students/student_home/bindings/student_home_binding.dart';
-import '../modules/students/student_home/views/student_home_view.dart';
+
 import '../modules/teachers/teacher_navigator_bar/bindings/teacher_shell_binding.dart';
 import '../modules/teachers/teacher_navigator_bar/views/teacher_shell_view.dart';
 
@@ -43,7 +48,7 @@ part 'app_routes.dart';
 class AppPages {
   AppPages._();
 
-  static const INITIAL = Routes.HOME_STUDENT;
+  static const INITIAL = Routes.AUTH;
 
   static final routes = [
     GetPage(
@@ -56,11 +61,7 @@ class AppPages {
       page: () => const AdminShellView(),
       binding: AdminShellBinding(),
     ),
-    GetPage(
-      name: _Paths.STUDENT_HOME,
-      page: () => const StudentHomeView(),
-      binding: StudentHomeBinding(),
-    ),
+
     GetPage(
       name: _Paths.TEACHER_HOME,
       page: () => const TeacherShellView(),
@@ -82,16 +83,14 @@ class AppPages {
       binding: EvalutionBinding(),
     ),
     GetPage(
-      name: _Paths.PROFILES,
-      page: () => const ProfilesView(),
-      binding: ProfilesBinding(),
-      children: [
-        GetPage(
-          name: _Paths.PROFILES,
-          page: () => const ProfilesView(),
-          binding: ProfilesBinding(),
-        ),
-      ],
+      name: _Paths.ADMIN_PROFILE,
+      page: () => const AdminProfileView(),
+      binding: AdminProfileBinding(),
+    ),
+    GetPage(
+      name: _Paths.TEACHER_PROFILE,
+      page: () => const TeacherProfileView(),
+      binding: TeacherProfileBinding(),
     ),
     GetPage(
       name: _Paths.SCHEDULES,
@@ -147,6 +146,16 @@ class AppPages {
       name: _Paths.STUDENT_NOTI,
       page: () => const StudentNotiView(),
       binding: StudentNotiBinding(),
+    ),
+    GetPage(
+      name: _Paths.ADMIN_NOTI,
+      page: () => const AdminNotiView(),
+      binding: AdminNotiBinding(),
+    ),
+    GetPage(
+      name: _Paths.TEACHER_NOTI,
+      page: () => const TeacherNotiView(),
+      binding: TeacherNotiBinding(),
     ),
   ];
 }

@@ -1,115 +1,199 @@
-import "package:flutter/material.dart";
-import "package:get/get.dart";
-import "../controllers/faculty_feedback_controller.dart";
-import "faculty_model.dart";
+import 'package:flutter/material.dart';
+import 'package:frontend/app/widgets/widget.dart';
+import 'package:get/get.dart';
+
+import '../controllers/faculty_feedback_controller.dart';
+import 'faculty_model.dart';
 
 class EvaluationFormView extends GetView<FacultyFeedbackController> {
   const EvaluationFormView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // รับข้อมูล Faculty จาก arguments (ห้ามใส่ ?? 0 เพราะเราส่งเป็น Object)
     final Faculty faculty = Get.arguments;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
-        title: const Text('Faculty Feedback', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.blue,
+        title: const Text('ປະເມີນອາຈານ', style: AppTypography.heading),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Get.back(),
+          icon: const Icon(Icons.arrow_back_ios_rounded,
+              color: AppColors.textPrimary, size: 20),
+          onPressed: Get.back,
         ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildFacultyHeader(faculty),
-            const SizedBox(height: 20),
-
-            for (int i = 0; i < 7; i++) _buildStarRatingQuestion(i),
-
-            const SizedBox(height: 20),
-            const Text("Comment", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 10),
-
-            TextField(
-              onChanged: (val) => controller.comment.value = val,
-              decoration: InputDecoration(
-                hintText: 'ใส่ความเห็นเพิ่มเติม',
-                fillColor: Colors.grey[200],
-                filled: true,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-              maxLines: 3,
-            ),
-            
-            const SizedBox(height: 30),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => controller.submitFeedback(faculty),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF5D69F1),
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Submit Feedback', style: TextStyle(color: Colors.white)),
-              ),
-            ),
-          ],
-        ),
-      ),
+      // Pop back to the list the moment the evaluation window closes
+      // (admin closed it, or `close_time` passed while the student was here).
+      // The list view itself renders the closed state; we only schedule the
+      // pop, never paint anything for the closed branch.
+      body: Obx(() {
+        if (!controller.isEvaluationOpen.value) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (Get.currentRoute != '/evaluation-form') return;
+            Get.back();
+            // Delay snackbar so navigation completes before the overlay
+            // attaches — avoids AnimationController-after-dispose crash.
+            Future.delayed(const Duration(milliseconds: 150), () {
+              Get.snackbar(
+                'ໄລຍະການປະເມີນຖືກປິດ',
+                'ບໍ່ສາມາດສົ່ງການປະເມີນຕໍ່ໄດ້ໃນຕອນນີ້.',
+                snackPosition: SnackPosition.BOTTOM,
+              );
+            });
+          });
+          return const SizedBox.shrink();
+        }
+        return _buildForm(faculty);
+      }),
     );
   }
 
-  Widget _buildFacultyHeader(Faculty faculty) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundColor: Colors.blue[50],
-          child: Text(faculty.initials, style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold)),
+  Widget _buildForm(Faculty faculty) {
+    return SafeArea(
+      child: GetBuilder<FacultyFeedbackController>(
+        builder: (controller) => SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.l,
+              AppSpacing.s,
+              AppSpacing.l,
+              AppSpacing.xl,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FacultyHeader(faculty: faculty),
+                const SizedBox(height: AppSpacing.l),
+                const Text('ຄຳຖາມການປະເມີນ',
+                    style: AppTypography.subheading),
+                const SizedBox(height: AppSpacing.s),
+                Obx(() {
+                  final questions = controller.questions;
+                  if (questions.isEmpty) {
+                    return const AppEmptyState(
+                      icon: Icons.quiz_outlined,
+                      title: 'ຍັງບໍ່ມີຄຳຖາມການປະເມີນ',
+                      subtitle: 'ກະລຸນາລອງໃໝ່ພາຍຫຼັງ',
+                    );
+                  }
+                  return Column(
+                    children: List.generate(
+                      questions.length,
+                      (i) => _StarRatingQuestion(
+                        index: i,
+                        question: questions[i].question,
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: AppSpacing.l),
+                AppTextField(
+                  label: 'ຄຳເຫັນເພີ່ມເຕີມ',
+                  hint: 'ບອກພວກເຮົາແບບໃດກໍຄິດໄດ້... (ບໍ່ບັງຄັບ)',
+                  maxLines: 4,
+                  minLines: 3,
+                  keyboardType: TextInputType.multiline,
+                  textInputAction: TextInputAction.newline,
+                  onChanged: (val) => controller.comment.value = val,
+                ),
+                const SizedBox(height: AppSpacing.l),
+                AppPrimaryButton(
+                  label: 'ສົ່ງການປະເມີນ',
+                  icon: Icons.send_rounded,
+                  onPressed: () => controller.submitFeedback(faculty),
+                ),
+                const SizedBox(height: AppSpacing.s),
+                Text(
+                  'ການປະເມີນຂອງທ່ານຈະຖືກສົ່ງແບບບໍ່ລະບຸຕົວຕົນ',
+                  style: AppTypography.caption,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(width: 15),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(faculty.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            Text(faculty.course, style: const TextStyle(color: Colors.grey)),
-          ],
-        )
-      ],
     );
   }
+}
 
-  Widget _buildStarRatingQuestion(int index) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 15.0),
+class _FacultyHeader extends StatelessWidget {
+  final Faculty faculty;
+  const _FacultyHeader({required this.faculty});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      padding: const EdgeInsets.all(AppSpacing.m),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 32,
+            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+            child: Text(
+              faculty.initials,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.m),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(faculty.name, style: AppTypography.subheading),
+                const SizedBox(height: AppSpacing.xs),
+                Text(faculty.course, style: AppTypography.bodySmallMuted),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StarRatingQuestion extends GetView<FacultyFeedbackController> {
+  final int index;
+  final String question;
+
+  const _StarRatingQuestion({required this.index, required this.question});
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSurfaceCard(
+      margin: const EdgeInsets.only(bottom: AppSpacing.s + 2),
+      padding: const EdgeInsets.all(AppSpacing.m),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("หัวข้อการประเมินที่ ${index + 1}", style: const TextStyle(fontSize: 16)),
-          Obx(() => Row(
-            children: List.generate(5, (starIndex) {
-              return IconButton(
-                icon: Icon(
-                  Icons.star,
-                  size: 35,
-                  color: starIndex < controller.ratings[index] 
-                      ? Colors.orangeAccent 
-                      : Colors.grey[300],
-                ),
-                onPressed: () => controller.setRating(index, starIndex + 1),
-              );
-            }),
-          )),
+          Text(question, style: AppTypography.body),
+          const SizedBox(height: AppSpacing.s),
+          Obx(
+            () => Row(
+              children: List.generate(5, (starIndex) {
+                final filled = starIndex < controller.ratings[index];
+                return Expanded(
+                  child: SizedBox(
+                    height: AppColors.minTouchTarget,
+                    child: IconButton(
+                      tooltip: '${starIndex + 1} ດາວ',
+                      onPressed: () =>
+                          controller.setRating(index, starIndex + 1),
+                      icon: Icon(
+                        filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                        size: 30,
+                        color: filled
+                            ? AppColors.accentYellow
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
         ],
       ),
     );

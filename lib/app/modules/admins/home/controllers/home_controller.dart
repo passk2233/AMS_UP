@@ -1,88 +1,66 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:get/get.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../data/models/room_booking_model.dart';
-import '../../../data/models/user_model.dart';
-import '../../../data/models/semaster_model.dart';
+import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
+import '../../../data/models/room_booking_model.dart';
+import '../../../data/models/semaster_model.dart';
+import '../../../data/models/user_model.dart';
 
+/// Reactive state owner for [AdminHomeView].
+///
+/// On init, fans out four parallel requests (current user, bookings, active
+/// semester, room-usage %) and aggregates them into observables. Exposes
+/// approve / reject mutations that update local state optimistically and
+/// reconcile via the backend response.
 class AdminHomeController extends GetxController {
-  // ── Observable state ──────────────────────────────────────────────────────
+  /// Currently signed-in admin user.
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
+
+  /// Most recent booking page from the API.
   final RxList<RoomBookingModel> bookings = <RoomBookingModel>[].obs;
+
+  /// `true` while the initial fan-out or refresh is in flight.
   final RxBool isLoading = false.obs;
+
+  /// Last user-facing error message, empty when there is no error.
   final RxString errorMessage = ''.obs;
 
-  // Dashboard stats (computed from real data)
+  /// Count of `pending` bookings in [bookings].
   final RxInt pendingCount = 0.obs;
+
+  /// Count of `approved` bookings in [bookings].
   final RxInt approvedCount = 0.obs;
+
+  /// Percentage of rooms with at least one approved booking today.
   final RxInt roomInUsePercent = 0.obs;
 
-  // Semester display
+  /// Display label for the active semester (e.g. `S1 (2025-2026)`).
   final RxString semester = ''.obs;
 
-  // Today's formatted date
+  /// Lao-formatted today's date (e.g. `ວັນຈັນ, ມັງກອນ 5`).
   final RxString todayDate = ''.obs;
 
-  late final Dio _dio;
-  String _token = '';
+  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
     super.onInit();
-    _initDio();
-    _setTodayDate();
+    todayDate.value = _formatToday(DateTime.now());
     fetchDashboardData();
   }
 
-  // ── Dio setup ─────────────────────────────────────────────────────────────
-  void _initDio() {
-    final baseUrl = dotenv.env['API_URL'] ?? '';
-    _dio = Dio(BaseOptions(
-      baseUrl: baseUrl,
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-      headers: {
-        'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
-      },
-    ));
-  }
+  /// Refresh handler bound to the pull-to-refresh and to tab switches in
+  /// [BottomNavController].
+  Future<void> refreshData() => fetchDashboardData();
 
-  Future<void> _loadToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString('token') ?? '';
-    _dio.options.headers['Authorization'] = 'Bearer $_token';
-  }
-
-  // ── Today's date ──────────────────────────────────────────────────────────
-  void _setTodayDate() {
-    final now = DateTime.now();
-    const weekdays = [
-      'ວັນຈັນ', 'ວັນອັງຄານ', 'ວັນພຸດ', 'ວັນພະຫັດ',
-      'ວັນສຸກ', 'ວັນເສົາ', 'ວັນອາທິດ'
-    ];
-    const months = [
-      'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ',
-      'ພຶດສະພາ', 'ມິຖຸນາ', 'ກໍລະກົດ', 'ສິງຫາ',
-      'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ'
-    ];
-    todayDate.value =
-        '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
-  }
-
-  // ── Fetch all dashboard data ──────────────────────────────────────────────
+  /// Run all four dashboard fetches in parallel. Always clears the loading
+  /// flag, even on failure.
   Future<void> fetchDashboardData() async {
     isLoading.value = true;
     errorMessage.value = '';
-
     try {
-      await _loadToken();
-
-      // Run all fetches in parallel for speed
       await Future.wait([
         _fetchCurrentUser(),
         _fetchBookings(),
@@ -90,14 +68,59 @@ class AdminHomeController extends GetxController {
         _fetchRoomUsage(),
       ]);
     } catch (e) {
-      errorMessage.value = 'Failed to load dashboard data';
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນແດດໂບດໄດ້';
       debugPrint('Dashboard fetch error: $e');
     } finally {
       isLoading.value = false;
     }
   }
 
-  // ── Fetch current user from /auth/me ──────────────────────────────────────
+  /// PATCH a booking to `approved` and reconcile local state on success.
+  Future<void> approveBooking(int bookingId) =>
+      _changeBookingStatus(bookingId, 'approved');
+
+  /// PATCH a booking to `rejected` and reconcile local state on success.
+  Future<void> rejectBooking(int bookingId) =>
+      _changeBookingStatus(bookingId, 'rejected');
+
+  // ───────────────────────────────────────────────────────────── private ──
+
+  Future<void> _changeBookingStatus(int bookingId, String status) async {
+    try {
+      final response = await _dio.patch(
+        '/room-bookings/$bookingId/status',
+        data: {'status': status},
+      );
+      if (response.statusCode != 200) return;
+
+      final index = bookings.indexWhere((b) => b.bookingId == bookingId);
+      if (index != -1) {
+        bookings[index].status = status;
+        bookings.refresh();
+        _updateStats();
+      }
+
+      if (status == 'approved') {
+        AppDialogs.showSuccess(
+          title: 'ອະນຸມັດສຳເລັດ',
+          message: 'ການຈອງຫ້ອງໄດ້ຮັບການອະນຸມັດແລ້ວ.',
+        );
+      } else {
+        AppDialogs.showWarning(
+          title: 'ປະຕິເສດແລ້ວ',
+          message: 'ການຈອງຫ້ອງໄດ້ຖືກປະຕິເສດ.',
+        );
+      }
+    } on DioException catch (e) {
+      _showErrorDialog(
+        status == 'approved'
+            ? 'Failed to approve booking'
+            : 'Failed to reject booking',
+        e,
+      );
+    }
+  }
+
   Future<void> _fetchCurrentUser() async {
     try {
       final response = await _dio.get('/auth/me');
@@ -109,211 +132,132 @@ class AdminHomeController extends GetxController {
     }
   }
 
-  // ── Fetch room bookings ───────────────────────────────────────────────────
   Future<void> _fetchBookings() async {
     try {
-      // Fetch all bookings (pending first, then approved for display)
-      final response = await _dio.get('/room-bookings', queryParameters: {
-        'limit': 50,
-      });
+      final response = await _dio.get(
+        '/room-bookings',
+        queryParameters: {'limit': 50},
+      );
+      if (response.statusCode != 200) return;
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-
-        bookings.assignAll(
-          items.map((json) => RoomBookingModel.fromJson(json)).toList(),
-        );
-
-        // Update computed stats from all fetched bookings
-        _updateStats();
-      }
+      bookings.assignAll(
+        _extractList(response.data)
+            .map((json) => RoomBookingModel.fromJson(json))
+            .toList(),
+      );
+      _updateStats();
     } on DioException catch (e) {
       debugPrint('Failed to fetch bookings: ${e.message}');
     }
   }
 
-  // ── Fetch active semester ─────────────────────────────────────────────────
   Future<void> _fetchActiveSemester() async {
     try {
-      final response = await _dio.get('/semasters', queryParameters: {
-        'limit': 10,
-      });
+      final response = await _dio.get(
+        '/semasters',
+        queryParameters: {'limit': 10},
+      );
+      if (response.statusCode != 200) return;
 
-      if (response.statusCode == 200) {
-        final data = response.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-
-        // Find the active semester (status == 1)
-        final activeSemesters = items
-            .map((json) => SemasterModel.fromJson(json))
-            .where((s) => s.status == 1)
-            .toList();
-
-        if (activeSemesters.isNotEmpty) {
-          final s = activeSemesters.first;
-          semester.value = '${s.semasterCode} (${s.year})';
-        } else if (items.isNotEmpty) {
-          // Fallback to latest semester
-          final s = SemasterModel.fromJson(items.first);
-          semester.value = '${s.semasterCode} (${s.year})';
-        } else {
-          semester.value = 'No active semester';
-        }
-      }
+      final items = _extractList(response.data)
+          .map((json) => SemasterModel.fromJson(json))
+          .toList();
+      semester.value = _pickSemesterLabel(items);
     } on DioException catch (e) {
       debugPrint('Failed to fetch semester: ${e.message}');
       semester.value = 'Semester';
     }
   }
 
-  // ── Compute room usage % ──────────────────────────────────────────────────
   Future<void> _fetchRoomUsage() async {
     try {
-      // Get total rooms
-      final roomResponse = await _dio.get('/rooms', queryParameters: {
-        'limit': 100,
-      });
+      final totalRooms = await _fetchTotalRooms();
+      if (totalRooms <= 0) return;
 
-      if (roomResponse.statusCode == 200) {
-        final roomData = roomResponse.data;
-        int totalRooms = 0;
-        if (roomData is Map) {
-          totalRooms = (roomData['meta']?['total'] as int?) ?? 0;
-          if (totalRooms == 0 && roomData['data'] is List) {
-            totalRooms = (roomData['data'] as List).length;
-          }
-        } else if (roomData is List) {
-          totalRooms = roomData.length;
-        }
+      final response = await _dio.get(
+        '/room-bookings',
+        queryParameters: {'status': 'approved', 'limit': 100},
+      );
+      if (response.statusCode != 200) return;
 
-        if (totalRooms > 0) {
-          // Count rooms with active (approved) bookings today
-          final today = DateTime.now().toIso8601String().split('T')[0];
-          final bookingResponse = await _dio.get('/room-bookings',
-              queryParameters: {
-                'status': 'approved',
-                'limit': 100,
-              });
+      final today = _isoDate(DateTime.now());
+      final roomsInUse = _extractList(response.data)
+          .map((b) => RoomBookingModel.fromJson(b))
+          .where((b) => _isoDate(b.bookingDate) == today)
+          .map((b) => b.roomId)
+          .toSet()
+          .length;
 
-          if (bookingResponse.statusCode == 200) {
-            final bookingData = bookingResponse.data;
-            List<dynamic> activeBookings = [];
-            if (bookingData is List) {
-              activeBookings = bookingData;
-            } else if (bookingData is Map && bookingData['data'] != null) {
-              activeBookings = bookingData['data'];
-            }
-
-            // Count unique rooms booked today
-            final roomsInUse = activeBookings
-                .map((b) => RoomBookingModel.fromJson(b))
-                .where((b) {
-                  final bookingDateStr =
-                      b.bookingDate.toIso8601String().split('T')[0];
-                  return bookingDateStr == today;
-                })
-                .map((b) => b.roomId)
-                .toSet()
-                .length;
-
-            roomInUsePercent.value =
-                ((roomsInUse / totalRooms) * 100).round();
-          }
-        }
-      }
+      roomInUsePercent.value = ((roomsInUse / totalRooms) * 100).round();
     } on DioException catch (e) {
       debugPrint('Failed to compute room usage: ${e.message}');
     }
   }
 
-  // ── Approve a booking ─────────────────────────────────────────────────────
-  Future<void> approveBooking(int bookingId) async {
-    try {
-      final response = await _dio.patch(
-        '/room-bookings/$bookingId/status',
-        data: {'status': 'approved'},
-      );
+  Future<int> _fetchTotalRooms() async {
+    final response = await _dio.get(
+      '/rooms',
+      queryParameters: {'limit': 100},
+    );
+    if (response.statusCode != 200) return 0;
 
-      if (response.statusCode == 200) {
-        // Update local state
-        final index =
-            bookings.indexWhere((b) => b.bookingId == bookingId);
-        if (index != -1) {
-          bookings[index].status = 'approved';
-          bookings.refresh();
-          _updateStats();
-        }
-
-        AppDialogs.showSuccess(
-          title: 'ອະນຸມັດສຳເລັດ',
-          message: 'ການຈອງຫ້ອງໄດ້ຮັບການອະນຸມັດແລ້ວ.',
-        );
-      }
-    } on DioException catch (e) {
-      _showErrorSnackbar('Failed to approve booking', e);
+    final raw = response.data;
+    if (raw is Map) {
+      final metaTotal = raw['meta']?['total'] as int?;
+      if (metaTotal != null && metaTotal > 0) return metaTotal;
+      if (raw['data'] is List) return (raw['data'] as List).length;
     }
+    if (raw is List) return raw.length;
+    return 0;
   }
 
-  // ── Reject a booking ──────────────────────────────────────────────────────
-  Future<void> rejectBooking(int bookingId) async {
-    try {
-      final response = await _dio.patch(
-        '/room-bookings/$bookingId/status',
-        data: {'status': 'rejected'},
-      );
-
-      if (response.statusCode == 200) {
-        final index =
-            bookings.indexWhere((b) => b.bookingId == bookingId);
-        if (index != -1) {
-          bookings[index].status = 'rejected';
-          bookings.refresh();
-          _updateStats();
-        }
-
-        AppDialogs.showWarning(
-          title: 'ປະຕິເສດແລ້ວ',
-          message: 'ການຈອງຫ້ອງໄດ້ຖືກປະຕິເສດ.',
-        );
-      }
-    } on DioException catch (e) {
-      _showErrorSnackbar('Failed to reject booking', e);
-    }
-  }
-
-  // ── Stats helper ──────────────────────────────────────────────────────────
   void _updateStats() {
-    pendingCount.value =
-        bookings.where((b) => b.status == 'pending').length;
-    approvedCount.value =
-        bookings.where((b) => b.status == 'approved').length;
+    pendingCount.value = bookings.where((b) => b.status == 'pending').length;
+    approvedCount.value = bookings.where((b) => b.status == 'approved').length;
   }
 
-  // ── Error helper ──────────────────────────────────────────────────────────
-  void _showErrorSnackbar(String title, DioException e) {
+  void _showErrorDialog(String title, DioException e) {
     String message = 'ມີບັນຫາເກີດຂຶ້ນ, ກະລຸນາລອງໃໝ່.';
-    if (e.response?.data is Map<String, dynamic>) {
-      message = e.response?.data['error'] ?? message;
+    final data = e.response?.data;
+    if (data is Map<String, dynamic> && data['error'] != null) {
+      message = data['error'].toString();
     }
-    final detail = AppDialogs.buildDioErrorDetail(e);
     AppDialogs.showError(
       title: title,
       message: message,
-      detail: detail,
+      detail: AppDialogs.buildDioErrorDetail(e),
     );
   }
 
-  // ── Refresh ───────────────────────────────────────────────────────────────
-  Future<void> refreshData() => fetchDashboardData();
+  /// Pick the semester to display from the full list. Active (`status == 1`)
+  /// wins; otherwise the newest (first in the response).
+  String _pickSemesterLabel(List<SemasterModel> items) {
+    if (items.isEmpty) return 'No active semester';
+    final active = items.where((s) => s.status == 1).toList();
+    final picked = active.isNotEmpty ? active.first : items.first;
+    return '${picked.semasterCode} (${picked.year})';
+  }
+
+  /// Normalize the two server response shapes into a `List<dynamic>`.
+  List<dynamic> _extractList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map && data['data'] is List) return data['data'] as List;
+    return const <dynamic>[];
+  }
+
+  /// `2026-05-18`-style date used for same-day comparisons.
+  String _isoDate(DateTime d) => d.toIso8601String().split('T').first;
+
+  String _formatToday(DateTime now) {
+    const weekdays = <String>[
+      'ວັນຈັນ', 'ວັນອັງຄານ', 'ວັນພຸດ', 'ວັນພະຫັດ',
+      'ວັນສຸກ', 'ວັນເສົາ', 'ວັນອາທິດ',
+    ];
+    const months = <String>[
+      'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ',
+      'ພຶດສະພາ', 'ມິຖຸນາ', 'ກໍລະກົດ', 'ສິງຫາ',
+      'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ',
+    ];
+    return '${weekdays[now.weekday - 1]}, ${months[now.month - 1]} ${now.day}';
+  }
 }
