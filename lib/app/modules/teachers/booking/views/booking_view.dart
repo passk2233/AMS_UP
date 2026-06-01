@@ -28,7 +28,7 @@ class BookingView extends GetView<BookingController> {
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => _showCreateDialog(context),
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.primaryFill,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('ຈອງໃໝ່'),
@@ -540,7 +540,7 @@ class BookingView extends GetView<BookingController> {
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('ດຶງຂໍ້ມູນຄືນ'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
+                backgroundColor: AppColors.primaryFill,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.m, vertical: AppSpacing.s),

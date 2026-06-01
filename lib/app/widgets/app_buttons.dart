@@ -25,7 +25,7 @@ class AppPrimaryButton extends StatelessWidget {
   /// When true (default), the button stretches to fill its parent's width.
   final bool fullWidth;
 
-  /// Override the default brand background.
+  /// Override the default on-fill teal background.
   final Color? backgroundColor;
 
   /// Color applied to the label and icon (default white).
@@ -44,7 +44,7 @@ class AppPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? AppColors.primary;
+    final bg = backgroundColor ?? AppColors.primaryFill;
     return SizedBox(
       width: fullWidth ? double.infinity : null,
       height: AppColors.minTouchTarget,

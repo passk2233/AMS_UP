@@ -45,7 +45,7 @@ class AppErrorState extends StatelessWidget {
                   label: const Text('ລອງໃໝ່',
                       style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
+                    backgroundColor: AppColors.primaryFill,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(horizontal: 24),
                     shape: RoundedRectangleBorder(

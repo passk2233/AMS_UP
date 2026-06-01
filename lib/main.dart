@@ -88,7 +88,7 @@ class MyApp extends StatelessWidget {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
+            backgroundColor: AppColors.primaryFill,
             foregroundColor: Colors.white,
             elevation: 0,
             minimumSize: const Size(64, AppColors.minTouchTarget),

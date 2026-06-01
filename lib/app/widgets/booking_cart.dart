@@ -334,7 +334,7 @@ class _BookingActions extends StatelessWidget {
             icon: const Icon(Icons.check, size: 16),
             label: const Text('Approve'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.primaryFill,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(AppSpacing.s),

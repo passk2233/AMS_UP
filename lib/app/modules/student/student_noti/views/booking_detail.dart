@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:frontend/app/widgets/app_colors.dart';
 
 class BookingDetailView extends StatelessWidget {
   const BookingDetailView({super.key});
@@ -9,15 +10,15 @@ class BookingDetailView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.scaffoldBg,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+          icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
           onPressed: () => Get.back(),
         ),
         title: const Text(
           "Booking Detail",
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -61,12 +62,12 @@ class BookingDetailView extends StatelessWidget {
           const SizedBox(height: 25),
           const Text(
             "Booking Confirmed",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
           ),
           const SizedBox(height: 10),
           const Text(
             "Your study group session has been confirmed.",
-            style: TextStyle(color: Color(0xFF64748B)),
+            style: TextStyle(color: AppColors.textSecondary),
           ),
 
           const SizedBox(height: 30),
@@ -77,11 +78,11 @@ class BookingDetailView extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(25),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.cardBg,
                 borderRadius: BorderRadius.circular(25),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 15,
                   ),
                 ],
@@ -93,8 +94,8 @@ class BookingDetailView extends StatelessWidget {
                     "ROOM LOCATION",
                     "Room A301",
                     "Academic Wing, 3rd Floor",
-                    const Color(0xFFEEF2FF),
-                    const Color(0xFF6366F1),
+                    AppColors.info.withValues(alpha: 0.1),
+                    AppColors.info,
                   ),
                   const Divider(height: 40),
                   Row(
@@ -166,7 +167,7 @@ class BookingDetailView extends StatelessWidget {
             Text(
               label,
               style: const TextStyle(
-                color: Colors.grey,
+                color: AppColors.textSecondary,
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -174,12 +175,12 @@ class BookingDetailView extends StatelessWidget {
             ),
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
             ),
             if (sub.isNotEmpty)
               Text(
                 sub,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
               ),
           ],
         ),

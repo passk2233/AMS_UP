@@ -31,7 +31,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
             ),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => _showCreateDialog(context),
-              backgroundColor: AppColors.primary,
+              backgroundColor: AppColors.primaryFill,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('ຈອງໃໝ່'),

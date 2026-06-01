@@ -84,7 +84,7 @@ class AppDialogs {
     required String message,
     String confirmText = 'ຢືນຢັນ',
     String cancelText = 'ຍົກເລີກ',
-    Color confirmColor = AppColors.primary,
+    Color confirmColor = AppColors.primaryFill,
   }) {
     return Get.dialog<bool>(
       _DialogShell(

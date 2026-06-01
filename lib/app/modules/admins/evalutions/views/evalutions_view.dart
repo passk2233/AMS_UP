@@ -1125,7 +1125,7 @@ class _SubjectSubtitle extends StatelessWidget {
             _MetaChip(
               icon: Icons.calendar_today_outlined,
               text: subject.semesterLabel,
-              color: const Color(0xFF6366F1),
+              color: AppColors.info,
             ),
             const SizedBox(width: 6),
             if (subject.studentGroupName.isNotEmpty)

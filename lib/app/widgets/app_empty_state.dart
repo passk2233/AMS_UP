@@ -60,7 +60,7 @@ class AppEmptyState extends StatelessWidget {
                 icon: Icon(actionIcon ?? Icons.add_rounded, size: 18),
                 label: Text(actionLabel!),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primaryFill,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 18, vertical: 10),
