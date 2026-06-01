@@ -387,9 +387,7 @@ class _AppFilterChipTile extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        constraints: const BoxConstraints(
-          minHeight: AppColors.minTouchTarget,
-        ),
+        constraints: const BoxConstraints(minHeight: AppColors.minTouchTarget),
         decoration: BoxDecoration(
           color: isSelected ? activeColor : AppColors.cardBg,
           borderRadius: BorderRadius.circular(AppColors.chipRadius),

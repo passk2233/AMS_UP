@@ -193,14 +193,12 @@ class AuthController extends GetxController {
         return body['error'].toString();
       }
       if (body is String) {
-        return body.length > 100
-            ? 'Server Error: Please check Backend'
-            : body;
+        return body.length > 100 ? 'Server Error: Please check Backend' : body;
       }
     }
     switch (e.type) {
       case DioExceptionType.connectionError:
-        return 'Cannot connect to server. Please check your internet or Ngrok URL.';
+        return 'Cannot connect to server. Please check your internet.';
       case DioExceptionType.connectionTimeout:
         return 'Cannot connect to server. Please check your internet connection.';
       default:

@@ -8,11 +8,14 @@ import 'package:frontend/app/services/auth_storage.dart';
 import 'package:frontend/app/services/fcm_service.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
+import '../../../../widgets/widget.dart';
+
 class ProfileStudentController extends GetxController {
   Dio get _dio => ApiClient.dio;
 
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = false.obs;
+  final RxBool isLoggingOut = false.obs;
   final RxString errorMessage = ''.obs;
 
   @override
@@ -48,18 +51,21 @@ class ProfileStudentController extends GetxController {
   Future<void> logout() async {
     final confirmed = await AppDialogs.showConfirmation(
       title: 'ອອກຈາກລະບົບ',
-      message: 'ຕ້ອງການອອກຈາກລະບົບບໍ່?',
-      confirmText: 'ອອກຈາກລະບົບ',
+      message: 'ທ່ານຕ້ອງການອອກຈາກລະບົບແທ້ບໍ?',
+      confirmText: 'ອອກ',
       cancelText: 'ຍົກເລີກ',
-      confirmColor: const Color(0xFFE53935),
+      confirmColor: AppColors.rejectRed,
     );
     if (confirmed != true) return;
 
-    // Unregister this device with the backend BEFORE clearing the JWT,
-    // otherwise the DELETE request can't authenticate.
-    await FCMService.clearTokenOnLogout();
-    await AuthStorage.clear();
-    Get.offAllNamed('/auth');
+    isLoggingOut.value = true;
+    try {
+      await FCMService.clearTokenOnLogout();
+      await AuthStorage.clear();
+      Get.offAllNamed('/auth');
+    } finally {
+      isLoggingOut.value = false;
+    }
   }
 
   UserModel? get _u => user.value;
