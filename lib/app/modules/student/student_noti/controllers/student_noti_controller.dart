@@ -7,12 +7,20 @@ import 'package:frontend/app/modules/data/data_exporter.dart';
 import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
+/// Reactive state for [StudentNotiView].
+///
+/// Reads the signed-in student's **personal inbox** from `GET /user-noti`
+/// (rows scoped to the current user, each with its parent notification
+/// preloaded) and marks rows read via `PATCH /user-noti/:id/read`. The view
+/// item's `id` is the `user_noti` row id, which is what mark-as-read needs.
 class StudentNotiController extends GetxController {
   var selectedFilterIndex = 0.obs;
 
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
-  final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
+
+  /// The current user's inbox rows, newest first.
+  final RxList<UserNotiModel> notifications = <UserNotiModel>[].obs;
 
   Dio get _dio => ApiClient.dio;
 
@@ -26,9 +34,13 @@ class StudentNotiController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final resp = await _dio.get('/notifications', queryParameters: {'limit': 100});
-      final items = _extractList(resp.data);
-      notifications.assignAll(items.map((j) => NotificationModel.fromJson(j)).toList());
+      final resp =
+          await _dio.get('/user-noti', queryParameters: {'limit': 100});
+      notifications.assignAll(
+        _extractList(resp.data)
+            .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
+            .toList(),
+      );
     } on DioException catch (e) {
       debugPrint('StudentNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
@@ -40,63 +52,70 @@ class StudentNotiController extends GetxController {
     }
   }
 
+  /// Pull-to-refresh / tab-activation hook.
+  Future<void> refreshData() => fetchNotifications();
+
   List<Map<String, dynamic>> get filteredNotifications {
     final all = notifications.map(_toViewItem).toList();
     if (selectedFilterIndex.value == 0) return all;
 
-    final category = selectedFilterIndex.value == 1 ? "Academic" : "Room Booking";
+    final category =
+        selectedFilterIndex.value == 1 ? "Academic" : "Room Booking";
     return all.where((n) => n['category'] == category).toList();
   }
 
   /// Count of items the user hasn't tapped yet. Drives badges.
-  int get unreadCount =>
-      notifications.where((n) => n.isRead == 0).length;
+  int get unreadCount => notifications.where((n) => n.isRead == 0).length;
 
-  /// Optimistically marks an item read in the local list and tells the
-  /// backend. Falls back silently — the local list will resync on next
-  /// fetch if the PUT fails.
-  Future<void> markAsRead(int notiId) async {
-    final idx = notifications.indexWhere((n) => n.notiId == notiId);
+  /// Optimistically marks an inbox row read locally and tells the backend.
+  /// [userNotiId] is the `user_noti` row id (not the notification id). Falls
+  /// back silently — the list resyncs on the next fetch if the PATCH fails.
+  Future<void> markAsRead(int userNotiId) async {
+    final idx = notifications.indexWhere((n) => n.id == userNotiId);
     if (idx == -1 || notifications[idx].isRead == 1) return;
 
     notifications[idx].isRead = 1;
     notifications.refresh();
 
     try {
-      await _dio.put('/notifications/$notiId/read');
+      await _dio.patch('/user-noti/$userNotiId/read');
     } on DioException catch (e) {
-      debugPrint('markAsRead failed for $notiId: ${e.message}');
+      debugPrint('markAsRead failed for $userNotiId: ${e.message}');
     }
   }
 
-  Map<String, dynamic> _toViewItem(NotificationModel n) {
-    final typeRaw = (n.type ?? '').toLowerCase();
+  Map<String, dynamic> _toViewItem(UserNotiModel n) {
+    final noti = n.notification;
+    final typeRaw = (noti?.type ?? '').toLowerCase();
     final isUrgent = typeRaw == 'urgent';
     final category = typeRaw.contains('booking') ? 'Room Booking' : 'Academic';
 
-    final ts = n.createdAt;
-    final time = ts == null ? '-' : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+    final ts = n.createAt ?? noti?.createdAt;
+    final time =
+        ts == null ? '-' : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+    final title = noti?.title ?? '';
+    final message = noti?.message ?? '';
 
     if (isUrgent) {
       return {
-        'id': n.notiId,
+        'id': n.id,
         'unread': n.isRead == 0,
         'type': 'Urgent',
         'category': category,
-        'title': n.title,
-        'sub': n.message,
+        'title': title,
+        'sub': message,
         'status': 'Urgent',
         'time': time,
       };
     }
 
     return {
-      'id': n.notiId,
+      'id': n.id,
       'unread': n.isRead == 0,
       'type': 'Normal',
       'category': category,
-      'title': n.title,
-      'desc': n.message,
+      'title': title,
+      'desc': message,
       'time': time,
     };
   }

@@ -459,7 +459,12 @@ class AnnouncementController extends GetxController {
     try {
       final response = await _dio.post(
         '/notifications',
-        data: _buildSendPayload(),
+        queryParameters: _buildSendQuery(),
+        data: {
+          'title': titleCtrl.text.trim(),
+          'message': messageCtrl.text.trim(),
+          'type': buildNotificationType(),
+        },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
         _resetForm();
@@ -676,25 +681,22 @@ class AnnouncementController extends GetxController {
 
   // ────────────────────────────────────────────────── payload + ui ──
 
-  /// Build the JSON payload posted to `/notifications` from current form
-  /// state. Exposed so [_SendConfirmationDialog] can hint at it.
-  Map<String, dynamic> _buildSendPayload() {
-    final payload = <String, dynamic>{
-      'title': titleCtrl.text.trim(),
-      'message': messageCtrl.text.trim(),
-      'category': 'announcement',
-      'audience': _audienceCode(),
-      'type': buildNotificationType(),
-    };
-
-    final filters = _buildFilters();
-    if (filters.isNotEmpty) payload['filters'] = filters;
-
-    if (selectedAudience.value == AnnouncementAudience.individual &&
-        foundStudent.value != null) {
-      payload['target_user_id'] = foundStudent.value!.id;
+  /// Build the audience + filter **query parameters** for `POST /notifications`.
+  ///
+  /// The backend resolves the recipient set from the query string (see
+  /// `resolveAudienceUserIDs`), not the JSON body — so audience, group/type/
+  /// department filters, and the individual `std_id` all travel here. The body
+  /// carries only title/message/type. This also keeps the send aligned with the
+  /// reach-estimate call, which already uses query params.
+  Map<String, dynamic> _buildSendQuery() {
+    final q = <String, dynamic>{'audience': _audienceCode()};
+    if (selectedAudience.value == AnnouncementAudience.individual) {
+      final s = foundStudent.value;
+      if (s != null) q['std_id'] = s.id;
+    } else {
+      q.addAll(_buildFilters());
     }
-    return payload;
+    return q;
   }
 
   /// Human-readable audience description stored as the notification's

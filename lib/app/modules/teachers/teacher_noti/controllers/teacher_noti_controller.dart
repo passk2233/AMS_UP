@@ -7,11 +7,12 @@ import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
 
-/// Reactive state owner for [TeacherNotiView].
+/// Reactive state for [TeacherNotiView].
 ///
-/// Loads the most recent notifications on init, exposes a filtered view
-/// driven by [selectedFilterIndex] (0 = All, 1 = Academic, 2 = Room Booking),
-/// and optimistically marks notifications as read.
+/// Reads the signed-in teacher's **personal inbox** from `GET /user-noti`
+/// (rows scoped to the current user, each with its parent notification
+/// preloaded) and marks rows read via `PATCH /user-noti/:id/read`. The view
+/// item's `id` is the `user_noti` row id, which is what mark-as-read needs.
 class TeacherNotiController extends GetxController {
   /// Currently selected filter chip index — 0 = All, 1 = Academic,
   /// 2 = Room Booking.
@@ -23,8 +24,8 @@ class TeacherNotiController extends GetxController {
   /// User-facing error message from the last load; empty when none.
   final RxString errorMessage = ''.obs;
 
-  /// Raw notifications returned by the API.
-  final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
+  /// The current user's inbox rows, newest first.
+  final RxList<UserNotiModel> notifications = <UserNotiModel>[].obs;
 
   Dio get _dio => ApiClient.dio;
 
@@ -34,19 +35,17 @@ class TeacherNotiController extends GetxController {
     fetchNotifications();
   }
 
-  /// GET `/notifications` and populate [notifications]. Errors map to a
+  /// GET `/user-noti` and populate [notifications]. Errors map to a
   /// localized message in [errorMessage].
   Future<void> fetchNotifications() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response = await _dio.get(
-        '/notifications',
-        queryParameters: {'limit': 100},
-      );
+      final response =
+          await _dio.get('/user-noti', queryParameters: {'limit': 100});
       notifications.assignAll(
         _extractList(response.data)
-            .map((j) => NotificationModel.fromJson(j))
+            .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
             .toList(),
       );
     } on DioException catch (e) {
@@ -61,6 +60,9 @@ class TeacherNotiController extends GetxController {
     }
   }
 
+  /// Pull-to-refresh / tab-activation hook.
+  Future<void> refreshData() => fetchNotifications();
+
   /// Notifications projected to view-model maps, filtered by
   /// [selectedFilterIndex].
   List<Map<String, dynamic>> get filteredNotifications {
@@ -74,52 +76,55 @@ class TeacherNotiController extends GetxController {
   /// Number of unread notifications.
   int get unreadCount => notifications.where((n) => n.isRead == 0).length;
 
-  /// Mark a notification read locally first, then sync to the backend.
-  /// No-op if the notification is unknown or already read.
-  Future<void> markAsRead(int notiId) async {
-    final idx = notifications.indexWhere((n) => n.notiId == notiId);
+  /// Optimistically marks an inbox row read locally and tells the backend.
+  /// [userNotiId] is the `user_noti` row id (not the notification id).
+  Future<void> markAsRead(int userNotiId) async {
+    final idx = notifications.indexWhere((n) => n.id == userNotiId);
     if (idx == -1 || notifications[idx].isRead == 1) return;
 
     notifications[idx].isRead = 1;
     notifications.refresh();
 
     try {
-      await _dio.put('/notifications/$notiId/read');
+      await _dio.patch('/user-noti/$userNotiId/read');
     } on DioException catch (e) {
-      debugPrint('markAsRead failed for $notiId: ${e.message}');
+      debugPrint('markAsRead failed for $userNotiId: ${e.message}');
     }
   }
 
-  /// Convert a model into the loose view-model map consumed by the list
+  /// Convert an inbox row into the loose view-model map consumed by the list
   /// items. Urgent rows carry a status pill; normal rows don't.
-  Map<String, dynamic> _toViewItem(NotificationModel n) {
-    final typeRaw = (n.type ?? '').toLowerCase();
+  Map<String, dynamic> _toViewItem(UserNotiModel n) {
+    final noti = n.notification;
+    final typeRaw = (noti?.type ?? '').toLowerCase();
     final isUrgent = typeRaw == 'urgent';
     final category = typeRaw.contains('booking') ? 'Room Booking' : 'Academic';
-    final ts = n.createdAt;
-    final time = ts == null
-        ? '-'
-        : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+
+    final ts = n.createAt ?? noti?.createdAt;
+    final time =
+        ts == null ? '-' : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+    final title = noti?.title ?? '';
+    final message = noti?.message ?? '';
 
     if (isUrgent) {
       return {
-        'id': n.notiId,
+        'id': n.id,
         'unread': n.isRead == 0,
         'type': 'Urgent',
         'category': category,
-        'title': n.title,
-        'sub': n.message,
+        'title': title,
+        'sub': message,
         'status': 'Urgent',
         'time': time,
       };
     }
     return {
-      'id': n.notiId,
+      'id': n.id,
       'unread': n.isRead == 0,
       'type': 'Normal',
       'category': category,
-      'title': n.title,
-      'desc': n.message,
+      'title': title,
+      'desc': message,
       'time': time,
     };
   }

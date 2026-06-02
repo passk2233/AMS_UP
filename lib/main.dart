@@ -13,6 +13,14 @@ import 'package:frontend/app/services/auth_storage.dart';
 import 'package:frontend/app/services/fcm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Background / terminated isolate entry point.
+///
+/// We do **not** post a notification here: the backend always sends a
+/// `notification` payload, so Android/iOS build and show the system
+/// notification automatically (using the channel + icon declared in
+/// `AndroidManifest.xml`) before this Dart handler even runs. This handler
+/// exists only to let us do optional background data work; taps are routed by
+/// `FCMService` via `onMessageOpenedApp` / `getInitialMessage`.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);

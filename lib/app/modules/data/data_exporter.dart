@@ -8,6 +8,7 @@ export 'models/teacher_model.dart';
 export 'models/student_model.dart';
 export 'models/role_model.dart';
 export 'models/notification_model.dart';
+export 'models/user_noti_model.dart';
 export 'models/student_group_model.dart';
 export 'models/student_type_model.dart';
 export 'models/evaluation_question_model.dart';

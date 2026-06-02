@@ -45,6 +45,10 @@ dependencies:
   flutter_dotenv: ^6.0.0
   firebase_core: ^4.6.0
   firebase_messaging: ^16.1.3
+  # Foreground bridge: FCM does not auto-display notifications while the app is
+  # open on Android, so we post a local notification on the same high-importance
+  # channel to satisfy the "always show in the system panel" requirement.
+  flutter_local_notifications: ^19.0.0
   badges: ^3.2.0
 
 
