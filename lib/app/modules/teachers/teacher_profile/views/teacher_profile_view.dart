@@ -20,10 +20,7 @@ class TeacherProfileView extends GetView<TeacherProfileController> {
     }
     return AppPageScaffold(
       title: 'ໂປຣໄຟລ໌',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/teacher-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/teacher-noti'),
       body: _TeacherProfileBody(controller: controller),
     );
   }

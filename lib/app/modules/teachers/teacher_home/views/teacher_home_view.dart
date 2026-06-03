@@ -135,10 +135,7 @@ class _Greeting extends StatelessWidget {
     return AppGreetingHeader(
       greeting: 'ສະບາຍດີ, $name 👋',
       subtitle: 'ພາກຮຽນ 2026',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/teacher-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/teacher-noti'),
     );
   }
 }

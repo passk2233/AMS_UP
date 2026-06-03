@@ -17,10 +17,7 @@ class ScoreView extends GetView<ScoreController> {
     return AppPageScaffold(
       withBackground: true,
       title: 'ຄະແນນ',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/student-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/student-noti'),
       body: Obx(() {
         if (controller.isLoading.value) {
           return AppRefreshableLoader(

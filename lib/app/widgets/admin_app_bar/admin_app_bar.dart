@@ -61,7 +61,7 @@ class _AdminAppBarBody extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: _SemesterChip(controller: controller)),
-        _NotificationBubble(controller: controller),
+        const _NotificationBubble(),
       ],
     );
   }
@@ -161,22 +161,28 @@ class _SemesterReadyChip extends StatelessWidget {
 }
 
 /// Circular notification-bell button with a live unread badge. Taps route
-/// to `/admin-noti` via GetX.
+/// to `/admin-noti` via GetX, then refresh the count on return so rows read
+/// there clear the dot immediately.
+///
+/// The count comes from the shared [notiBadge] (the per-user `/user-noti`
+/// inbox) — the same source the admin notification screen marks read — so the
+/// badge stays in sync instead of lingering after a read.
 class _NotificationBubble extends StatelessWidget {
-  /// Source of the reactive unread count.
-  final AdminAppBarControllers controller;
-
-  const _NotificationBubble({required this.controller});
+  const _NotificationBubble();
 
   @override
   Widget build(BuildContext context) {
+    final badge = notiBadge;
     return Obx(() {
-      final count = controller.unreadNotiCount.value;
+      final count = badge.unreadCount.value;
       return Material(
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
-          onTap: () => Get.toNamed('/admin-noti'),
+          onTap: () async {
+            await Get.toNamed('/admin-noti');
+            await badge.fetchUnread();
+          },
           child: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(

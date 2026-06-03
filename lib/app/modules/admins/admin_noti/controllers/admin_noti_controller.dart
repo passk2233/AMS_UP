@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:frontend/app/modules/data/data_exporter.dart';
 import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
+import 'package:frontend/app/widgets/noti_bell.dart';
 
 /// Reactive state owner for [AdminNotiView].
 ///
@@ -48,6 +49,7 @@ class AdminNotiController extends GetxController {
             .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
             .toList(),
       );
+      notiBadge.setCount(unreadCount);
     } on DioException catch (e) {
       debugPrint('AdminNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       errorMessage.value = e.response?.statusCode == 401
@@ -82,6 +84,7 @@ class AdminNotiController extends GetxController {
 
     notifications[idx].isRead = 1;
     notifications.refresh();
+    notiBadge.setCount(unreadCount);
 
     try {
       await _dio.patch('/user-noti/$userNotiId/read');

@@ -249,6 +249,8 @@ class ScheduleStudentController extends GetxController {
         'instructor': teacher,
         'location': room,
         'color': palette[i % palette.length],
+        // Full record so the detail sheet can surface subject / teacher / room.
+        'plan': p,
       };
     });
   }

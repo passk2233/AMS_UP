@@ -16,10 +16,7 @@ class FeedbacksView extends GetView<FeedbacksController> {
   Widget build(BuildContext context) {
     return AppPageScaffold(
       title: 'ຄຳຄິດເຫັນ',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/teacher-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/teacher-noti'),
       body: _FeedbacksBody(controller: controller),
     );
   }

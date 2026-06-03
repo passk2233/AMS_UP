@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
+import '../../../../widgets/noti_bell.dart';
 import '../../../data/data_exporter.dart';
 
 /// Reactive state for [TeacherNotiView].
@@ -48,6 +49,7 @@ class TeacherNotiController extends GetxController {
             .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
             .toList(),
       );
+      notiBadge.setCount(unreadCount);
     } on DioException catch (e) {
       debugPrint(
         'TeacherNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
@@ -84,6 +86,7 @@ class TeacherNotiController extends GetxController {
 
     notifications[idx].isRead = 1;
     notifications.refresh();
+    notiBadge.setCount(unreadCount);
 
     try {
       await _dio.patch('/user-noti/$userNotiId/read');

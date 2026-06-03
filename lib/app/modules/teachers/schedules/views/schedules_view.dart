@@ -19,10 +19,7 @@ class SchedulesView extends GetView<SchedulesController> {
           return AppPageScaffold(
             withBackground: true,
             title: 'ຕາຕະລາງສອນ',
-            trailing: AppIconBubble(
-              icon: Icons.notifications_none_rounded,
-              onTap: () => Get.toNamed('/teacher-noti'),
-            ),
+            trailing: const NotiBellButton(route: '/teacher-noti'),
             body: Column(
               children: [
                 _buildSemesterBanner(controller),

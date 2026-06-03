@@ -7,6 +7,7 @@ import 'package:get/get.dart';
 
 import '../routes/app_pages.dart';
 import '../widgets/app_snackbar.dart';
+import '../widgets/noti_bell.dart';
 import 'api_client.dart';
 import 'auth_storage.dart';
 
@@ -125,7 +126,7 @@ class FCMService {
     );
 
     await _localNotifications.initialize(
-      const InitializationSettings(android: android, iOS: darwin),
+      settings: const InitializationSettings(android: android, iOS: darwin),
       onDidReceiveNotificationResponse: _onLocalNotificationTap,
     );
 
@@ -253,6 +254,10 @@ class FCMService {
       return;
     }
 
+    // A new notification just landed in this user's inbox — re-sync the unread
+    // badge so the red-dot count goes up live without waiting for a navigation.
+    notiBadge.fetchUnread();
+
     if (GetPlatform.isAndroid) {
       _showForegroundSystemNotification(message, title ?? 'AMS', body ?? '');
     }
@@ -278,10 +283,10 @@ class FCMService {
     String body,
   ) {
     return _localNotifications.show(
-      _stableNotificationId(message),
-      title,
-      body,
-      const NotificationDetails(
+      id: _stableNotificationId(message),
+      title: title,
+      body: body,
+      notificationDetails: const NotificationDetails(
         android: AndroidNotificationDetails(
           _androidChannelId,
           _androidChannelName,

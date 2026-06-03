@@ -198,20 +198,44 @@ class AppSurfaceCard extends StatelessWidget {
 }
 
 /// Circular icon button used inside headers (notifications, refresh).
+///
+/// When [badgeCount] is greater than zero, a red corner [Badge] is overlaid on
+/// the glyph — used by the notification bell to surface the unread count.
 class AppIconBubble extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final Color? color;
+
+  /// Optional unread count rendered as a red corner badge; `0` hides it.
+  final int badgeCount;
 
   const AppIconBubble({
     super.key,
     required this.icon,
     this.onTap,
     this.color,
+    this.badgeCount = 0,
   });
 
   @override
   Widget build(BuildContext context) {
+    Widget glyph = Icon(icon, color: color ?? AppColors.textPrimary, size: 22);
+    if (badgeCount > 0) {
+      glyph = Badge(
+        label: Text(
+          badgeCount > 99 ? '99+' : '$badgeCount',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: AppColors.rejectRed,
+        offset: const Offset(6, -4),
+        child: glyph,
+      );
+    }
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -231,7 +255,7 @@ class AppIconBubble extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(icon, color: color ?? AppColors.textPrimary, size: 22),
+          child: glyph,
         ),
       ),
     );

@@ -18,10 +18,7 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
         builder: (context, constraints) {
           return AppPageScaffold(
             title: 'ໂປຣໄຟລ໌',
-            trailing: AppIconBubble(
-              icon: Icons.notifications_none_rounded,
-              onTap: () => Get.toNamed('/student-noti'),
-            ),
+            trailing: const NotiBellButton(route: '/student-noti'),
             body: Obx(() {
               if (controller.isLoading.value) {
                 return AppRefreshableLoader(
