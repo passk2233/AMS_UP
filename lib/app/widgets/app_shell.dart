@@ -244,6 +244,12 @@ class AppIconBubble extends StatelessWidget {
         child: Container(
           width: AppColors.minTouchTarget,
           height: AppColors.minTouchTarget,
+          // Center the glyph explicitly. Without this the fixed-size box sends
+          // tight constraints to the child: a bare Icon self-centers, but once
+          // wrapped in a Badge (badgeCount > 0) the Badge's Stack defaults to
+          // topStart and pins the icon to the top-left — the visible "jump to
+          // the left" when the unread dot appears.
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(AppColors.cardRadius),

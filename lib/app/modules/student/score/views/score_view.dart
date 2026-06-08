@@ -63,7 +63,9 @@ class ScoreView extends GetView<ScoreController> {
                     _StatCell(
                       value: controller.gpa.toStringAsFixed(2),
                       label: 'ເກຣດສະເລ່ຍລວມ',
-                      color: AppColors.primary,
+                      // White value sits on this fill; bright primary is 2.43:1,
+                      // the on-fill teal clears AA at 4.70:1. See DESIGN.md.
+                      color: AppColors.primaryFill,
                     ),
                     _StatCell(
                       value:
@@ -125,7 +127,9 @@ class ScoreView extends GetView<ScoreController> {
                   vertical: 8,
                 ),
                 minimumSize: const Size(0, AppColors.minTouchTarget),
-                elevation: selected ? 4 : 0,
+                // Flat — the system bans Material elevation tiers. The selected
+                // chip already reads via its filled background + bold label.
+                elevation: 0,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -145,7 +149,7 @@ class ScoreView extends GetView<ScoreController> {
                         color: selected
                             ? Colors.white70
                             : AppColors.textSecondary,
-                        fontSize: 11,
+                        fontSize: 12,
                       ),
                     ),
                 ],
@@ -295,16 +299,12 @@ class ScoreView extends GetView<ScoreController> {
         final title = sub?.nameLao ?? sub?.nameEng ?? '-';
         final teacherName = teacher?.nameLao ?? teacher?.nameEng ?? '-';
         final grade = e.grade ?? '-';
-        final color = grade == 'A'
-            ? AppColors.statsBlue
-            : (grade == 'B+' || grade == 'B')
-            ? AppColors.borderApproved
-            : AppColors.borderPending;
+        final gc = _gradeColors(grade);
 
         return AppSurfaceCard(
           margin: const EdgeInsets.only(bottom: 15),
           padding: const EdgeInsets.all(15),
-          borderLeftColor: color,
+          borderLeftColor: gc.bg,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -315,7 +315,8 @@ class ScoreView extends GetView<ScoreController> {
                     Text(
                       "$code  ~ $credit ໜ່ວຍກິດ",
                       style: const TextStyle(
-                        color: AppColors.primary,
+                        // On-fill teal (4.70:1) — bright primary fails at 12px.
+                        color: AppColors.primaryFill,
                         fontSize: 12,
                       ),
                     ),
@@ -342,16 +343,20 @@ class ScoreView extends GetView<ScoreController> {
               Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.all(15),
+                    width: 52,
+                    height: 52,
+                    alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.1),
+                      // Solid status fill; the grade letter is the figure, so
+                      // it earns a real surface, not a 10% wash.
+                      color: gc.bg,
                       shape: BoxShape.circle,
                     ),
                     child: Text(
                       grade,
                       style: TextStyle(
-                        color: color,
-                        fontSize: 24,
+                        color: gc.fg,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -390,6 +395,29 @@ class ScoreView extends GetView<ScoreController> {
         return 'ຕົກ';
       default:
         return '-';
+    }
+  }
+
+  /// Badge background + foreground for a grade. Honest status mapping
+  /// (emerald=good, blue=ok, amber=marginal, red=fail) with AA-safe
+  /// foregrounds: white on emerald/blue/red (≥3:1 at 22px bold), ink on
+  /// amber where white is only 2.15:1. See DESIGN.md.
+  ({Color bg, Color fg}) _gradeColors(String grade) {
+    switch (grade.toUpperCase()) {
+      case 'A':
+      case 'B+':
+        return (bg: AppColors.success, fg: Colors.white);
+      case 'B':
+      case 'C+':
+      case 'C':
+        return (bg: AppColors.info, fg: Colors.white);
+      case 'D+':
+      case 'D':
+        return (bg: AppColors.warning, fg: AppColors.textPrimary);
+      case 'F':
+        return (bg: AppColors.danger, fg: Colors.white);
+      default:
+        return (bg: AppColors.textSecondary, fg: Colors.white);
     }
   }
 }
@@ -436,7 +464,7 @@ class _TranscriptStatStrip extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           height: 1.2,
                           color: cell.labelColor,
                         ),

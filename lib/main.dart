@@ -9,9 +9,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:frontend/firebase_options.dart';
-import 'package:frontend/app/services/auth_storage.dart';
 import 'package:frontend/app/services/fcm_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// Background / terminated isolate entry point.
 ///
@@ -37,44 +35,19 @@ Future<void> main() async {
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FCMService.init();
 
-  final initialRoute = await _resolveInitialRoute();
-
-  runApp(MyApp(initialRoute: initialRoute));
-}
-
-Future<String> _resolveInitialRoute() async {
-  final token = await AuthStorage.readToken();
-  if (token == null || token.isEmpty) return Routes.AUTH;
-
-  final prefs = await SharedPreferences.getInstance();
-  final rememberUntil = prefs.getInt('remember_until');
-  if (rememberUntil == null ||
-      rememberUntil < DateTime.now().millisecondsSinceEpoch) {
-    // Treat stale remember window as a forced re-login; clear the token so
-    // the user lands on /auth with no auto-login resume.
-    await AuthStorage.clear();
-    return Routes.AUTH;
-  }
-
-  final roles = await AuthStorage.readRoles();
-  final lowered = roles.map((r) => r.toLowerCase()).toSet();
-  if (lowered.contains('administrator') || lowered.contains('admin')) {
-    return Routes.ADMIN_HOME;
-  }
-  if (lowered.contains('teacher')) return Routes.TEACHER_HOME;
-  if (lowered.contains('student')) return Routes.HOME_STUDENT;
-  return Routes.AUTH;
+  runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key, required this.initialRoute});
-
-  final String initialRoute;
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return GetMaterialApp(
-      initialRoute: initialRoute,
+      // The splash is the boot gate: it verifies the backend is reachable,
+      // then resolves the role-aware landing route (token + remember window +
+      // role) that used to be computed here before `runApp`.
+      initialRoute: Routes.SPLASH,
       getPages: AppPages.routes,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(

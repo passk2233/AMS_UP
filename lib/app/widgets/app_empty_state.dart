@@ -47,9 +47,11 @@ class AppEmptyState extends StatelessWidget {
               Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
-                  color: Colors.grey.shade400,
+                  // Slate, not grey.shade400 (~1.9:1) — the lightest text the
+                  // system allows still clears AA. See DESIGN.md.
+                  color: AppColors.textSecondary,
                 ),
               ),
             ],

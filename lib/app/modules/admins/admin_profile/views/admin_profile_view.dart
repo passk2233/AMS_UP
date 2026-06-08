@@ -226,7 +226,7 @@ class _RolePillRow extends StatelessWidget {
             child: Text(
               r,
               style: const TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
@@ -485,7 +485,7 @@ class _RoleTile extends StatelessWidget {
                 Text(
                   info.desc,
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: Colors.grey.shade500,
                   ),
                 ),

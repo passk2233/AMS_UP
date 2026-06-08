@@ -42,14 +42,18 @@ class ProfileCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          // White text/icons sit on this banner, so both stops must clear AA.
+          // The bright primary (#40b4cd) is only 2.43:1 under white; the
+          // darker on-fill teal (4.70:1) into Info Blue (6.2:1) stays legible
+          // across the whole sweep and mirrors the admin app bar. See DESIGN.md.
+          colors: [AppColors.primaryFill, AppColors.info],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: AppColors.primaryFill.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -280,7 +284,9 @@ class _ProfileStatTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
+          // Dark wash (not white) so the white value + label keep contrast on
+          // the gradient; a translucent-white tile lightens it and fails AA.
+          color: Colors.black.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(

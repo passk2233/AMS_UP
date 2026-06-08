@@ -71,7 +71,7 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
                       Text(
                         range,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),

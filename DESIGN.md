@@ -9,7 +9,7 @@ colors:
   highlight-gold: "#f5c842"
   approved-emerald: "#067a59"
   pending-amber: "#f59e0b"
-  reject-red: "#e53935"
+  reject-red: "#c62828"
   ink: "#1a1a2e"
   slate-gray: "#6b7280"
   surface-white: "#ffffff"
@@ -155,7 +155,7 @@ A cool, bright palette: one teal lead, a family of supporting blues, a strict th
 ### Status (semantic, never decorative)
 - **Approved Emerald** (`#067a59`): Approved bookings, success dialogs and toasts, positive captions. Darkened from the former bright `#10b981` so it carries white text and reads as legible green text on white (AA 5.3:1). The two former duplicate greens (`#27ae60`, `#4caf50`) folded into this one.
 - **Pending Amber** (`#f59e0b`): Bookings awaiting approval, warning dialogs and toasts. Always pair with dark Ink (`#1a1a2e`) text and icons on a filled amber surface — white on amber is only 2.15:1 and fails; ink on amber is 7.94:1.
-- **Reject Red** (`#e53935`): Rejected bookings, destructive actions (sign out, delete), error dialogs and field errors, nav badges.
+- **Reject Red** (`#c62828`): Rejected bookings, destructive actions (sign out, delete), error dialogs and field errors, nav badges. Darkened from the former bright `#e53935` (3.99:1) so red text on white and white text on a red fill both clear AA (5.4:1) — the same fix already applied to Approved Emerald. Small red text and the white-on-red badge failed at the old value.
 
 ### Neutral
 - **Ink** (`#1a1a2e`): Primary text. A near-black with a faint indigo cast. Never pure `#000000`.
@@ -213,7 +213,7 @@ The component voice is calm and utilitarian: large tap targets (48dp minimum), s
 - **Primary:** Solid on-fill Faculty Teal (`#1f7e93`) with white text (AA 4.70:1; the bright `#40b4cd` accent is reserved for focus, nav, links, and icon tints and is never the fill under white text), no elevation, 24px horizontal padding, 16px/600 label. One primary per screen. Disabled drops background to 50 percent and text to 85 percent. Loading swaps the leading icon for an 18px 2px-stroke spinner and blocks re-tap.
 - **Secondary:** Outlined, 1.2px Faculty Teal border, teal label, transparent fill. Same height and radius. For "Cancel," "Back," and alternatives beside a primary.
 - **Tertiary:** Text-only, teal, 14px/600, for inline "more" / "skip."
-- **Sign-out / Destructive:** Outlined Reject Red (`#e53935`), 14px radius, bold red label with a logout glyph. The only red button.
+- **Sign-out / Destructive:** Outlined Reject Red (`#c62828`), 14px radius, bold red label with a logout glyph. The only red button.
 
 ### Chips (filter row)
 - **Style:** Horizontal scrolling pills, 20px radius, 18px/10px padding, 48dp minimum height, animating over 200ms.
@@ -251,7 +251,7 @@ The "every state is designed" principle is shipped as four reusable widgets, and
 
 ### Do:
 - **Do** use Faculty Teal for every primary action, focus ring, active tab, and link, and nothing else for those — one accent, one meaning. The bright accent (`#40b4cd`) carries focus rings, active tabs, links, and icon tints; the darker on-fill tone (`#1f7e93`) is the fill wherever white text or icons sit on solid teal (buttons, FABs), so contrast clears AA.
-- **Do** keep status to the three-color set: Pending Amber (`#f59e0b`), Approved Emerald (`#067a59`), Reject Red (`#e53935`). Report state with them; never decorate with them.
+- **Do** keep status to the three-color set: Pending Amber (`#f59e0b`), Approved Emerald (`#067a59`), Reject Red (`#c62828`). Report state with them; never decorate with them.
 - **Do** float white cards on Mist Gray with the single Surface Rest shadow (`0 2px 8px rgba(0,0,0,0.06)`). Flat at rest.
 - **Do** hold body and input text at 16px and keep Slate Gray (`#6b7280`) as the lightest text that touches a background. Verify 4.5:1.
 - **Do** ship all four states on every data screen: skeleton, teaching empty state, plain-language error with retry, and toast/dialog success. Reuse `AppLoading`, `AppEmptyState`, `AppErrorState`, `AppSnackbar`, `AppDialogs`.

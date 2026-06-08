@@ -213,7 +213,7 @@ class _QuickActionRow extends StatelessWidget {
           child: _QuickAction(
             icon: Icons.person_rounded,
             label: 'ໂປຣໄຟລ໌',
-            color: Colors.purple,
+            color: AppColors.primary,
             onTap: () => nav.changeTab(TeacherTab.profile),
           ),
         ),
@@ -262,7 +262,7 @@ class _QuickAction extends StatelessWidget {
           Text(
             label,
             style: const TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
@@ -284,14 +284,9 @@ class _TodaysClasses {
 
   const _TodaysClasses({required this.controller, required this.nav});
 
-  static const List<Color> _palette = <Color>[
-    Colors.purple,
-    AppColors.statsBlue,
-    AppColors.borderApproved,
-    AppColors.borderPending,
-    AppColors.rejectRed,
-    Colors.teal,
-  ];
+  // Single brand accent — matches the student dashboard and avoids tinting
+  // class cards in the reserved status colors. See the status rule in DESIGN.md.
+  static const List<Color> _palette = <Color>[AppColors.info];
 
   List<Widget> build() {
     final classes = controller.todaySchedules;

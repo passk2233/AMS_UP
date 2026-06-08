@@ -393,7 +393,7 @@ class _HistoryListFooter extends StatelessWidget {
           child: Center(
             child: Text(
               'ສິ້ນສຸດລາຍການ',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
           ),
         );
@@ -438,6 +438,8 @@ class _HistoryTile extends StatelessWidget {
 
   const _HistoryTile({required this.noti, required this.controller});
 
+  bool get _hasAttachment => noti.files.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -465,6 +467,13 @@ class _HistoryTile extends StatelessWidget {
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
+          if (_hasAttachment) ...[
+            const SizedBox(height: 10),
+            NotificationAttachments(
+              files: noti.files,
+              imageHeight: 140,
+            ),
+          ],
           if (noti.type != null && noti.type!.isNotEmpty) ...[
             const SizedBox(height: 8),
             _TypeTag(type: noti.type!),
@@ -523,7 +532,7 @@ class _TitleRow extends StatelessWidget {
                 Text(
                   relative,
                   style:
-                      TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
             ],
           ),
@@ -648,7 +657,7 @@ class _HistoryActionButton extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: color,
               ),

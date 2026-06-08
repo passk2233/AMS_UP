@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/app/modules/student/student_noti/views/booking_detail.dart';
 import 'package:frontend/app/modules/student/student_noti/views/grade_noti.dart';
+import 'package:frontend/app/modules/data/models/notification_file_model.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/student_noti_controller.dart';
@@ -117,6 +118,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
                     desc: item['desc']!,
                     time: item['time']!,
                     unread: unread,
+                    files: item['files'] as List<NotificationFileModel>?,
                     onTap: () {
                       if (id != null) controller.markAsRead(id);
                       if (item['title'] == "Grade Released") {
@@ -209,7 +211,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
                         Text(
                           time,
                           style: const TextStyle(
-                              color: AppColors.rejectRed, fontSize: 11),
+                              color: AppColors.rejectRed, fontSize: 12),
                         ),
                       ],
                     ),
@@ -244,6 +246,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
     required String desc,
     required String time,
     bool unread = false,
+    List<NotificationFileModel>? files,
     VoidCallback? onTap,
   }) {
     return AppSurfaceCard(
@@ -299,7 +302,7 @@ class StudentNotiView extends GetView<StudentNotiController> {
                     Text(
                       time,
                       style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 11),
+                          color: AppColors.textSecondary, fontSize: 12),
                     ),
                   ],
                 ),
@@ -312,6 +315,13 @@ class StudentNotiView extends GetView<StudentNotiController> {
                     height: 1.4,
                   ),
                 ),
+                if (files != null && files.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  NotificationAttachments(
+                    files: files,
+                    imageHeight: 120,
+                  ),
+                ],
               ],
             ),
           ),

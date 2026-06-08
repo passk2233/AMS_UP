@@ -311,14 +311,10 @@ class SchedulesController extends GetxController {
     return out;
   }
 
-  static const _palette = <Color>[
-    Colors.purple,
-    AppColors.statsBlue,
-    AppColors.borderApproved,
-    AppColors.borderPending,
-    AppColors.rejectRed,
-    Colors.teal,
-  ];
+  // One neutral brand accent for every class card. The prior rainbow reused
+  // the closed status colors (amber/emerald/red) decoratively and shipped
+  // off-brand purple/teal. See the status-color rule in DESIGN.md.
+  static const _palette = <Color>[AppColors.info];
 
   Map<String, dynamic> _planToMap(StudyPlanModel sp, int index, DateTime day) {
     final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';

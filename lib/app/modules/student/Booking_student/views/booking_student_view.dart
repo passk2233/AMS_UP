@@ -127,8 +127,10 @@ class BookingStudentView extends GetView<BookingStudentController> {
               const SizedBox(height: 6),
               Text(
                 '$value',
-                style: TextStyle(
-                  color: color,
+                style: const TextStyle(
+                  // High-contrast ink number; the tile's color lives in the
+                  // icon + tint, not the figure (amber/teal text fails AA).
+                  color: AppColors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
                 ),
@@ -136,7 +138,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
               const SizedBox(height: 2),
               Text(
                 label,
-                style: const TextStyle(fontSize: 11),
+                style: const TextStyle(fontSize: 12),
               ),
             ],
           ),
@@ -169,31 +171,14 @@ class BookingStudentView extends GetView<BookingStudentController> {
       ('cancelled', 'ຍົກເລີກ'),
       ('past', 'ຜ່ານໄປແລ້ວ'),
     ];
-    return SizedBox(
-      height: 36,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemBuilder: (_, i) {
-          final (key, label) = filters[i];
-          final selected = c.bookingFilter.value == key;
-          return ChoiceChip(
-            label: Text(label),
-            selected: selected,
-            onSelected: (_) => c.bookingFilter.value = key,
-            labelStyle: TextStyle(
-              fontSize: 12,
-              color: selected ? Colors.white : AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-            selectedColor: AppColors.primary,
-            backgroundColor: Colors.grey.shade100,
-            side: BorderSide(color: Colors.grey.shade300),
-            visualDensity: VisualDensity.compact,
-          );
-        },
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemCount: filters.length,
-      ),
+    final selectedIndex =
+        filters.indexWhere((f) => f.$1 == c.bookingFilter.value);
+    return AppFilterChipRow(
+      items: [for (final f in filters) AppFilterChip(label: f.$2)],
+      selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+      onSelected: (i) => c.bookingFilter.value = filters[i].$1,
+      activeColor: AppColors.info,
+      padding: EdgeInsets.zero,
     );
   }
 
@@ -204,20 +189,11 @@ class BookingStudentView extends GetView<BookingStudentController> {
     final status = b.status;
     final s = status.toLowerCase();
     final past = controller.isBookingPast(b);
-    final color = s == 'approved'
-        ? Colors.green
-        : s == 'rejected' || s == 'cancelled'
-            ? Colors.red
-            : Colors.orange;
+    final style = BookingStatusStyle.of(status);
     final canCancel = (s == 'pending' || s == 'approved') && !past;
     final dayBadge = _dayBadge(b.bookingDate);
-    return Card(
-      elevation: 0,
+    return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       child: Opacity(
         opacity: past ? 0.65 : 1.0,
         child: ListTile(
@@ -252,14 +228,14 @@ class BookingStudentView extends GetView<BookingStudentController> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.12),
+                  color: style.color,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  status,
+                  style.labelLao,
                   style: TextStyle(
-                    color: color,
-                    fontSize: 11,
+                    color: style.onColor,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -271,8 +247,8 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   child: const Text(
                     'ຍົກເລີກ',
                     style: TextStyle(
-                      color: Colors.red,
-                      fontSize: 11,
+                      color: AppColors.danger,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -293,7 +269,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
     Color? color;
     if (sameDate(target, today)) {
       label = 'ມື້ນີ້';
-      color = AppColors.primary;
+      color = AppColors.primaryFill;
     } else if (sameDate(target, today.add(const Duration(days: 1)))) {
       label = 'ມື້ອື່ນ';
       color = AppColors.bookingBlue;
@@ -441,7 +417,6 @@ class BookingStudentView extends GetView<BookingStudentController> {
                     labelText: isPast
                         ? 'ບໍ່ມີຫ້ອງ (ເວລາຜ່ານໄປແລ້ວ)'
                         : 'ຫ້ອງ (ມີ ${available.length} ຫ້ອງວ່າງ)',
-                    border: const OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -483,7 +458,6 @@ class BookingStudentView extends GetView<BookingStudentController> {
                         onTap: () => _pickTime(context, startCtrl),
                         decoration: const InputDecoration(
                           labelText: 'ເລີ່ມ (HH:mm)',
-                          border: OutlineInputBorder(),
                           suffixIcon: Icon(Icons.access_time, size: 18),
                         ),
                       ),
@@ -496,7 +470,6 @@ class BookingStudentView extends GetView<BookingStudentController> {
                         onTap: () => _pickTime(context, endCtrl),
                         decoration: const InputDecoration(
                           labelText: 'ສິ້ນສຸດ (HH:mm)',
-                          border: OutlineInputBorder(),
                           suffixIcon: Icon(Icons.access_time, size: 18),
                         ),
                       ),
@@ -518,15 +491,14 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   controller: purposeCtrl,
                   decoration: const InputDecoration(
                     labelText: 'ເປົ້າໝາຍ (ບໍ່ບັງຄັບ)',
-                    border: OutlineInputBorder(),
                   ),
                 ),
                 if (pastNote.value.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  _inlineWarning(pastNote.value, Colors.red),
+                  _inlineWarning(pastNote.value, AppColors.danger),
                 ] else if (conflictNote.value.isNotEmpty) ...[
                   const SizedBox(height: 8),
-                  _inlineWarning(conflictNote.value, Colors.red),
+                  _inlineWarning(conflictNote.value, AppColors.danger),
                 ],
                 const SizedBox(height: 16),
                 AppPrimaryButton(

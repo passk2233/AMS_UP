@@ -420,7 +420,7 @@ class _CategoryChip extends StatelessWidget {
       child: Text(
         category,
         style: const TextStyle(
-          fontSize: 11,
+          fontSize: 12,
           color: AppColors.textSecondary,
           fontWeight: FontWeight.w500,
         ),
@@ -454,7 +454,7 @@ class _ActiveToggle extends StatelessWidget {
         child: Text(
           active ? 'ເປີດ' : 'ປິດ',
           style: TextStyle(
-            fontSize: 11,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
             color: active ? AppColors.borderApproved : Colors.grey.shade500,
           ),
@@ -673,7 +673,7 @@ class _TeacherCard extends StatelessWidget {
                     Text(
                       '${summary.subjectNames.length} ວິຊາ • ${summary.totalResponses} ການປະເມີນ',
                       style:
-                          TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                          TextStyle(fontSize: 12, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -914,7 +914,7 @@ class _TeacherSummaryCard extends StatelessWidget {
                 Text(
                   teacher.teacherCode,
                   style:
-                      TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 6),
                 Row(
@@ -942,7 +942,7 @@ class _TeacherSummaryCard extends StatelessWidget {
               ),
               Text(
                 'ການປະເມີນ',
-                style: TextStyle(fontSize: 10, color: Colors.grey.shade400),
+                style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
               ),
             ],
           ),
@@ -1117,7 +1117,7 @@ class _SubjectSubtitle extends StatelessWidget {
         if (subject.subjectCode.isNotEmpty)
           Text(
             subject.subjectCode,
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
           ),
         const SizedBox(height: 4),
         Row(
@@ -1139,7 +1139,7 @@ class _SubjectSubtitle extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           '${subject.totalResponses} ການປະເມີນ',
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
         ),
       ],
     );
@@ -1229,7 +1229,7 @@ class _QuestionBreakdown extends StatelessWidget {
                 const Text(
                   '/5',
                   style: TextStyle(
-                    fontSize: 11,
+                    fontSize: 12,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -1295,7 +1295,7 @@ class _CommentTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.format_quote_rounded, size: 14,
-              color: Colors.grey.shade400),
+              color: AppColors.textSecondary),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -1425,7 +1425,7 @@ class _WindowStatusCard extends StatelessWidget {
     return Obx(() {
       final current = controller.currentWindow;
       final isOpen = controller.isEvaluationOpen;
-      final accent = isOpen ? AppColors.borderApproved : Colors.grey.shade400;
+      final accent = isOpen ? AppColors.borderApproved : AppColors.textSecondary;
       final statusLabel = isOpen ? 'ເປີດໃຊ້ງານຢູ່' : 'ປິດ';
       final icon =
           isOpen ? Icons.lock_open_rounded : Icons.lock_outline_rounded;
@@ -1682,7 +1682,7 @@ class _WindowHistoryTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.history_rounded, size: 16, color: Colors.grey.shade400),
+          Icon(Icons.history_rounded, size: 16, color: AppColors.textSecondary),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -1696,7 +1696,7 @@ class _WindowHistoryTile extends StatelessWidget {
           Text(
             window.inactive == 0 ? 'ເປີດ' : 'ປິດ',
             style: TextStyle(
-              fontSize: 11,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: window.inactive == 0
                   ? AppColors.borderApproved
@@ -1857,7 +1857,7 @@ class _WindowTimePicker extends StatelessWidget {
                     ),
                   ),
                   Icon(Icons.chevron_right_rounded,
-                      size: 18, color: Colors.grey.shade400),
+                      size: 18, color: AppColors.textSecondary),
                 ],
               ),
             ),

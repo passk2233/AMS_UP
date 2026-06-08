@@ -32,7 +32,8 @@ class AdminAppBar extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0x40000000),
+            // 8% black — the soft-shadow cap. (Was 0x40 = 25%, a hard shadow.)
+            color: Color(0x14000000),
             blurRadius: 8,
             offset: Offset(0, 2),
           ),

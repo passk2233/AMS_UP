@@ -29,9 +29,9 @@ class AppErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 15,
-                color: Colors.grey.shade600,
+                color: AppColors.textSecondary,
                 height: 1.4,
               ),
             ),

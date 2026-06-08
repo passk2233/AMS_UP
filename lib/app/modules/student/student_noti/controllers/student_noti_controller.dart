@@ -40,7 +40,8 @@ class StudentNotiController extends GetxController {
       notifications.assignAll(
         _extractList(resp.data)
             .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
-            .toList(),
+            .toList()
+          ..sort(_byNewestFirst),
       );
       notiBadge.setCount(unreadCount);
     } on DioException catch (e) {
@@ -120,7 +121,21 @@ class StudentNotiController extends GetxController {
       'title': title,
       'desc': message,
       'time': time,
+      'files': noti?.files,
     };
+  }
+
+  /// Sort comparator: newest first. Prefers the inbox row's own timestamp,
+  /// falls back to the parent notification's, then to row id (monotonic) so
+  /// missing timestamps and ties still order deterministically. The backend
+  /// is supposed to return rows in this order, but ordering it client-side
+  /// keeps the "newest first" guarantee even if it doesn't.
+  static int _byNewestFirst(UserNotiModel a, UserNotiModel b) {
+    final epoch = DateTime(2000);
+    final at = a.createAt ?? a.notification?.createdAt ?? epoch;
+    final bt = b.createAt ?? b.notification?.createdAt ?? epoch;
+    final cmp = bt.compareTo(at);
+    return cmp != 0 ? cmp : b.id.compareTo(a.id);
   }
 
   static List<dynamic> _extractList(dynamic data) {

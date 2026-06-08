@@ -452,7 +452,7 @@ class _CountBadge extends StatelessWidget {
       child: Text(
         '$count',
         style: TextStyle(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.bold,
           color: onAccent ? Colors.white : AppColors.textSecondary,
         ),
@@ -709,8 +709,9 @@ class _SelectionSummary extends StatelessWidget {
           child: Text(
             count == 0 ? 'ເລືອກທັງໝົດທີ່ລໍຖ້າ' : 'ລ້າງການເລືອກ',
             style: const TextStyle(
-              fontSize: 11,
-              color: AppColors.primary,
+              // On-fill teal (4.70:1); bright primary is 2.43:1 as text.
+              fontSize: 12,
+              color: AppColors.primaryFill,
               fontWeight: FontWeight.w600,
             ),
           ),

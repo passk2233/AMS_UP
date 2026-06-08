@@ -61,8 +61,12 @@ class AppColors {
   /// Pending / warning amber. Pair with dark text on filled surfaces.
   static const Color warning = Color(0xfff59e0b);
 
-  /// Rejected / destructive red. Reject buttons, field errors, delete actions.
-  static const Color danger = Color(0xffe53935);
+  /// Rejected / destructive red. Reject buttons, field errors, delete actions,
+  /// nav badges. Darkened from the former bright #E53935 (only 3.99:1) so it
+  /// clears AA both as red text on white and as white text on a red fill
+  /// (5.4:1) — the same reasoning that darkened [success]. The old value made
+  /// small red text/labels and the white-on-red badge fail contrast.
+  static const Color danger = Color(0xffc62828);
 
   /// Highlight gold — sparing use on hero banners / highlight chips only.
   /// Never as text on a white surface (fails contrast).

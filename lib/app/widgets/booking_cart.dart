@@ -4,6 +4,7 @@ import '../modules/data/models/room_booking_model.dart';
 import 'app_colors.dart';
 import 'app_spacing.dart';
 import 'app_typography.dart';
+import 'booking_status.dart';
 
 /// Card that summarizes one [RoomBookingModel] and exposes approve / reject
 /// actions when the booking is pending.
@@ -88,11 +89,7 @@ class _BookingDisplay {
   bool get isApproved => booking.status.toLowerCase() == 'approved';
   bool get isRejected => booking.status.toLowerCase() == 'rejected';
 
-  Color get borderColor {
-    if (isApproved) return AppColors.borderApproved;
-    if (isPending) return AppColors.borderPending;
-    return AppColors.rejectRed;
-  }
+  Color get borderColor => BookingStatusStyle.of(booking.status).color;
 
   /// Whether the booker is a student — used to switch the role pill color.
   bool get isStudent => booking.user?.stdId != null;
@@ -188,9 +185,11 @@ class _BookingStatusIcon extends StatelessWidget {
       height: 22,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: approved ? AppColors.laoBlue : Colors.transparent,
+        // Approved is emerald everywhere — the status color, matching the card
+        // border and the resolved pill. (Was Info Blue, which collided.)
+        color: approved ? AppColors.success : Colors.transparent,
         border: Border.all(
-          color: approved ? AppColors.laoBlue : Colors.grey.shade400,
+          color: approved ? AppColors.success : Colors.grey.shade400,
           width: 2,
         ),
       ),
@@ -242,18 +241,21 @@ class _RolePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // On-palette tints: Info Blue for students, on-fill teal for teachers.
+    // (Was raw blue/orange Material shades, off the palette entirely.)
+    final color = isStudent ? AppColors.info : AppColors.primaryFill;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
-        color: isStudent ? Colors.blue.shade50 : Colors.orange.shade50,
-        borderRadius: BorderRadius.circular(4),
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        isStudent ? '(Student)' : '(Teacher)',
+        isStudent ? 'ນັກສຶກສາ' : 'ອາຈານ',
         style: TextStyle(
-          fontSize: 11,
-          color: isStudent ? Colors.blue.shade700 : Colors.orange.shade700,
-          fontWeight: FontWeight.w500,
+          fontSize: 12,
+          color: color,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -316,7 +318,7 @@ class _BookingActions extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onReject,
             icon: const Icon(Icons.close, size: 16),
-            label: const Text('Reject'),
+            label: const Text('ປະຕິເສດ'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.rejectRed,
               side: const BorderSide(color: AppColors.rejectRed),
@@ -332,7 +334,7 @@ class _BookingActions extends StatelessWidget {
           child: ElevatedButton.icon(
             onPressed: onApprove,
             icon: const Icon(Icons.check, size: 16),
-            label: const Text('Approve'),
+            label: const Text('ອະນຸມັດ'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryFill,
               foregroundColor: Colors.white,
@@ -359,20 +361,20 @@ class _ResolvedPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final approved = display.isApproved;
-    final tint = approved ? AppColors.borderApproved : AppColors.rejectRed;
+    // Same color + Lao label source as the card border and the booking lists.
+    final style = BookingStatusStyle.of(display.booking.status);
     return Center(
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         decoration: BoxDecoration(
-          color: tint.withValues(alpha: 0.1),
+          color: style.color,
           borderRadius: BorderRadius.circular(AppColors.chipRadius),
         ),
         child: Text(
-          approved ? 'Approved' : 'Rejected',
+          style.labelLao,
           style: TextStyle(
-            color: tint,
-            fontWeight: FontWeight.w600,
+            color: style.onColor,
+            fontWeight: FontWeight.w700,
             fontSize: 13,
           ),
         ),

@@ -1,6 +1,9 @@
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:get/get.dart' hide Response;
+// dio and get both export FormData / MultipartFile; hide get's so the dio
+// types win for the multipart upload below.
+import 'package:get/get.dart' hide Response, FormData, MultipartFile;
 
 import '../../../../services/api_client.dart';
 import '../../../../widgets/app_colors.dart';
@@ -64,6 +67,34 @@ class AnnouncementController extends GetxController {
 
   /// History page — search field controller.
   final TextEditingController searchHistoryCtrl = TextEditingController();
+
+  /// Compose form — attachments the admin picked but hasn't uploaded yet.
+  /// Uploaded to `/notifications/upload` at send time; empty when none.
+  final RxList<PlatformFile> pickedFiles = <PlatformFile>[].obs;
+
+  /// `true` while the picked attachments are being uploaded to the server.
+  final RxBool isUploading = false.obs;
+
+  /// Edit dialog — how many attachments the edited notification already has;
+  /// drives the "remove attachments" row (0 hides it).
+  final RxInt editingFilesCount = 0.obs;
+
+  /// Edit dialog — when `true`, the existing attachments are cleared on save.
+  final RxBool editRemoveFile = false.obs;
+
+  /// Per-file size cap, mirroring the backend's MaxUploadFileBytes (10 MiB),
+  /// so the picker rejects oversized files before an upload round-trip.
+  static const int maxUploadFileBytes = 10 * 1024 * 1024;
+
+  /// Max attachments per notification (mirrors the backend's MaxUploadFiles).
+  static const int maxUploadFiles = 10;
+
+  /// Extensions accepted by the picker — must stay within the backend's
+  /// `allowedUploadExt` allow-list.
+  static const List<String> allowedUploadExtensions = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv',
+  ];
 
   /// Active audience tab — see [AnnouncementAudience].
   final RxInt selectedAudience = AnnouncementAudience.all.obs;
@@ -419,6 +450,115 @@ class AnnouncementController extends GetxController {
     return total;
   }
 
+  // ──────────────────────────────────────────────── attachment ──
+
+  /// Open the system file picker (multi-select, restricted to
+  /// [allowedUploadExtensions]) and append the chosen files to [pickedFiles].
+  /// Skips files over [maxUploadFileBytes] and enforces the [maxUploadFiles]
+  /// total, surfacing a warning rather than failing silently.
+  Future<void> pickAttachment() async {
+    try {
+      final result = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: allowedUploadExtensions,
+        allowMultiple: true,
+        withData: true, // load bytes so upload works on web + in-memory paths
+      );
+      if (result == null || result.files.isEmpty) return;
+
+      final tooLarge = <String>[];
+      final accepted = <PlatformFile>[];
+      for (final f in result.files) {
+        if (f.size > maxUploadFileBytes) {
+          tooLarge.add(f.name);
+        } else {
+          accepted.add(f);
+        }
+      }
+
+      // Keep earlier picks; cap the running total at maxUploadFiles.
+      final room = maxUploadFiles - pickedFiles.length;
+      final overflow = accepted.length > room;
+      if (room > 0) pickedFiles.addAll(accepted.take(room));
+
+      if (tooLarge.isNotEmpty || overflow) {
+        final parts = <String>[];
+        if (tooLarge.isNotEmpty) {
+          parts.add('ຂ້າມໄຟລ໌ໃຫຍ່ກວ່າ 10 MB: ${tooLarge.join(', ')}');
+        }
+        if (overflow) {
+          parts.add('ແນບໄດ້ສູງສຸດ $maxUploadFiles ໄຟລ໌.');
+        }
+        AppDialogs.showWarning(
+          title: 'ບາງໄຟລ໌ບໍ່ຖືກເພີ່ມ',
+          message: parts.join('\n'),
+        );
+      }
+    } catch (e) {
+      debugPrint('pickAttachment error: $e');
+      AppDialogs.showError(
+        title: 'ເລືອກໄຟລ໌ບໍ່ໄດ້',
+        message: 'ບໍ່ສາມາດເລືອກໄຟລ໌ໄດ້. ກະລຸນາລອງໃໝ່.',
+      );
+    }
+  }
+
+  /// Remove one staged attachment by index.
+  void removePickedFileAt(int index) {
+    if (index >= 0 && index < pickedFiles.length) pickedFiles.removeAt(index);
+  }
+
+  /// Drop all staged attachments.
+  void clearPickedFiles() => pickedFiles.clear();
+
+  /// Upload every staged file to `/notifications/upload` in one multipart
+  /// request and return the list of `{path,name,mime,size}` refs to send on
+  /// the notification. Returns `[]` when nothing is staged, `null` when the
+  /// response was malformed. Throws [DioException] on network failure so the
+  /// caller can surface a precise error.
+  Future<List<Map<String, dynamic>>?> _uploadPickedFiles() async {
+    if (pickedFiles.isEmpty) return const [];
+
+    final form = FormData();
+    for (final f in pickedFiles) {
+      final MultipartFile part;
+      if (f.bytes != null) {
+        part = MultipartFile.fromBytes(f.bytes!, filename: f.name);
+      } else if (f.path != null) {
+        part = await MultipartFile.fromFile(f.path!, filename: f.name);
+      } else {
+        continue; // no readable data for this platform
+      }
+      form.files.add(MapEntry('files', part));
+    }
+    if (form.files.isEmpty) return null;
+
+    isUploading.value = true;
+    try {
+      final response = await _dio.post(
+        '/notifications/upload',
+        data: form,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      final data = response.data;
+      if (data is Map && data['files'] is List) {
+        return (data['files'] as List)
+            .whereType<Map>()
+            .where((m) => m['path'] is String && (m['path'] as String).isNotEmpty)
+            .map<Map<String, dynamic>>((m) => {
+                  'path': m['path'],
+                  'name': m['name'],
+                  if (m['mime'] != null) 'mime': m['mime'],
+                  if (m['size'] != null) 'size': m['size'],
+                })
+            .toList();
+      }
+      return null;
+    } finally {
+      isUploading.value = false;
+    }
+  }
+
   // ────────────────────────────────────────── send / delete flow ──
 
   /// Validate the compose form, show a confirmation dialog with reach
@@ -457,6 +597,29 @@ class AnnouncementController extends GetxController {
 
     isSending.value = true;
     try {
+      // Upload staged attachments first so their refs travel with the
+      // notification. A failed upload aborts the send; the `finally` still
+      // clears the sending flag.
+      List<Map<String, dynamic>> fileRefs = const [];
+      if (pickedFiles.isNotEmpty) {
+        List<Map<String, dynamic>>? uploaded;
+        try {
+          uploaded = await _uploadPickedFiles();
+        } on DioException catch (e) {
+          _showDioError('ອັບໂຫຼດໄຟລ໌ລົ້ມເຫຼວ', e,
+              fallback: 'ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້.');
+          return;
+        }
+        if (uploaded == null) {
+          AppDialogs.showError(
+            title: 'ອັບໂຫຼດໄຟລ໌ລົ້ມເຫຼວ',
+            message: 'ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້. ກະລຸນາລອງໃໝ່.',
+          );
+          return;
+        }
+        fileRefs = uploaded;
+      }
+
       final response = await _dio.post(
         '/notifications',
         queryParameters: _buildSendQuery(),
@@ -464,6 +627,7 @@ class AnnouncementController extends GetxController {
           'title': titleCtrl.text.trim(),
           'message': messageCtrl.text.trim(),
           'type': buildNotificationType(),
+          'files': fileRefs,
         },
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -513,6 +677,8 @@ class AnnouncementController extends GetxController {
   Future<void> editNotification(NotificationModel noti) async {
     editTitleCtrl.text = noti.title;
     editMessageCtrl.text = noti.message;
+    editingFilesCount.value = noti.files.length;
+    editRemoveFile.value = false;
 
     final confirmed = await Get.dialog<bool>(
       _EditNotificationDialog(controller: this),
@@ -526,6 +692,12 @@ class AnnouncementController extends GetxController {
         'title': editTitleCtrl.text.trim(),
         'message': editMessageCtrl.text.trim(),
         'type': noti.type ?? '',
+        // Clear attachments when "remove" is ticked, otherwise resend the
+        // existing set. Always sending `files` keeps both the PUT (replace)
+        // and the delete+POST fallback paths correct.
+        'files': editRemoveFile.value
+            ? const []
+            : noti.files.map((f) => f.toUploadRef()).toList(),
       };
 
       Response? response;
@@ -574,6 +746,7 @@ class AnnouncementController extends GetxController {
         'title': noti.title,
         'message': noti.message,
         'type': noti.type ?? '',
+        'files': noti.files.map((f) => f.toUploadRef()).toList(),
       });
       if (response.statusCode == 200 || response.statusCode == 201) {
         await fetchNotifications();
@@ -804,6 +977,7 @@ class AnnouncementController extends GetxController {
     titleCtrl.clear();
     messageCtrl.clear();
     individualIdCtrl.clear();
+    pickedFiles.clear();
     selectedAudience.value = AnnouncementAudience.all;
     selectedDepartment.value = null;
     selectedStudentGroup.value = null;
@@ -1057,6 +1231,14 @@ class _EditNotificationDialog extends StatelessWidget {
               controller: controller.editMessageCtrl,
               maxLines: 4,
             ),
+            Obx(() {
+              final count = controller.editingFilesCount.value;
+              if (count == 0) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: _EditRemoveFileRow(controller: controller, count: count),
+              );
+            }),
             const SizedBox(height: 16),
             _DialogFooter(
               cancelLabel: 'ຍົກເລີກ',
@@ -1067,6 +1249,77 @@ class _EditNotificationDialog extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+/// Row inside [_EditNotificationDialog] showing how many attachments the
+/// notification has, with a toggle to clear them on save. Tapping "ລຶບ" flips
+/// [AnnouncementController.editRemoveFile]; the row reflects the pending
+/// removal with a strikethrough so the choice is reversible before saving.
+class _EditRemoveFileRow extends StatelessWidget {
+  /// Owner of [AnnouncementController.editRemoveFile].
+  final AnnouncementController controller;
+
+  /// Number of existing attachments.
+  final int count;
+
+  const _EditRemoveFileRow({required this.controller, required this.count});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final remove = controller.editRemoveFile.value;
+      final muted = Colors.grey.shade400;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF9FAFB),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.attach_file_rounded,
+              size: 18,
+              color: remove ? muted : AppColors.laoBlue,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '$count ໄຟລ໌ແນບ',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: remove ? muted : const Color(0xFF374151),
+                  decoration: remove ? TextDecoration.lineThrough : null,
+                ),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: controller.editRemoveFile.toggle,
+              icon: Icon(
+                remove ? Icons.undo_rounded : Icons.delete_outline_rounded,
+                size: 16,
+                color: remove ? AppColors.laoBlue : AppColors.rejectRed,
+              ),
+              label: Text(
+                remove ? 'ກູ້ຄືນ' : 'ລຶບ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: remove ? AppColors.laoBlue : AppColors.rejectRed,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: const Size(0, 36),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 }
 

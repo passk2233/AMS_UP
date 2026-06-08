@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
 import 'package:frontend/app/services/api_client.dart';
+import 'package:frontend/app/widgets/app_colors.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class ScheduleStudentController extends GetxController {
@@ -216,14 +217,10 @@ class ScheduleStudentController extends GetxController {
   List<Map<String, dynamic>> get filteredSchedules {
     if (!isInSemester(selectedDate.value)) return const [];
 
-    final palette = <Color>[
-      Colors.purple,
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.redAccent,
-      Colors.teal,
-    ];
+    // Class cards use one neutral brand accent. The prior rainbow tinted
+    // cards in the reserved status colors (amber/emerald/red) and off-brand
+    // purple, which collided with the closed status vocabulary. See DESIGN.md.
+    final palette = <Color>[AppColors.info];
 
     final selectedWeekday = selectedDate.value.weekday;
     final selected = studyPlans.where((p) {

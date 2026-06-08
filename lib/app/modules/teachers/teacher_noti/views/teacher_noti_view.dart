@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../widgets/widget.dart';
+import '../../../data/models/notification_file_model.dart';
 import '../../../student/student_noti/views/booking_detail.dart';
 import '../../../student/student_noti/views/grade_noti.dart';
 import '../controllers/teacher_noti_controller.dart';
@@ -187,6 +188,7 @@ class _NotificationListItem extends StatelessWidget {
       desc: item['desc'] as String,
       time: item['time'] as String,
       unread: unread,
+      files: item['files'] as List<NotificationFileModel>?,
       onTap: () {
         if (id != null) controller.markAsRead(id);
         if (item['title'] == 'Grade Released') {
@@ -339,6 +341,9 @@ class _RecentNotificationCard extends StatelessWidget {
   /// When true, prepends an [_UnreadDot] before the title.
   final bool unread;
 
+  /// Optional uploaded attachments.
+  final List<NotificationFileModel>? files;
+
   /// Tap handler.
   final VoidCallback? onTap;
 
@@ -349,8 +354,11 @@ class _RecentNotificationCard extends StatelessWidget {
     required this.desc,
     required this.time,
     this.unread = false,
+    this.files,
     this.onTap,
   });
+
+  bool get _hasAttachment => files?.isNotEmpty ?? false;
 
   @override
   Widget build(BuildContext context) {
@@ -384,6 +392,13 @@ class _RecentNotificationCard extends StatelessWidget {
                     height: 1.4,
                   ),
                 ),
+                if (_hasAttachment) ...[
+                  const SizedBox(height: 10),
+                  NotificationAttachments(
+                    files: files ?? const [],
+                    imageHeight: 120,
+                  ),
+                ],
               ],
             ),
           ),
@@ -437,7 +452,7 @@ class _NotiTitleRow extends StatelessWidget {
             ],
           ),
         ),
-        Text(time, style: TextStyle(color: timeColor, fontSize: 11)),
+        Text(time, style: TextStyle(color: timeColor, fontSize: 12)),
       ],
     );
   }

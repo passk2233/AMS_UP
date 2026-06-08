@@ -217,7 +217,7 @@ class _RoleTile extends StatelessWidget {
       ),
       subtitle: Text(
         info.desc,
-        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
       trailing: Icon(Icons.check_circle_rounded, color: info.color, size: 18),
     );
@@ -275,7 +275,7 @@ class _RoleInfo {
       case 'admin':
         return const _RoleInfo(
           Icons.shield_rounded,
-          Colors.indigo,
+          AppColors.info,
           'ເຂົ້າເຖິງລະບົບທັງໝົດ',
         );
       case 'teacher':

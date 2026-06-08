@@ -261,10 +261,12 @@ class AppStatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: color,
+              // Numbers stay high-contrast ink; the color lives in the icon
+              // bubble. A tinted value fails AA when the tint is amber/teal.
+              color: AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 2),
