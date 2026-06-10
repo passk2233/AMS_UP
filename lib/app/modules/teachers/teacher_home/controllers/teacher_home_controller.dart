@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
 
@@ -12,6 +11,21 @@ import '../../../data/data_exporter.dart';
 /// in a single fan-out. Filtering is done both server-side (`teacher_id`
 /// query param) and client-side, in case the backend ignores the filter.
 class TeacherHomeController extends GetxController {
+  TeacherHomeController({
+    AuthProvider? auth,
+    AcademicProvider? academic,
+    BookingProvider? booking,
+    EvaluationProvider? evaluation,
+  })  : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _booking = booking ?? BookingProvider(),
+        _eval = evaluation ?? EvaluationProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+  final BookingProvider _booking;
+  final EvaluationProvider _eval;
+
   /// `true` while [fetchDashboard] is in flight.
   final RxBool isLoading = false.obs;
 
@@ -35,8 +49,6 @@ class TeacherHomeController extends GetxController {
 
   /// Currently signed-in user (used to derive [UserModel.teacherId]).
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -82,32 +94,17 @@ class TeacherHomeController extends GetxController {
   }
 
   Future<void> _loadCurrentUser() async {
-    final me = await _dio.get('/auth/me');
-    if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-      currentUser.value = UserModel.fromJson(me.data);
-    }
+    currentUser.value = await _auth.me();
   }
 
   /// Server-side filter by `teacher_id`, with a client-side fallback when
   /// the backend ignores the filter (returns the full list, possibly empty).
   Future<List<StudyPlanModel>> _loadTeacherStudyPlans(int teacherId) async {
-    final scoped = await _dio.get(
-      '/study-plans',
-      queryParameters: {'teacher_id': teacherId, 'limit': 500},
-    );
-    final scopedList = _extractList(scoped.data)
-        .map((j) => StudyPlanModel.fromJson(j))
-        .toList();
-    if (scopedList.isNotEmpty) return scopedList;
+    final scoped = await _academic.fetchStudyPlans(teacherId: teacherId);
+    if (scoped.isNotEmpty) return scoped;
 
-    final all = await _dio.get(
-      '/study-plans',
-      queryParameters: {'limit': 500},
-    );
-    return _extractList(all.data)
-        .map((j) => StudyPlanModel.fromJson(j))
-        .where((sp) => sp.teacherId == teacherId)
-        .toList();
+    final all = await _academic.fetchStudyPlans();
+    return all.where((sp) => sp.teacherId == teacherId).toList();
   }
 
   /// Filter [studyPlans] to entries whose `day_of_week` matches today and
@@ -122,12 +119,7 @@ class TeacherHomeController extends GetxController {
   }
 
   Future<void> _loadMyBookings() async {
-    final response = await _dio.get(
-      '/room-bookings',
-      queryParameters: {'limit': 200},
-    );
-    final mine = _extractList(response.data)
-        .map((j) => RoomBookingModel.fromJson(j))
+    final mine = (await _booking.fetchBookings(limit: 200))
         .where((b) => b.userId == currentUser.value?.id)
         .toList();
     myBookingsCount.value = mine.length;
@@ -143,20 +135,9 @@ class TeacherHomeController extends GetxController {
     List<StudyPlanModel> studyPlans,
   ) async {
     final spIds = studyPlans.map((sp) => sp.id).toSet();
-    final response = await _dio.get(
-      '/evaluation-results',
-      queryParameters: {'teacher_id': teacherId, 'limit': 500},
-    );
-    myEvaluationsCount.value = _extractList(response.data)
-        .map((j) => EvaluationResultModel.fromJson(j))
-        .where((r) => spIds.contains(r.studyPlanId))
-        .length;
-  }
-
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
+    final results = await _eval.fetchResults(teacherId: teacherId);
+    myEvaluationsCount.value =
+        results.where((r) => spIds.contains(r.studyPlanId)).length;
   }
 
   /// Lowercase English weekday name matching the backend's `day_of_week`

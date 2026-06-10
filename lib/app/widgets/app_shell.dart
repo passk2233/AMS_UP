@@ -42,11 +42,7 @@ class AppPageScaffold extends StatelessWidget {
                 children: [
                   const SizedBox(width: 40),
                   Expanded(child: AppPageTitle(text: title!)),
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: trailing,
-                  ),
+                  SizedBox(width: 40, height: 40, child: trailing),
                 ],
               ),
             ),
@@ -144,8 +140,6 @@ class AppSurfaceCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
-  final Color? borderLeftColor;
-  final double borderLeftWidth;
   final VoidCallback? onTap;
 
   const AppSurfaceCard({
@@ -153,8 +147,6 @@ class AppSurfaceCard extends StatelessWidget {
     required this.child,
     this.padding = EdgeInsets.zero,
     this.margin = EdgeInsets.zero,
-    this.borderLeftColor,
-    this.borderLeftWidth = 4,
     this.onTap,
   });
 
@@ -166,14 +158,6 @@ class AppSurfaceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(AppColors.cardRadius),
-        border: borderLeftColor != null
-            ? Border(
-                left: BorderSide(
-                  color: borderLeftColor!,
-                  width: borderLeftWidth,
-                ),
-              )
-            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -209,12 +193,18 @@ class AppIconBubble extends StatelessWidget {
   /// Optional unread count rendered as a red corner badge; `0` hides it.
   final int badgeCount;
 
+  /// Accessible name for this icon-only control (e.g. "ການແຈ້ງເຕືອນ"). When
+  /// set, the button is announced with this label plus the unread count, and
+  /// the decorative glyph/badge are excluded from the semantics tree.
+  final String? semanticLabel;
+
   const AppIconBubble({
     super.key,
     required this.icon,
     this.onTap,
     this.color,
     this.badgeCount = 0,
+    this.semanticLabel,
   });
 
   @override
@@ -236,7 +226,7 @@ class AppIconBubble extends StatelessWidget {
       );
     }
 
-    return Material(
+    final Widget bubble = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppColors.cardRadius),
@@ -264,6 +254,14 @@ class AppIconBubble extends StatelessWidget {
           child: glyph,
         ),
       ),
+    );
+
+    if (semanticLabel == null) return Semantics(button: true, child: bubble);
+    return Semantics(
+      button: true,
+      label: badgeCount > 0 ? '$semanticLabel, $badgeCount' : semanticLabel,
+      excludeSemantics: true,
+      child: bubble,
     );
   }
 }

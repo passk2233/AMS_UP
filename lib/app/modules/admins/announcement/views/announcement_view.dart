@@ -7,6 +7,7 @@ import '../../../../utilities/media_url.dart';
 import '../../../../widgets/widget.dart';
 import '../../../data/models/department_model.dart';
 import '../../../data/models/student_group_model.dart';
+import '../../../data/models/student_model.dart';
 import '../../../data/models/student_type_model.dart';
 import '../controllers/announcement_controller.dart';
 import 'announcement_history_view.dart';
@@ -239,10 +240,7 @@ class _AudienceChips extends StatelessWidget {
   /// Currently selected audience index.
   final int selected;
 
-  const _AudienceChips({
-    required this.controller,
-    required this.selected,
-  });
+  const _AudienceChips({required this.controller, required this.selected});
 
   @override
   Widget build(BuildContext context) {
@@ -261,8 +259,7 @@ class _AudienceChips extends StatelessWidget {
   void _onSelect(int i) {
     controller.selectedAudience.value = i;
     if (i != AnnouncementAudience.individual) {
-      controller.foundStudent.value = null;
-      controller.individualIdCtrl.clear();
+      controller.clearIndividualSelection();
     }
   }
 }
@@ -279,15 +276,15 @@ class _IndividualSearchSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _FieldLabel('ຄົ້ນຫານັກສຶກສາ (ໃສ່ ID)'),
+        const _FieldLabel('ຄົ້ນຫານັກສຶກສາ (ລະຫັດ ຫຼື ຊື່)'),
         const SizedBox(height: 6),
         Row(
           children: [
             Expanded(
               child: _FilledTextField(
-                controller: controller.individualIdCtrl,
-                hint: 'ເຊັ່ນ: 123',
-                keyboardType: TextInputType.number,
+                controller: controller.individualSearchCtrl,
+                hint: 'ເຊັ່ນ: 64010001 ຫຼື ຊື່ນັກສຶກສາ',
+                keyboardType: TextInputType.text,
               ),
             ),
             const SizedBox(width: 8),
@@ -297,7 +294,7 @@ class _IndividualSearchSection extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: controller.isSearching.value
                       ? null
-                      : controller.searchStudentById,
+                      : controller.searchStudents,
                   icon: controller.isSearching.value
                       ? const SizedBox(
                           width: 16,
@@ -308,8 +305,7 @@ class _IndividualSearchSection extends StatelessWidget {
                           ),
                         )
                       : const Icon(Icons.search, size: 18),
-                  label:
-                      const Text('ຄົ້ນຫາ', style: TextStyle(fontSize: 13)),
+                  label: const Text('ຄົ້ນຫາ', style: TextStyle(fontSize: 13)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.laoBlue,
                     foregroundColor: Colors.white,
@@ -323,16 +319,35 @@ class _IndividualSearchSection extends StatelessWidget {
           ],
         ),
         Obx(() {
-          final s = controller.foundStudent.value;
-          if (s == null) return const SizedBox.shrink();
+          final selected = controller.foundStudent.value;
+          if (selected != null) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: _FoundStudentCard(
+                student: selected,
+                onClear: controller.clearIndividualSelection,
+              ),
+            );
+          }
+
+          final results = controller.searchResults;
+          if (results.isEmpty) return const SizedBox.shrink();
           return Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: _FoundStudentCard(
-              student: s,
-              onClear: () {
-                controller.foundStudent.value = null;
-                controller.individualIdCtrl.clear();
-              },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _FieldLabel('ຜົນການຄົ້ນຫາ (${results.length})'),
+                const SizedBox(height: 6),
+                for (final s in results)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _StudentResultRow(
+                      student: s,
+                      onTap: () => controller.selectStudent(s),
+                    ),
+                  ),
+              ],
             ),
           );
         }),
@@ -341,10 +356,80 @@ class _IndividualSearchSection extends StatelessWidget {
   }
 }
 
-/// Green-tinted card summarizing the looked-up student.
-class _FoundStudentCard extends StatelessWidget {
+/// Tappable row for one search match — picks the student as the recipient.
+class _StudentResultRow extends StatelessWidget {
   /// The matched student.
-  final dynamic student;
+  final StudentModel student;
+
+  /// Selects this student.
+  final VoidCallback onTap;
+
+  const _StudentResultRow({required this.student, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = student;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.scaffoldBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.laoBlue.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(
+                Icons.person_rounded,
+                color: AppColors.laoBlue,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${s.nameLao} ${s.surnameLao ?? ''}'.trim(),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'ລະຫັດ: ${s.stdCode}  •  ກຸ່ມ: ${s.studentGroup?.stdGroupName ?? '-'}',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 20,
+              color: Colors.grey.shade500,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Green-tinted card summarizing the selected student.
+class _FoundStudentCard extends StatelessWidget {
+  /// The selected student.
+  final StudentModel student;
 
   /// Tap handler for the close button.
   final VoidCallback onClear;
@@ -359,8 +444,9 @@ class _FoundStudentCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.borderApproved.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border:
-            Border.all(color: AppColors.borderApproved.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppColors.borderApproved.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
@@ -382,7 +468,7 @@ class _FoundStudentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${s.nameLao} ${s.surnameLao ?? ''}',
+                  '${s.nameLao} ${s.surnameLao ?? ''}'.trim(),
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -391,12 +477,15 @@ class _FoundStudentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'ID: ${s.id}  •  ${s.stdCode}',
+                  'ລະຫັດ: ${s.stdCode}',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                 ),
                 Text(
                   'ກຸ່ມ: ${s.studentGroup?.stdGroupName ?? '-'}  •  ປະເພດ: ${s.studentType?.stdTypeNameLao ?? '-'}',
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
@@ -476,8 +565,9 @@ class _DepartmentSelector extends StatelessWidget {
       ],
       onChanged: (val) => controller.selectedDepartment.value = val == null
           ? null
-          : controller.departments
-              .firstWhereOrNull((DepartmentModel d) => d.id == val),
+          : controller.departments.firstWhereOrNull(
+              (DepartmentModel d) => d.id == val,
+            ),
     );
   }
 }
@@ -540,8 +630,9 @@ class _StudentGroupSelector extends StatelessWidget {
       ],
       onChanged: (val) => controller.selectedStudentGroup.value = val == null
           ? null
-          : controller.studentGroups
-              .firstWhereOrNull((StudentGroupModel g) => g.id == val),
+          : controller.studentGroups.firstWhereOrNull(
+              (StudentGroupModel g) => g.id == val,
+            ),
     );
   }
 }
@@ -575,8 +666,9 @@ class _StudentTypeSelector extends StatelessWidget {
       ],
       onChanged: (val) => controller.selectedStudentType.value = val == null
           ? null
-          : controller.studentTypes
-              .firstWhereOrNull((StudentTypeModel t) => t.id == val),
+          : controller.studentTypes.firstWhereOrNull(
+              (StudentTypeModel t) => t.id == val,
+            ),
     );
   }
 }
@@ -657,7 +749,10 @@ class _AttachmentCard extends StatelessWidget {
           Text(
             'ຮອງຮັບ PDF, Word, Excel, PowerPoint, ຮູບ — ສູງສຸດ 10 MB/ໄຟລ໌, '
             '${AnnouncementController.maxUploadFiles} ໄຟລ໌',
-            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
@@ -691,8 +786,11 @@ class _PickFileButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.upload_file_rounded,
-                size: 20, color: AppColors.laoBlue),
+            const Icon(
+              Icons.upload_file_rounded,
+              size: 20,
+              color: AppColors.laoBlue,
+            ),
             const SizedBox(width: 8),
             Text(
               label,
@@ -717,10 +815,7 @@ class _PickedFileRow extends StatelessWidget {
   /// Removes this staged file.
   final VoidCallback onRemove;
 
-  const _PickedFileRow({
-    required this.file,
-    required this.onRemove,
-  });
+  const _PickedFileRow({required this.file, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -730,8 +825,9 @@ class _PickedFileRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.borderApproved.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(10),
-        border:
-            Border.all(color: AppColors.borderApproved.withValues(alpha: 0.3)),
+        border: Border.all(
+          color: AppColors.borderApproved.withValues(alpha: 0.3),
+        ),
       ),
       child: Row(
         children: [
@@ -742,9 +838,7 @@ class _PickedFileRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
-              isImage
-                  ? Icons.image_outlined
-                  : Icons.insert_drive_file_outlined,
+              isImage ? Icons.image_outlined : Icons.insert_drive_file_outlined,
               size: 20,
               color: AppColors.borderApproved,
             ),
@@ -767,15 +861,21 @@ class _PickedFileRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _formatBytes(file.size),
-                  style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
               ],
             ),
           ),
           IconButton(
             onPressed: onRemove,
-            icon:
-                Icon(Icons.close_rounded, size: 18, color: Colors.grey.shade600),
+            icon: Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: Colors.grey.shade600,
+            ),
             tooltip: 'ລຶບ',
             visualDensity: VisualDensity.compact,
           ),
@@ -875,11 +975,18 @@ class _FilledTextField extends StatelessWidget {
       keyboardType: keyboardType,
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 14),
+        // Slate (4.5:1), not grey.shade400 (~1.8:1) — placeholders are held to
+        // the same contrast floor as body text. See DESIGN.md.
+        hintStyle: const TextStyle(
+          color: AppColors.textSecondary,
+          fontSize: 14,
+        ),
         filled: true,
         fillColor: AppColors.scaffoldBg,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 12,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide.none,
@@ -936,10 +1043,14 @@ class _LabeledDropdown<T> extends StatelessWidget {
             child: DropdownButton<T>(
               value: value,
               isExpanded: true,
-              icon: Icon(Icons.keyboard_arrow_down,
-                  color: Colors.grey.shade500),
-              style:
-                  const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+              icon: Icon(
+                Icons.keyboard_arrow_down,
+                color: Colors.grey.shade500,
+              ),
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textPrimary,
+              ),
               items: items,
               onChanged: onChanged,
             ),

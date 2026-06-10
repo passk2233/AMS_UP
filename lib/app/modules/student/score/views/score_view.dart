@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/utilities/assets.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/score_controller.dart';
@@ -45,7 +44,7 @@ class ScoreView extends GetView<ScoreController> {
                   name: controller.displayName,
                   subtitle: controller.studentCode,
                   caption: _captionText(),
-                  avatarImage: const AssetImage(AssetImages.profile2),
+                  photo: controller.photo,
                 ),
                 const SizedBox(height: AppSpacing.m),
                 _TranscriptStatStrip(
@@ -304,7 +303,6 @@ class ScoreView extends GetView<ScoreController> {
         return AppSurfaceCard(
           margin: const EdgeInsets.only(bottom: 15),
           padding: const EdgeInsets.all(15),
-          borderLeftColor: gc.bg,
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [

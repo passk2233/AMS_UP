@@ -3,15 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/services/auth_storage.dart';
 import 'package:frontend/app/services/fcm_service.dart';
-import 'package:frontend/app/widgets/app_dialogs.dart';
 
 import '../../../../widgets/widget.dart';
 
 class ProfileStudentController extends GetxController {
-  Dio get _dio => ApiClient.dio;
+  ProfileStudentController({AuthProvider? auth})
+      : _auth = auth ?? AuthProvider();
+
+  /// Data-access seam for `/auth/*`.
+  final AuthProvider _auth;
 
   final Rx<UserModel?> user = Rx<UserModel?>(null);
   final RxBool isLoading = false.obs;
@@ -28,21 +30,19 @@ class ProfileStudentController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response = await _dio.get('/auth/me');
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        user.value = UserModel.fromJson(response.data);
-      }
+      final result = await _auth.me();
+      if (result != null) user.value = result;
     } on DioException catch (e) {
       debugPrint(
         'ProfileStudent fetchProfile Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
       );
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
       errorMessage.value = e.response?.statusCode == 401
-          ? 'Session expired. Please login again.'
-          : 'Failed to load profile.';
+          ? 'ການເຂົ້າລະບົບຫມົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.'
+          : 'ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້.';
     } catch (e) {
       debugPrint('ProfileStudent fetchProfile error: $e');
-      errorMessage.value = 'Failed to load profile.';
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດໂປຣໄຟລ໌ໄດ້.';
     } finally {
       isLoading.value = false;
     }
@@ -61,6 +61,7 @@ class ProfileStudentController extends GetxController {
     isLoggingOut.value = true;
     try {
       await FCMService.clearTokenOnLogout();
+      await _auth.logout(); // best-effort server-side session revoke
       await AuthStorage.clear();
       Get.offAllNamed('/auth');
     } finally {
@@ -70,6 +71,9 @@ class ProfileStudentController extends GetxController {
 
   UserModel? get _u => user.value;
   StudentModel? get student => _u?.student;
+
+  /// Stored profile photo path/URL; null when unset (header shows placeholder).
+  String? get photo => student?.photo;
 
   String get displayName {
     final s = student;

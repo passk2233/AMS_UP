@@ -216,7 +216,11 @@ class _StatChip extends StatelessWidget {
                 children: [
                   Text(
                     '$count',
-                    style: AppTypography.heading.copyWith(color: color),
+                    // Numbers stay high-contrast ink; the hue lives in the icon
+                    // bubble. Amber (#f59e0b) as text is ~2:1 and fails AA — the
+                    // pending count is the admin's most-read number, so it must
+                    // not be the lowest-contrast thing on screen.
+                    style: AppTypography.heading,
                   ),
                   Text(
                     label,
@@ -328,8 +332,7 @@ class _FilterTabsRow extends StatelessWidget {
           children: [
             for (var i = 0; i < _tabs.length; i++)
               Padding(
-                padding:
-                    EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
+                padding: EdgeInsets.only(right: i < _tabs.length - 1 ? 8 : 0),
                 child: _FilterTab(
                   info: _tabs[i],
                   count: _countForTab(i),
@@ -389,8 +392,7 @@ class _FilterTab extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: isSelected ? accent : Colors.white,
             borderRadius: BorderRadius.circular(AppColors.chipRadius),
@@ -515,8 +517,9 @@ class _BookingListSliver extends StatelessWidget {
                 onReject: () => controller.rejectBooking(booking.bookingId),
               );
             }
-            final selected =
-                controller.selectedBookingIds.contains(booking.bookingId);
+            final selected = controller.selectedBookingIds.contains(
+              booking.bookingId,
+            );
             return _SelectableBookingCard(
               booking: booking,
               selected: selected,
@@ -632,12 +635,9 @@ class _BulkActionBar extends StatelessWidget {
               children: [
                 Expanded(child: _SelectionSummary(controller: controller)),
                 OutlinedButton.icon(
-                  onPressed: count == 0
-                      ? null
-                      : controller.bulkRejectSelected,
+                  onPressed: count == 0 ? null : controller.bulkRejectSelected,
                   icon: const Icon(Icons.close_rounded, size: 16),
-                  label: const Text('ປະຕິເສດ',
-                      style: TextStyle(fontSize: 12)),
+                  label: const Text('ປະຕິເສດ', style: TextStyle(fontSize: 12)),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.rejectRed,
                     side: const BorderSide(color: AppColors.rejectRed),
@@ -652,12 +652,9 @@ class _BulkActionBar extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: count == 0
-                      ? null
-                      : controller.bulkApproveSelected,
+                  onPressed: count == 0 ? null : controller.bulkApproveSelected,
                   icon: const Icon(Icons.check_rounded, size: 16),
-                  label: const Text('ອະນຸມັດ',
-                      style: TextStyle(fontSize: 12)),
+                  label: const Text('ອະນຸມັດ', style: TextStyle(fontSize: 12)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.borderApproved,
                     foregroundColor: Colors.white,

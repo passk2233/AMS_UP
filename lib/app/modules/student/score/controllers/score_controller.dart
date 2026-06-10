@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 /// A single academic semester's worth of enrollments plus the resolved
@@ -35,6 +34,13 @@ class ScoreSemester {
 }
 
 class ScoreController extends GetxController {
+  ScoreController({AuthProvider? auth, AcademicProvider? academic})
+      : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -49,8 +55,6 @@ class ScoreController extends GetxController {
   /// `/semasters` because the `/enrollments` payload only carries the FK.
   final Map<int, SemasterModel> _semesterById = {};
 
-  Dio get _dio => ApiClient.dio;
-
   @override
   void onInit() {
     super.onInit();
@@ -61,25 +65,16 @@ class ScoreController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final me = await _dio.get('/auth/me');
-      if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-        currentUser.value = UserModel.fromJson(me.data);
-      }
+      currentUser.value = await _auth.me();
       final stdId = currentUser.value?.stdId ?? currentUser.value?.student?.id;
       if (stdId == null) {
-        errorMessage.value = 'Student account not linked.';
+        errorMessage.value = 'ບັນຊີນັກສຶກສາຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່.';
         return;
       }
 
       await _loadSemesters();
 
-      final resp = await _dio.get('/enrollments', queryParameters: {
-        'std_id': stdId,
-        'limit': 200,
-      });
-      final items = _extractList(resp.data);
-      enrollments
-          .assignAll(items.map((j) => EnrollmentModel.fromJson(j)).toList());
+      enrollments.assignAll(await _academic.fetchEnrollments(studentId: stdId));
 
       _ensureSelection();
     } on DioException catch (e) {
@@ -87,11 +82,11 @@ class ScoreController extends GetxController {
           'ScoreController Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
       errorMessage.value = e.response?.statusCode == 401
-          ? 'Session expired. Please login again.'
-          : 'Failed to load scores.';
+          ? 'ການເຂົ້າລະບົບຫມົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.'
+          : 'ບໍ່ສາມາດໂຫຼດຄະແນນໄດ້.';
     } catch (e) {
       debugPrint('ScoreController error: $e');
-      errorMessage.value = 'Failed to load scores.';
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຄະແນນໄດ້.';
     } finally {
       isLoading.value = false;
     }
@@ -99,12 +94,8 @@ class ScoreController extends GetxController {
 
   Future<void> _loadSemesters() async {
     try {
-      final resp =
-          await _dio.get('/semasters', queryParameters: {'limit': 100});
-      final items = _extractList(resp.data);
       _semesterById.clear();
-      for (final j in items) {
-        final s = SemasterModel.fromJson(j);
+      for (final s in await _academic.fetchSemesters(limit: 100)) {
         _semesterById[s.id] = s;
       }
     } on DioException catch (e) {
@@ -139,6 +130,9 @@ class ScoreController extends GetxController {
   }
 
   String get studentCode => currentUser.value?.student?.stdCode ?? '-';
+
+  /// Stored profile photo path/URL; null when unset (header shows placeholder).
+  String? get photo => currentUser.value?.student?.photo;
 
   String get curriculumName =>
       currentUser.value?.student?.curriculum?.curriNameEng ??
@@ -336,9 +330,4 @@ class ScoreController extends GetxController {
     }
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
-  }
 }

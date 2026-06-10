@@ -10,134 +10,147 @@ class BookingDetailView extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
-          onPressed: () => Get.back(),
-        ),
-        title: const Text(
-          "Booking Detail",
-          style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          const SizedBox(height: 30),
-          // Success Icon
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(25),
-              decoration: const BoxDecoration(
-                color: Color(0xFFDCFCE7),
-                shape: BoxShape.circle,
+          backgroundColor: AppColors.scaffoldBg,
+          appBar: AppBar(
+            leading: IconButton(
+              icon: const Icon(
+                Icons.arrow_back_ios,
+                color: AppColors.textPrimary,
               ),
-              child: const Icon(
-                Icons.check_circle,
-                color: Color(0xFF22C55E),
-                size: 40,
-              ),
+              onPressed: () => Get.back(),
             ),
-          ),
-          const SizedBox(height: 15),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              "CONFIRMED",
+            title: const Text(
+              "Booking Detail",
               style: TextStyle(
-                color: Color(0xFF166534),
+                color: AppColors.textPrimary,
                 fontWeight: FontWeight.bold,
-                fontSize: 12,
               ),
             ),
+            centerTitle: true,
+            backgroundColor: Colors.transparent,
+            elevation: 0,
           ),
-
-          const SizedBox(height: 25),
-          const Text(
-            "Booking Confirmed",
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            "Your study group session has been confirmed.",
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-
-          const SizedBox(height: 30),
-
-          // Details Card
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 30),
-            child: Container(
-              padding: const EdgeInsets.all(25),
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                borderRadius: BorderRadius.circular(25),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.05),
-                    blurRadius: 15,
+          body: Column(
+            children: [
+              const SizedBox(height: 30),
+              // Success Icon
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
                   ),
-                ],
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: AppColors.success,
+                    size: 40,
+                  ),
+                ),
               ),
-              child: Column(
-                children: [
-                  _buildDetailRow(
-                    Icons.apartment,
-                    "ROOM LOCATION",
-                    "Room A301",
-                    "Academic Wing, 3rd Floor",
-                    AppColors.info.withValues(alpha: 0.1),
-                    AppColors.info,
+              const SizedBox(height: 15),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 15,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  "CONFIRMED",
+                  style: TextStyle(
+                    color: AppColors.success,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
                   ),
-                  const Divider(height: 40),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildDetailRow(
-                          Icons.calendar_today,
-                          "DATE",
-                          "Jan 26, 2024",
-                          "",
-                          const Color(0xFFFFF7ED),
-                          const Color(0xFFF97316),
-                        ),
-                      ),
-                      Expanded(
-                        child: _buildDetailRow(
-                          Icons.access_time,
-                          "TIME",
-                          "09:00 - 11:00",
-                          "",
-                          const Color(0xFFEFF6FF),
-                          const Color(0xFF3B82F6),
-                        ),
+                ),
+              ),
+
+              const SizedBox(height: 25),
+              const Text(
+                "Booking Confirmed",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                "Your study group session has been confirmed.",
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+
+              const SizedBox(height: 30),
+
+              // Details Card
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 30),
+                child: Container(
+                  padding: const EdgeInsets.all(25),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBg,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.05),
+                        blurRadius: 15,
                       ),
                     ],
                   ),
-                  const Divider(height: 40),
-                  _buildDetailRow(
-                    Icons.person_outline,
-                    "BOOKED BY",
-                    "Souksakhone SAYYAVONG",
-                    "",
-                    const Color(0xFFF5F3FF),
-                    const Color(0xFF8B5CF6),
+                  child: Column(
+                    children: [
+                      _buildDetailRow(
+                        Icons.apartment,
+                        "ROOM LOCATION",
+                        "Room A301",
+                        "Academic Wing, 3rd Floor",
+                        AppColors.info.withValues(alpha: 0.1),
+                        AppColors.info,
+                      ),
+                      const Divider(height: 40),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildDetailRow(
+                              Icons.calendar_today,
+                              "DATE",
+                              "Jan 26, 2024",
+                              "",
+                              AppColors.info.withValues(alpha: 0.1),
+                              AppColors.info,
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildDetailRow(
+                              Icons.access_time,
+                              "TIME",
+                              "09:00 - 11:00",
+                              "",
+                              AppColors.info.withValues(alpha: 0.1),
+                              AppColors.info,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 40),
+                      _buildDetailRow(
+                        Icons.person_outline,
+                        "BOOKED BY",
+                        "Souksakhone SAYYAVONG",
+                        "",
+                        AppColors.info.withValues(alpha: 0.1),
+                        AppColors.info,
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
       },
     );
   }
@@ -175,12 +188,19 @@ class BookingDetailView extends StatelessWidget {
             ),
             Text(
               title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary),
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 15,
+                color: AppColors.textPrimary,
+              ),
             ),
             if (sub.isNotEmpty)
               Text(
                 sub,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 12,
+                ),
               ),
           ],
         ),

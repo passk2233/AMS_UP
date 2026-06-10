@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:frontend/app/modules/student/student_home/bindings/home_student_binding.dart';
 import 'package:frontend/app/routes/app_pages.dart';
@@ -28,9 +27,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   await FCMService.init();
@@ -98,8 +95,10 @@ class MyApp extends StatelessWidget {
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: AppColors.inputFill,
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(AppColors.buttonRadius),
             borderSide: BorderSide.none,
@@ -121,6 +120,21 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
+      builder: (context, child) {
+        // Clamp dynamic type: very large system font scales otherwise overflow
+        // the dense fixed-height rows (48dp chips, stat tiles, 10–13px meta).
+        // User scaling is still honored up to a legible 1.3× ceiling.
+        final mq = MediaQuery.of(context);
+        return MediaQuery(
+          data: mq.copyWith(
+            textScaler: mq.textScaler.clamp(
+              minScaleFactor: 1.0,
+              maxScaleFactor: 1.3,
+            ),
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
+      },
       initialBinding: BindingsBuilder(() {
         Get.put(HomeStudentBinding());
       }),

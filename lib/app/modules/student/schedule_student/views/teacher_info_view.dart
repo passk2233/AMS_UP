@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/widget.dart';
 
 /// Read-only profile of the teacher who teaches a given subject, opened from
@@ -46,6 +45,7 @@ class TeacherInfoView extends StatefulWidget {
 }
 
 class _TeacherInfoViewState extends State<TeacherInfoView> {
+  final PeopleProvider _people = PeopleProvider();
   TeacherModel? _teacher;
   bool _loading = false;
   bool _failed = false;
@@ -64,13 +64,9 @@ class _TeacherInfoViewState extends State<TeacherInfoView> {
       _failed = false;
     });
     try {
-      final resp = await ApiClient.dio.get('/teachers/${widget.teacherId}');
-      final raw = resp.data;
-      final data = (raw is Map && raw['data'] != null) ? raw['data'] : raw;
-      if (data is Map<String, dynamic>) {
-        if (!mounted) return;
-        setState(() => _teacher = TeacherModel.fromJson(data));
-      }
+      final teacher = await _people.fetchTeacherById(widget.teacherId);
+      if (!mounted) return;
+      if (teacher != null) setState(() => _teacher = teacher);
     } on DioException catch (e) {
       debugPrint(
           'TeacherInfo fetch Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
@@ -222,28 +218,15 @@ class _TeacherHero extends StatelessWidget {
     final engName = '${teacher.nameEng} ${teacher.surnameEng ?? ''}'.trim();
     final showEng = engName.isNotEmpty &&
         engName.toLowerCase() != laoName.toLowerCase();
-    final photo = teacher.photo;
-    final hasPhoto = photo != null && photo.startsWith('http');
-    final initial = laoName.isNotEmpty ? laoName.substring(0, 1) : '?';
 
     return AppSurfaceCard(
       padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
       child: Column(
         children: [
-          CircleAvatar(
+          AppAvatar(
+            photo: teacher.photo,
             radius: 42,
             backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-            backgroundImage: hasPhoto ? NetworkImage(photo) : null,
-            child: hasPhoto
-                ? null
-                : Text(
-                    initial.toUpperCase(),
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  ),
           ),
           const SizedBox(height: 14),
           Text(

@@ -3,11 +3,28 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../data/data_exporter.dart';
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
 import 'fixed_booking.dart';
 
 class BookingController extends GetxController {
+  BookingController({
+    AuthProvider? auth,
+    BookingProvider? booking,
+    AcademicProvider? academic,
+    PeopleProvider? people,
+    NotificationProvider? notification,
+  })  : _auth = auth ?? AuthProvider(),
+        _booking = booking ?? BookingProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _people = people ?? PeopleProvider(),
+        _noti = notification ?? NotificationProvider();
+
+  final AuthProvider _auth;
+  final BookingProvider _booking;
+  final AcademicProvider _academic;
+  final PeopleProvider _people;
+  final NotificationProvider _noti;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -27,8 +44,6 @@ class BookingController extends GetxController {
 
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
-
-  Dio get _dio => ApiClient.dio;
 
   /// Re-entrancy guard for [_ensureFixedBookingsPersisted]. Prevents two
   /// concurrent refreshes from racing and creating duplicate marker rows.
@@ -62,11 +77,8 @@ class BookingController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final me = await _dio.get('/auth/me');
-      if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-        currentUser.value = UserModel.fromJson(me.data);
-      }
-      final user = currentUser.value;
+      final user = await _auth.me();
+      currentUser.value = user;
       if (user == null) {
         errorMessage.value = 'ບໍ່ພົບຂໍ້ມູນຜູ້ໃຊ້';
         return;
@@ -74,9 +86,7 @@ class BookingController extends GetxController {
 
       await _loadActiveSemester();
 
-      final roomResp = await _dio.get('/rooms', queryParameters: {'limit': 200});
-      final roomItems = _extractList(roomResp.data);
-      rooms.assignAll(roomItems.map((j) => RoomModel.fromJson(j)).toList());
+      rooms.assignAll(await _booking.fetchRooms(limit: 200));
 
       await _reloadBookings();
 
@@ -201,22 +211,7 @@ class BookingController extends GetxController {
 
   Future<void> _loadActiveSemester() async {
     try {
-      final resp = await _dio.get('/semasters', queryParameters: {'limit': 20});
-      final items = _extractList(resp.data);
-      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
-      if (all.isEmpty) return;
-      final now = DateTime.now();
-      final containing = all.where((s) =>
-          s.startDate != null &&
-          s.endDate != null &&
-          !now.isBefore(dateOnly(s.startDate!)) &&
-          !now.isAfter(dateOnly(s.endDate!).add(const Duration(days: 1))));
-      if (containing.isNotEmpty) {
-        activeSemester.value = containing.first;
-        return;
-      }
-      final active = all.where((s) => s.status == 1);
-      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+      activeSemester.value = await _academic.fetchActiveSemester();
     } catch (e) {
       debugPrint('Active semester load error: $e');
     }
@@ -229,15 +224,12 @@ class BookingController extends GetxController {
       return;
     }
     try {
-      final query = <String, dynamic>{
-        'teacher_id': teacherId,
-        'limit': 200,
-      };
       final semId = activeSemester.value?.id;
-      if (semId != null) query['semaster_id'] = semId;
-      final resp = await _dio.get('/study-plans', queryParameters: query);
-      final items = _extractList(resp.data);
-      var list = items.map((j) => StudyPlanModel.fromJson(j)).toList();
+      var list = await _academic.fetchStudyPlans(
+        teacherId: teacherId,
+        semesterId: semId,
+        limit: 200,
+      );
       if (semId != null) {
         list = list.where((sp) => sp.semasterId == semId).toList();
       }
@@ -253,10 +245,7 @@ class BookingController extends GetxController {
   Future<void> _reloadBookings() async {
     final user = currentUser.value;
     if (user == null) return;
-    final bResp =
-        await _dio.get('/room-bookings', queryParameters: {'limit': 500});
-    final bItems = _extractList(bResp.data);
-    final all = bItems.map((j) => RoomBookingModel.fromJson(j)).toList();
+    final all = await _booking.fetchBookings(limit: 500);
     _allBookings.assignAll(all);
 
     final mine = all
@@ -370,20 +359,16 @@ class BookingController extends GetxController {
 
           try {
             // user_id intentionally omitted — backend derives from JWT.
-            final resp = await _dio.post('/room-bookings', data: {
-              'room_id': p.roomId,
-              'booking_date': _bookingDatePayload(d),
-              'start_time': p.startTime,
-              'end_time': p.endTime,
-              'purpose': fixedActivePurpose(p.id),
-            });
-            final newId = (resp.data is Map<String, dynamic>)
-                ? (resp.data['booking_id'] as int?)
-                : null;
+            final newId = await _booking.createBooking(
+              roomId: p.roomId!,
+              bookingDate: _bookingDatePayload(d),
+              startTime: p.startTime!,
+              endTime: p.endTime!,
+              purpose: fixedActivePurpose(p.id),
+            );
             if (newId != null) {
               try {
-                await _dio.patch('/room-bookings/$newId/status',
-                    data: {'status': 'approved'});
+                await _booking.updateStatus(newId, 'approved');
               } catch (_) {
                 // Status PATCH may be rejected; row will surface as 'pending'.
               }
@@ -534,7 +519,7 @@ class BookingController extends GetxController {
         return s == 'cancelled' || s == 'rejected';
       });
       if (!cancelled) {
-        final code = p.room?.roomCode ?? 'Room $roomId';
+        final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
         final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
         return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
       }
@@ -632,26 +617,18 @@ class BookingController extends GetxController {
       }
 
       // user_id intentionally omitted — backend derives from JWT.
-      final resp = await _dio.post('/room-bookings', data: {
-        'room_id': roomId,
-        'booking_date': _bookingDatePayload(bookingDate),
-        'start_time': startTime,
-        'end_time': endTime,
-        'purpose': purpose,
-      });
-
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        AppDialogs.showSuccess(
-          title: 'ສົ່ງຄຳຂໍຈອງສຳເລັດ',
-          message: 'ກະລຸນາລໍຖ້າການອະນຸມັດ',
-        );
-        await fetchData();
-      } else {
-        AppDialogs.showError(
-          title: 'ສົ່ງຄຳຂໍບໍ່ສຳເລັດ',
-          message: 'ກະລຸນາລອງໃໝ່',
-        );
-      }
+      await _booking.createBooking(
+        roomId: roomId,
+        bookingDate: _bookingDatePayload(bookingDate),
+        startTime: startTime,
+        endTime: endTime,
+        purpose: purpose,
+      );
+      AppDialogs.showSuccess(
+        title: 'ສົ່ງຄຳຂໍຈອງສຳເລັດ',
+        message: 'ກະລຸນາລໍຖ້າການອະນຸມັດ',
+      );
+      await fetchData();
     } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
       AppDialogs.showError(
@@ -693,8 +670,7 @@ class BookingController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _dio.patch('/room-bookings/${b.bookingId}/status',
-          data: {'status': 'cancelled'});
+      await _booking.updateStatus(b.bookingId, 'cancelled');
       AppDialogs.showSuccess(
         title: 'ຍົກເລີກສຳເລັດ',
         message: 'ການຈອງຖືກຍົກເລີກແລ້ວ',
@@ -811,8 +787,7 @@ class BookingController extends GetxController {
       // with status='cancelled' as cancelled regardless of its purpose
       // marker. The teacher-supplied reason rides along in the student
       // notification body below, which is where students actually see it.
-      await _dio.patch('/room-bookings/$bookingId/status',
-          data: {'status': 'cancelled'});
+      await _booking.updateStatus(bookingId, 'cancelled');
 
       await _notifyGroupOfCancellation(fb, trimmed);
 
@@ -879,8 +854,7 @@ class BookingController extends GetxController {
       // The original row keeps its `__sp_fixed:<plan_id>` marker through the
       // cancel→restore cycle (we never overwrite it), so flipping status
       // back to `approved` is sufficient to restore the occurrence.
-      await _dio.patch('/room-bookings/$bookingId/status',
-          data: {'status': 'approved'});
+      await _booking.updateStatus(bookingId, 'approved');
       AppDialogs.showSuccess(
         title: 'ກູ້ຄືນສຳເລັດ',
         message: 'ຄາບການຮຽນຖືກກູ້ຄືນແລ້ວ',
@@ -946,43 +920,25 @@ class BookingController extends GetxController {
     final message = reason.trim().isEmpty ? base : '$base\nເຫດຜົນ: $reason';
 
     try {
-      final notiResp = await _dio.post('/notifications', data: {
-        'title': title,
-        'message': message,
-        'type': 'study_plan_cancel',
-        'is_read': 0,
-      });
-      final notiId = (notiResp.data is Map<String, dynamic>)
-          ? (notiResp.data['noti_id'] as int?)
-          : null;
+      final notiId = await _noti.create(
+        title: title,
+        message: message,
+        type: 'study_plan_cancel',
+      );
       if (notiId == null) return;
 
-      final studentsResp = await _dio.get('/students',
-          queryParameters: {'std_group_id': fb.stdGroupId, 'limit': 500});
-      final studentItems = _extractList(studentsResp.data);
-      final usersResp =
-          await _dio.get('/users', queryParameters: {'limit': 1000});
-      final userItems = _extractList(usersResp.data);
-      final usersByStudent = <int, int>{};
-      for (final u in userItems) {
-        if (u is Map<String, dynamic>) {
-          final uid = u['id'] as int?;
-          final sid = u['std_id'] as int?;
-          if (uid != null && sid != null) usersByStudent[sid] = uid;
-        }
-      }
-      for (final s in studentItems) {
-        if (s is! Map<String, dynamic>) continue;
-        final sid = s['id'] as int?;
-        if (sid == null) continue;
-        final uid = usersByStudent[sid];
+      final students =
+          await _people.fetchStudents(studentGroupId: fb.stdGroupId);
+      final users = await _people.fetchUsers();
+      final usersByStudent = <int, int>{
+        for (final u in users)
+          if (u.stdId != null) u.stdId!: u.id,
+      };
+      for (final s in students) {
+        final uid = usersByStudent[s.id];
         if (uid == null) continue;
         try {
-          await _dio.post('/user-noti', data: {
-            'user_id': uid,
-            'noti_id': notiId,
-            'is_read': 0,
-          });
+          await _noti.createUserNoti(userId: uid, notiId: notiId);
         } catch (_) {
           // user-noti endpoint may be unavailable; the global notification
           // still surfaces via the notifications feed.
@@ -1025,9 +981,4 @@ class BookingController extends GetxController {
     return DateTime.utc(dd.year, dd.month, dd.day).toIso8601String();
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
-  }
 }

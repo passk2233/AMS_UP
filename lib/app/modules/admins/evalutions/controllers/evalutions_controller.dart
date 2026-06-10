@@ -2,10 +2,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_colors.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
+import '../views/question_dialog.dart';
 
 /// Page modes for the evaluations admin screen.
 abstract class EvalutionPageMode {
@@ -35,6 +35,21 @@ abstract class EvalutionPageMode {
 /// need: teacher, subject, semester, student group). Evaluator identity is
 /// stripped before display per CLAUDE.md privacy rule.
 class EvalutionController extends GetxController {
+  EvalutionController({
+    EvaluationProvider? evaluation,
+    PeopleProvider? people,
+    AcademicProvider? academic,
+    NotificationProvider? notification,
+  })  : _eval = evaluation ?? EvaluationProvider(),
+        _people = people ?? PeopleProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _noti = notification ?? NotificationProvider();
+
+  final EvaluationProvider _eval;
+  final PeopleProvider _people;
+  final AcademicProvider _academic;
+  final NotificationProvider _noti;
+
   /// Active page mode — see [EvalutionPageMode].
   final RxInt pageMode = EvalutionPageMode.questions.obs;
 
@@ -89,8 +104,7 @@ class EvalutionController extends GetxController {
 
   /// Evaluation window rows from `/open-evalu`. The row with the largest
   /// `id` is treated as the active gate.
-  final RxList<OpenEvaluationModel> openWindows =
-      <OpenEvaluationModel>[].obs;
+  final RxList<OpenEvaluationModel> openWindows = <OpenEvaluationModel>[].obs;
 
   /// `true` while the window fetch is in flight.
   final RxBool isLoadingWindow = false.obs;
@@ -116,8 +130,6 @@ class EvalutionController extends GetxController {
   /// Per-subject summaries computed for [selectedTeacherSummary].
   final RxList<SubjectEvalSummary> selectedTeacherSubjects =
       <SubjectEvalSummary>[].obs;
-
-  Dio get _dio => ApiClient.dio;
 
   /// Cache of `study_plan.id → StudyPlanModel` with preloaded relations.
   final Map<int, StudyPlanModel> _studyPlanMap = {};
@@ -155,16 +167,7 @@ class EvalutionController extends GetxController {
     isLoadingQuestions.value = true;
     questionsError.value = '';
     try {
-      final response = await _dio.get(
-        '/evaluation-questions',
-        queryParameters: {'limit': 200},
-      );
-      if (response.statusCode != 200) return;
-      questions.assignAll(
-        _extractList(response.data)
-            .map((j) => EvaluationQuestionModel.fromJson(j))
-            .toList(),
-      );
+      questions.assignAll(await _eval.fetchQuestions(limit: 200));
     } on DioException catch (e) {
       questionsError.value = 'ບໍ່ສາມາດໂຫຼດຄຳຖາມໄດ້';
       debugPrint('fetchQuestions error: ${e.message}');
@@ -195,18 +198,15 @@ class EvalutionController extends GetxController {
 
     isSaving.value = true;
     try {
-      final response = await _dio.post('/evaluation-questions', data: {
-        'question': text,
-        'category': _orNull(categoryCtrl.text.trim()),
-        'is_active': 1,
-      });
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchQuestions();
-        AppDialogs.showSuccess(
-          title: 'ເພີ່ມສຳເລັດ',
-          message: 'ຄຳຖາມໄດ້ຖືກເພີ່ມແລ້ວ.',
-        );
-      }
+      await _eval.createQuestion(
+        question: text,
+        category: _orNull(categoryCtrl.text.trim()),
+      );
+      await fetchQuestions();
+      AppDialogs.showSuccess(
+        title: 'ເພີ່ມສຳເລັດ',
+        message: 'ຄຳຖາມໄດ້ຖືກເພີ່ມແລ້ວ.',
+      );
     } on DioException catch (e) {
       _showDioError('ເພີ່ມຄຳຖາມລົ້ມເຫຼວ', e);
     } finally {
@@ -228,21 +228,17 @@ class EvalutionController extends GetxController {
 
     isSaving.value = true;
     try {
-      final response = await _dio.put(
-        '/evaluation-questions/${q.evaQuestionId}',
-        data: {
-          'question': text,
-          'category': _orNull(categoryCtrl.text.trim()),
-          'is_active': q.isActive,
-        },
+      await _eval.updateQuestion(
+        id: q.evaQuestionId,
+        question: text,
+        category: _orNull(categoryCtrl.text.trim()),
+        isActive: q.isActive,
       );
-      if (response.statusCode == 200) {
-        await fetchQuestions();
-        AppDialogs.showSuccess(
-          title: 'ແກ້ໄຂສຳເລັດ',
-          message: 'ຄຳຖາມໄດ້ຖືກອັບເດດແລ້ວ.',
-        );
-      }
+      await fetchQuestions();
+      AppDialogs.showSuccess(
+        title: 'ແກ້ໄຂສຳເລັດ',
+        message: 'ຄຳຖາມໄດ້ຖືກອັບເດດແລ້ວ.',
+      );
     } on DioException catch (e) {
       _showDioError('ແກ້ໄຂຄຳຖາມລົ້ມເຫຼວ', e);
     } finally {
@@ -260,23 +256,22 @@ class EvalutionController extends GetxController {
       message: 'ຕ້ອງການ $statusLabel ຄຳຖາມນີ້ແທ້ບໍ?',
       confirmText: statusLabel,
       cancelText: 'ຍົກເລີກ',
-      confirmColor:
-          newStatus == 1 ? AppColors.borderApproved : AppColors.rejectRed,
+      confirmColor: newStatus == 1
+          ? AppColors.borderApproved
+          : AppColors.rejectRed,
     );
     if (confirmed != true) return;
 
     try {
-      final response = await _dio.put(
-        '/evaluation-questions/${q.evaQuestionId}',
-        data: {
-          'question': q.question,
-          'category': q.category,
-          'is_active': newStatus,
-        },
+      await _eval.updateQuestion(
+        id: q.evaQuestionId,
+        question: q.question,
+        category: q.category,
+        isActive: newStatus,
       );
-      if (response.statusCode != 200) return;
-      final index =
-          questions.indexWhere((x) => x.evaQuestionId == q.evaQuestionId);
+      final index = questions.indexWhere(
+        (x) => x.evaQuestionId == q.evaQuestionId,
+      );
       if (index != -1) {
         questions[index].isActive = newStatus;
         questions.refresh();
@@ -298,7 +293,7 @@ class EvalutionController extends GetxController {
     if (confirmed != true) return;
 
     try {
-      await _dio.delete('/evaluation-questions/$questionId');
+      await _eval.deleteQuestion(questionId);
       questions.removeWhere((q) => q.evaQuestionId == questionId);
       AppDialogs.showSuccess(
         title: 'ລຶບສຳເລັດ',
@@ -317,16 +312,7 @@ class EvalutionController extends GetxController {
     isLoadingWindow.value = true;
     windowError.value = '';
     try {
-      final response = await _dio.get(
-        '/open-evalu',
-        queryParameters: {'limit': 20},
-      );
-      if (response.statusCode != 200) return;
-      openWindows.assignAll(
-        _extractList(response.data)
-            .map((j) => OpenEvaluationModel.fromJson(j))
-            .toList(),
-      );
+      openWindows.assignAll(await _eval.fetchWindows(limit: 20));
     } on DioException catch (e) {
       windowError.value = 'ບໍ່ສາມາດໂຫຼດໄລຍະເວລາການປະເມີນໄດ້';
       debugPrint('fetchOpenWindow error: ${e.message}');
@@ -381,22 +367,18 @@ class EvalutionController extends GetxController {
 
     isSavingWindow.value = true;
     try {
-      final fallbackPlanId = await _firstStudyPlanId();
-      final response = await _dio.post('/open-evalu', data: {
-        'study_plan_id': fallbackPlanId,
-        'open_time': openAt.toUtc().toIso8601String(),
-        'close_time': closeAt.toUtc().toIso8601String(),
-        'inactive': 0,
-      });
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchOpenWindow();
-        await _broadcastEvaluationOpened(openAt, closeAt);
-        AppDialogs.showSuccess(
-          title: 'ເປີດການປະເມີນສຳເລັດ',
-          message:
-              'ນັກສຶກສາສາມາດເຂົ້າປະເມີນອາຈານໄດ້ແລ້ວ ແລະ ການແຈ້ງເຕືອນຖືກສົ່ງອອກ.',
-        );
-      }
+      await _eval.createWindow(
+        studyPlanId: await _firstStudyPlanId(),
+        openTime: openAt,
+        closeTime: closeAt,
+      );
+      await fetchOpenWindow();
+      await _broadcastEvaluationOpened(openAt, closeAt);
+      AppDialogs.showSuccess(
+        title: 'ເປີດການປະເມີນສຳເລັດ',
+        message:
+            'ນັກສຶກສາສາມາດເຂົ້າປະເມີນອາຈານໄດ້ແລ້ວ ແລະ ການແຈ້ງເຕືອນຖືກສົ່ງອອກ.',
+      );
     } on DioException catch (e) {
       _showDioError('ເປີດການປະເມີນລົ້ມເຫຼວ', e);
     } finally {
@@ -427,22 +409,18 @@ class EvalutionController extends GetxController {
 
     isSavingWindow.value = true;
     try {
-      final response = await _dio.put(
-        '/open-evalu/${current.id}',
-        data: {
-          'study_plan_id': current.studyPlanId,
-          'open_time': current.openTime?.toUtc().toIso8601String(),
-          'close_time': DateTime.now().toUtc().toIso8601String(),
-          'inactive': 1,
-        },
+      await _eval.updateWindow(
+        id: current.id,
+        studyPlanId: current.studyPlanId,
+        openTime: current.openTime,
+        closeTime: DateTime.now(),
+        inactive: 1,
       );
-      if (response.statusCode == 200) {
-        await fetchOpenWindow();
-        AppDialogs.showSuccess(
-          title: 'ປິດສຳເລັດ',
-          message: 'ໄລຍະການປະເມີນຖືກປິດແລ້ວ.',
-        );
-      }
+      await fetchOpenWindow();
+      AppDialogs.showSuccess(
+        title: 'ປິດສຳເລັດ',
+        message: 'ໄລຍະການປະເມີນຖືກປິດແລ້ວ.',
+      );
     } on DioException catch (e) {
       _showDioError('ປິດການປະເມີນລົ້ມເຫຼວ', e);
     } finally {
@@ -457,14 +435,8 @@ class EvalutionController extends GetxController {
   /// study plan. Student-side logic ignores which plan it points to.
   Future<int?> _firstStudyPlanId() async {
     try {
-      final response = await _dio.get(
-        '/study-plans',
-        queryParameters: {'limit': 1},
-      );
-      if (response.statusCode != 200) return null;
-      final items = _extractList(response.data);
-      if (items.isEmpty) return null;
-      return (items.first as Map<String, dynamic>)['id'] as int?;
+      final plans = await _academic.fetchStudyPlans(limit: 1);
+      return plans.isEmpty ? null : plans.first.id;
     } on DioException catch (e) {
       debugPrint('firstStudyPlanId error: ${e.message}');
       return null;
@@ -481,16 +453,13 @@ class EvalutionController extends GetxController {
     final openLabel = _formatDateTime(openAt);
     final closeLabel = _formatDateTime(closeAt);
     try {
-      await _dio.post(
-        '/notifications',
-        queryParameters: {'audience': 'students'},
-        data: {
-          'title': 'ເປີດການປະເມີນອາຈານ',
-          'message':
-              'ໄລຍະການປະເມີນອາຈານໄດ້ເປີດແລ້ວ. ກະລຸນາເຂົ້າປະເມີນລະຫວ່າງ '
-                  '$openLabel ຫາ $closeLabel.',
-          'type': 'evaluation_open',
-        },
+      await _noti.broadcast(
+        audience: 'students',
+        title: 'ເປີດການປະເມີນອາຈານ',
+        message:
+            'ໄລຍະການປະເມີນອາຈານໄດ້ເປີດແລ້ວ. ກະລຸນາເຂົ້າປະເມີນລະຫວ່າງ '
+            '$openLabel ຫາ $closeLabel.',
+        type: 'evaluation_open',
       );
     } on DioException catch (e) {
       debugPrint('evaluation announce error: ${e.message}');
@@ -508,16 +477,7 @@ class EvalutionController extends GetxController {
   /// GET `/teachers` and populate [teachers].
   Future<void> fetchTeachers() async {
     try {
-      final response = await _dio.get(
-        '/teachers',
-        queryParameters: {'limit': 200},
-      );
-      if (response.statusCode != 200) return;
-      teachers.assignAll(
-        _extractList(response.data)
-            .map((j) => TeacherModel.fromJson(j))
-            .toList(),
-      );
+      teachers.assignAll(await _people.fetchTeachers(limit: 200));
     } on DioException catch (e) {
       debugPrint('fetchTeachers error: ${e.message}');
     }
@@ -531,15 +491,7 @@ class EvalutionController extends GetxController {
     try {
       await _fetchStudyPlans();
 
-      final response = await _dio.get(
-        '/evaluation-results',
-        queryParameters: {'limit': 500},
-      );
-      if (response.statusCode != 200) return;
-
-      final parsed = _extractList(response.data)
-          .map((j) => EvaluationResultModel.fromJson(j))
-          .toList();
+      final parsed = await _eval.fetchResults(limit: 500);
       for (final r in parsed) {
         final fullSp = _studyPlanMap[r.studyPlanId];
         if (fullSp != null) r.studyPlan = fullSp;
@@ -556,15 +508,8 @@ class EvalutionController extends GetxController {
 
   Future<void> _fetchStudyPlans() async {
     try {
-      final response = await _dio.get(
-        '/study-plans',
-        queryParameters: {'limit': 500},
-      );
-      if (response.statusCode != 200) return;
-
       _studyPlanMap.clear();
-      for (final j in _extractList(response.data)) {
-        final sp = StudyPlanModel.fromJson(j);
+      for (final sp in await _academic.fetchStudyPlans(limit: 500)) {
         _studyPlanMap[sp.id] = sp;
       }
     } on DioException catch (e) {
@@ -721,8 +666,7 @@ class EvalutionController extends GetxController {
     final q = teacherSearch.value.toLowerCase();
     if (q.isEmpty) return teacherSummaries;
     return teacherSummaries.where((s) {
-      final name =
-          '${s.teacher.nameLao} ${s.teacher.surnameLao}'.toLowerCase();
+      final name = '${s.teacher.nameLao} ${s.teacher.surnameLao}'.toLowerCase();
       final code = s.teacher.teacherCode.toLowerCase();
       final dept = s.teacher.department?.deptNameLao.toLowerCase() ?? '';
       return name.contains(q) || code.contains(q) || dept.contains(q);
@@ -756,7 +700,11 @@ class EvalutionController extends GetxController {
 
   Future<bool?> _showQuestionDialog({required bool isEdit}) {
     return Get.dialog<bool>(
-      _QuestionDialog(controller: this, isEdit: isEdit),
+      QuestionDialog(
+        questionCtrl: questionTextCtrl,
+        categoryCtrl: categoryCtrl,
+        isEdit: isEdit,
+      ),
       barrierDismissible: false,
     );
   }
@@ -778,11 +726,6 @@ class EvalutionController extends GetxController {
   /// optional fields go in as JSON null rather than empty strings.
   String? _orNull(String s) => s.isEmpty ? null : s;
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
-  }
 }
 
 // ────────────────────────────────────────────────── view models ──
@@ -931,163 +874,3 @@ class AnonymousEvalDetail {
   });
 }
 
-// ────────────────────────────────────────── question dialog ──
-
-/// Add / edit question dialog. Reads its inputs from the controller's
-/// [EvalutionController.questionTextCtrl] and [EvalutionController.categoryCtrl]
-/// so the caller can act on the captured values when this dialog returns
-/// `true`.
-class _QuestionDialog extends StatelessWidget {
-  /// Source of the text controllers.
-  final EvalutionController controller;
-
-  /// `true` shows "edit" copy, `false` shows "add" copy.
-  final bool isEdit;
-
-  const _QuestionDialog({required this.controller, required this.isEdit});
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              isEdit ? 'ແກ້ໄຂຄຳຖາມ' : 'ເພີ່ມຄຳຖາມໃໝ່',
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const _DialogLabel('ຄຳຖາມ *'),
-            const SizedBox(height: 4),
-            _DialogTextField(
-              controller: controller.questionTextCtrl,
-              hint: 'ພິມຄຳຖາມ...',
-              maxLines: 3,
-            ),
-            const SizedBox(height: 12),
-            const _DialogLabel('ໝວດໝູ່ (ບໍ່ບັງຄັບ)'),
-            const SizedBox(height: 4),
-            _DialogTextField(
-              controller: controller.categoryCtrl,
-              hint: 'ເຊັ່ນ: ການສອນ, ການປະເມີນ...',
-            ),
-            const SizedBox(height: 18),
-            _DialogFooter(confirmLabel: isEdit ? 'ບັນທຶກ' : 'ເພີ່ມ'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Caption rendered above each field in [_QuestionDialog].
-class _DialogLabel extends StatelessWidget {
-  /// Caption text.
-  final String text;
-
-  const _DialogLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF6B7280),
-      ),
-    );
-  }
-}
-
-/// Filled, rounded multi-line text field used inside [_QuestionDialog].
-class _DialogTextField extends StatelessWidget {
-  /// Backing controller.
-  final TextEditingController controller;
-
-  /// Placeholder.
-  final String hint;
-
-  /// Vertical line count.
-  final int maxLines;
-
-  const _DialogTextField({
-    required this.controller,
-    required this.hint,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: AppColors.scaffoldBg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: maxLines > 1 ? 12 : 10,
-        ),
-      ),
-    );
-  }
-}
-
-/// Cancel / confirm footer used by [_QuestionDialog].
-class _DialogFooter extends StatelessWidget {
-  /// Confirm button caption (changes between "add" and "save").
-  final String confirmLabel;
-
-  const _DialogFooter({required this.confirmLabel});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => Get.back(result: false),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: const Text('ຍົກເລີກ'),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: ElevatedButton(
-            onPressed: () => Get.back(result: true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.laoBlue,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 11),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: Text(confirmLabel),
-          ),
-        ),
-      ],
-    );
-  }
-}

@@ -39,7 +39,6 @@ class BookingCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(AppSpacing.s + 4),
-        border: Border(left: BorderSide(color: display.borderColor, width: 4)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -89,8 +88,6 @@ class _BookingDisplay {
   bool get isApproved => booking.status.toLowerCase() == 'approved';
   bool get isRejected => booking.status.toLowerCase() == 'rejected';
 
-  Color get borderColor => BookingStatusStyle.of(booking.status).color;
-
   /// Whether the booker is a student — used to switch the role pill color.
   bool get isStudent => booking.user?.stdId != null;
 
@@ -126,14 +123,28 @@ class _BookingDisplay {
   }
 
   static const _weekdays = <String>[
-    'ວັນຈັນ', 'ວັນອັງຄານ', 'ວັນພຸດ', 'ວັນພະຫັດ',
-    'ວັນສຸກ', 'ວັນເສົາ', 'ວັນອາທິດ',
+    'ວັນຈັນ',
+    'ວັນອັງຄານ',
+    'ວັນພຸດ',
+    'ວັນພະຫັດ',
+    'ວັນສຸກ',
+    'ວັນເສົາ',
+    'ວັນອາທິດ',
   ];
 
   static const _months = <String>[
-    'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ',
-    'ພຶດສະພາ', 'ມິຖຸນາ', 'ກໍລະກົດ', 'ສິງຫາ',
-    'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ',
+    'ມັງກອນ',
+    'ກຸມພາ',
+    'ມີນາ',
+    'ເມສາ',
+    'ພຶດສະພາ',
+    'ມິຖຸນາ',
+    'ກໍລະກົດ',
+    'ສິງຫາ',
+    'ກັນຍາ',
+    'ຕຸລາ',
+    'ພະຈິກ',
+    'ທັນວາ',
   ];
 }
 
@@ -196,8 +207,8 @@ class _BookingStatusIcon extends StatelessWidget {
       child: approved
           ? const Icon(Icons.check, color: Colors.white, size: 14)
           : rejected
-              ? Icon(Icons.close, color: Colors.grey.shade400, size: 14)
-              : null,
+          ? Icon(Icons.close, color: Colors.grey.shade400, size: 14)
+          : null,
     );
   }
 }
@@ -271,19 +282,22 @@ class _BookingMetaRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labelStyle = TextStyle(
-      fontSize: 13,
-      color: AppColors.textSecondary,
-    );
+    const labelStyle = TextStyle(fontSize: 13, color: AppColors.textSecondary);
     return Row(
       children: [
-        const Icon(Icons.calendar_today_outlined,
-            size: 14, color: AppColors.textSecondary),
+        const Icon(
+          Icons.calendar_today_outlined,
+          size: 14,
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(width: 4),
         Text(display.dateDisplay, style: labelStyle),
         const Spacer(),
-        const Icon(Icons.location_on_outlined,
-            size: 14, color: AppColors.textSecondary),
+        const Icon(
+          Icons.location_on_outlined,
+          size: 14,
+          color: AppColors.textSecondary,
+        ),
         const SizedBox(width: 4),
         Text(display.roomName, style: labelStyle),
       ],

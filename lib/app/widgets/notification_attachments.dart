@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -76,28 +77,25 @@ class _AttachmentImage extends StatelessWidget {
       onTap: () => _openUrl(url),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(10),
-        child: Image.network(
-          url,
+        child: CachedNetworkImage(
+          imageUrl: url,
           height: height,
           width: double.infinity,
           fit: BoxFit.cover,
-          loadingBuilder: (context, child, progress) {
-            if (progress == null) return child;
-            return Container(
-              height: height,
-              alignment: Alignment.center,
-              color: AppColors.scaffoldBg,
-              child: const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  color: AppColors.laoBlue,
-                ),
+          placeholder: (_, _) => Container(
+            height: height,
+            alignment: Alignment.center,
+            color: AppColors.scaffoldBg,
+            child: const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.4,
+                color: AppColors.laoBlue,
               ),
-            );
-          },
-          errorBuilder: (context, error, stack) => Container(
+            ),
+          ),
+          errorWidget: (_, _, _) => Container(
             height: 72,
             alignment: Alignment.center,
             decoration: BoxDecoration(
@@ -108,8 +106,11 @@ class _AttachmentImage extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.broken_image_outlined,
-                    size: 18, color: Colors.grey.shade400),
+                Icon(
+                  Icons.broken_image_outlined,
+                  size: 18,
+                  color: Colors.grey.shade400,
+                ),
                 const SizedBox(width: 6),
                 Text(
                   'ໂຫຼດຮູບບໍ່ໄດ້',
@@ -172,8 +173,11 @@ class _AttachmentFileRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 6),
-            const Icon(Icons.open_in_new_rounded,
-                size: 16, color: AppColors.laoBlue),
+            const Icon(
+              Icons.open_in_new_rounded,
+              size: 16,
+              color: AppColors.laoBlue,
+            ),
           ],
         ),
       ),

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../../widgets/noti_bell.dart';
 import '../../../data/data_exporter.dart';
@@ -15,6 +14,12 @@ import '../../../data/data_exporter.dart';
 /// preloaded) and marks rows read via `PATCH /user-noti/:id/read`. The view
 /// item's `id` is the `user_noti` row id, which is what mark-as-read needs.
 class TeacherNotiController extends GetxController {
+  TeacherNotiController({NotificationProvider? provider})
+      : _noti = provider ?? NotificationProvider();
+
+  /// Data-access seam for notifications.
+  final NotificationProvider _noti;
+
   /// Currently selected filter chip index — 0 = All, 1 = Academic,
   /// 2 = Room Booking.
   final RxInt selectedFilterIndex = 0.obs;
@@ -28,8 +33,6 @@ class TeacherNotiController extends GetxController {
   /// The current user's inbox rows, newest first.
   final RxList<UserNotiModel> notifications = <UserNotiModel>[].obs;
 
-  Dio get _dio => ApiClient.dio;
-
   @override
   void onInit() {
     super.onInit();
@@ -42,22 +45,15 @@ class TeacherNotiController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response =
-          await _dio.get('/user-noti', queryParameters: {'limit': 100});
-      notifications.assignAll(
-        _extractList(response.data)
-            .map((j) => UserNotiModel.fromJson(j as Map<String, dynamic>))
-            .toList()
-          ..sort(_byNewestFirst),
-      );
+      notifications.assignAll(await _noti.fetchInbox());
       notiBadge.setCount(unreadCount);
     } on DioException catch (e) {
       debugPrint(
         'TeacherNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
       );
       errorMessage.value = e.response?.statusCode == 401
-          ? 'Session expired. Please login again.'
-          : 'Failed to load notifications.';
+          ? 'ການເຂົ້າລະບົບຫມົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.'
+          : 'ບໍ່ສາມາດໂຫຼດການແຈ້ງເຕືອນໄດ້.';
     } finally {
       isLoading.value = false;
     }
@@ -90,9 +86,28 @@ class TeacherNotiController extends GetxController {
     notiBadge.setCount(unreadCount);
 
     try {
-      await _dio.patch('/user-noti/$userNotiId/read');
+      await _noti.markRead(userNotiId);
     } on DioException catch (e) {
       debugPrint('markAsRead failed for $userNotiId: ${e.message}');
+    }
+  }
+
+  /// Marks the whole inbox read: optimistic local flip + badge clear, then
+  /// one bulk `PATCH /user-noti/read-all`. On failure the list is re-fetched
+  /// so the optimistic flip cannot drift from the server.
+  Future<void> markAllAsRead() async {
+    if (unreadCount == 0) return;
+    for (final n in notifications) {
+      n.isRead = 1;
+    }
+    notifications.refresh();
+    notiBadge.setCount(0);
+
+    try {
+      await _noti.markAllRead();
+    } on DioException catch (e) {
+      debugPrint('markAllAsRead failed: ${e.message}');
+      await fetchNotifications();
     }
   }
 
@@ -110,6 +125,18 @@ class TeacherNotiController extends GetxController {
     final title = noti?.title ?? '';
     final message = noti?.message ?? '';
 
+    // The full notification handed to NotificationDetailView on tap. Synthesize
+    // a minimal stand-in if the row arrived without its parent preloaded, so a
+    // tap still opens a readable (if sparse) detail instead of doing nothing.
+    final model = noti ??
+        NotificationModel(
+          notiId: n.notiId,
+          title: title,
+          message: message,
+          isRead: n.isRead,
+          createdAt: ts,
+        );
+
     if (isUrgent) {
       return {
         'id': n.id,
@@ -118,8 +145,10 @@ class TeacherNotiController extends GetxController {
         'category': category,
         'title': title,
         'sub': message,
-        'status': 'Urgent',
+        'status': 'ດ່ວນ',
         'time': time,
+        'model': model,
+        'timestamp': ts,
       };
     }
     return {
@@ -131,25 +160,9 @@ class TeacherNotiController extends GetxController {
       'desc': message,
       'time': time,
       'files': noti?.files,
+      'model': model,
+      'timestamp': ts,
     };
   }
 
-  /// Sort comparator: newest first. Prefers the inbox row's own timestamp,
-  /// falls back to the parent notification's, then to row id (monotonic) so
-  /// missing timestamps and ties still order deterministically. The backend
-  /// is supposed to return rows in this order, but ordering it client-side
-  /// keeps the "newest first" guarantee even if it doesn't.
-  static int _byNewestFirst(UserNotiModel a, UserNotiModel b) {
-    final epoch = DateTime(2000);
-    final at = a.createAt ?? a.notification?.createdAt ?? epoch;
-    final bt = b.createAt ?? b.notification?.createdAt ?? epoch;
-    final cmp = bt.compareTo(at);
-    return cmp != 0 ? cmp : b.id.compareTo(a.id);
-  }
-
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
-  }
 }

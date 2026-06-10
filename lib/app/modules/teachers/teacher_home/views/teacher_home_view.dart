@@ -82,7 +82,7 @@ class _TeacherHomeContent extends StatelessWidget {
             name: display.name,
             subtitle: display.role,
             caption: display.department,
-            avatarFallback: display.name.isNotEmpty ? display.name : 'T',
+            photo: display.photo,
           ),
           const SizedBox(height: 16),
           _StatsBanner(controller: controller),
@@ -121,6 +121,9 @@ class _TeacherDisplay {
 
   /// Department name from the teacher relation, or empty.
   String get department => user?.teacher?.department?.deptNameLao ?? '';
+
+  /// Stored profile photo path/URL; null when unset (header shows placeholder).
+  String? get photo => user?.teacher?.photo;
 }
 
 /// Greeting line with a trailing notifications bubble.

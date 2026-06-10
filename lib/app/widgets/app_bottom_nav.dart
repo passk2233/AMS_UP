@@ -18,11 +18,7 @@ class AppNavItem {
   /// Optional unread / pending count rendered as a corner badge.
   final int? badgeCount;
 
-  const AppNavItem({
-    required this.icon,
-    required this.label,
-    this.badgeCount,
-  });
+  const AppNavItem({required this.icon, required this.label, this.badgeCount});
 }
 
 /// Shared bottom navigation bar used by all three roles (admin, teacher,
@@ -117,41 +113,55 @@ class _AppNavTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = AppColors.primary;
-    final idleColor = Colors.grey.shade400;
+    // Active uses the on-fill teal (#1f7e93, ~4.7:1 on white): the bright accent
+    // (#40b4cd) is only 2.43:1 as a glyph/label and fails AA. Idle uses slate
+    // (#6B7280, 4.5:1), not grey.shade400 (~1.9:1). Both are the tokens the
+    // design system already prescribes for "teal text/icon on white".
+    final activeColor = AppColors.primaryFill;
+    final idleColor = AppColors.textSecondary;
     final tint = isSelected ? activeColor : idleColor;
 
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        constraints: const BoxConstraints(
-          minWidth: AppColors.minTouchTarget,
-          minHeight: AppColors.minTouchTarget,
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? activeColor.withValues(alpha: 0.08)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(AppColors.buttonRadius),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _BadgedIcon(item: item, color: tint),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: TextStyle(
-                fontSize: 10,
-                color: tint,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      // Icon-only-ish tile: give the screen reader a name + state + unread
+      // count, and suppress the decorative descendant nodes.
+      label: (item.badgeCount ?? 0) > 0
+          ? '${item.label}, ${item.badgeCount}'
+          : item.label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          constraints: const BoxConstraints(
+            minWidth: AppColors.minTouchTarget,
+            minHeight: AppColors.minTouchTarget,
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? activeColor.withValues(alpha: 0.08)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppColors.buttonRadius),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _BadgedIcon(item: item, color: tint),
+              const SizedBox(height: 4),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: tint,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

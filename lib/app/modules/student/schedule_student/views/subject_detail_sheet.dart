@@ -188,6 +188,7 @@ class _SubjectDetailSheet extends StatelessWidget {
               _TeacherRow(
                 name: teacherName,
                 code: teacher?.teacherCode,
+                photo: teacher?.photo,
                 onTap: teacherId > 0
                     ? () {
                         Navigator.of(context).pop();
@@ -233,13 +234,13 @@ class _SubjectDetailSheet extends StatelessWidget {
 class _TeacherRow extends StatelessWidget {
   final String name;
   final String? code;
+  final String? photo;
   final VoidCallback? onTap;
 
-  const _TeacherRow({required this.name, this.code, this.onTap});
+  const _TeacherRow({required this.name, this.code, this.photo, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?';
     final tappable = onTap != null;
 
     return AppSurfaceCard(
@@ -247,18 +248,7 @@ class _TeacherRow extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-            child: Text(
-              initial,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
+          AppAvatar(photo: photo, radius: 24),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

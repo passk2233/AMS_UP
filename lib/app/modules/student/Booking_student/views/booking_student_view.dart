@@ -183,7 +183,7 @@ class BookingStudentView extends GetView<BookingStudentController> {
   }
 
   Widget _bookingCard(RoomBookingModel b) {
-    final room = b.room?.roomCode ?? 'Room ${b.roomId}';
+    final room = b.room?.roomCode ?? 'ຫ້ອງ ${b.roomId}';
     final date =
         '${b.bookingDate.day}/${b.bookingDate.month}/${b.bookingDate.year}';
     final status = b.status;
@@ -196,36 +196,34 @@ class BookingStudentView extends GetView<BookingStudentController> {
       margin: const EdgeInsets.only(bottom: 10),
       child: Opacity(
         opacity: past ? 0.65 : 1.0,
-        child: ListTile(
-          title: Row(
-            children: [
-              Flexible(
-                child: Text(
-                  '$room • ${b.startTime} - ${b.endTime}',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                  overflow: TextOverflow.ellipsis,
-                ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Row(
+                children: [
+                  Flexible(
+                    child: Text(
+                      '$room • ${b.startTime} - ${b.endTime}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  if (dayBadge != null) ...[
+                    const SizedBox(width: 6),
+                    dayBadge,
+                  ],
+                ],
               ),
-              if (dayBadge != null) ...[
-                const SizedBox(width: 6),
-                dayBadge,
-              ],
-            ],
-          ),
-          subtitle: Text(
-            [
-              'ວັນທີ $date',
-              if (b.purpose != null && b.purpose!.isNotEmpty)
-                'ເປົ້າໝາຍ: ${b.purpose}',
-            ].join('\n'),
-          ),
-          isThreeLine: true,
-          trailing: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
+              subtitle: Text(
+                [
+                  'ວັນທີ $date',
+                  if (b.purpose != null && b.purpose!.isNotEmpty)
+                    'ເປົ້າໝາຍ: ${b.purpose}',
+                ].join('\n'),
+              ),
+              isThreeLine: true,
+              trailing: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: style.color,
@@ -240,22 +238,40 @@ class BookingStudentView extends GetView<BookingStudentController> {
                   ),
                 ),
               ),
-              if (canCancel) ...[
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: () => controller.cancelBooking(b),
-                  child: const Text(
-                    'ຍົກເລີກ',
-                    style: TextStyle(
-                      color: AppColors.danger,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+            ),
+            // Discoverable cancel action. Replaces the old 12px tap-link so the
+            // destructive control meets the 48dp touch target (CLAUDE.md §7.1).
+            // Only shown for cancellable (pending/approved, not past) bookings.
+            if (canCancel)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.m, 0, AppSpacing.s, AppSpacing.s),
+                child: Row(
+                  children: [
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: () => controller.cancelBooking(b),
+                      icon: const Icon(Icons.cancel_outlined, size: 18),
+                      label: const Text('ຍົກເລີກການຈອງ'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.danger,
+                        backgroundColor:
+                            AppColors.danger.withValues(alpha: 0.08),
+                        minimumSize: const Size(0, 40),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.m, vertical: AppSpacing.s),
+                        shape: RoundedRectangleBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppColors.buttonRadius),
+                        ),
+                        textStyle: const TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

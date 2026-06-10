@@ -378,19 +378,19 @@ class _AccountInfoCard extends StatelessWidget {
         children: [
           _InfoRow(
             icon: Icons.badge_rounded,
-            label: 'User ID',
+            label: 'ລະຫັດຜູ້ໃຊ້',
             value: '${u?.id ?? '-'}',
           ),
           const _RowDivider(),
           _InfoRow(
             icon: Icons.account_circle_rounded,
-            label: 'Username',
+            label: 'ຊື່ຜູ້ໃຊ້',
             value: u?.username ?? '-',
           ),
           const _RowDivider(),
           _InfoRow(
             icon: Icons.email_rounded,
-            label: 'Email',
+            label: 'ອີເມລ',
             value: u?.email ?? '-',
           ),
           const _RowDivider(),

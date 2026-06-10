@@ -3,8 +3,8 @@ import 'package:get/get.dart';
 
 import '../../../../widgets/widget.dart';
 import '../../../data/models/notification_file_model.dart';
-import '../../../student/student_noti/views/booking_detail.dart';
-import '../../../student/student_noti/views/grade_noti.dart';
+import '../../../data/models/notification_model.dart';
+import '../../../student/student_noti/views/notification_detail.dart';
 import '../controllers/teacher_noti_controller.dart';
 
 /// Teacher notification center.
@@ -39,6 +39,21 @@ class TeacherNotiView extends GetView<TeacherNotiController> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          // Bulk badge-clear — visible only while something is unread.
+          Obx(
+            () => controller.unreadCount == 0
+                ? const SizedBox.shrink()
+                : IconButton(
+                    tooltip: 'ໝາຍວ່າອ່ານທັງໝົດ',
+                    icon: const Icon(
+                      Icons.done_all,
+                      color: AppColors.textPrimary,
+                    ),
+                    onPressed: controller.markAllAsRead,
+                  ),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -169,7 +184,10 @@ class _NotificationListItem extends StatelessWidget {
               unread: unread,
               onTap: () {
                 if (id != null) controller.markAsRead(id);
-                Get.to(() => const GradeNotiView());
+                Get.to(() => NotificationDetailView(
+                      notification: item['model'] as NotificationModel,
+                      receivedAt: item['timestamp'] as DateTime?,
+                    ));
               },
             ),
           ],
@@ -191,11 +209,10 @@ class _NotificationListItem extends StatelessWidget {
       files: item['files'] as List<NotificationFileModel>?,
       onTap: () {
         if (id != null) controller.markAsRead(id);
-        if (item['title'] == 'Grade Released') {
-          Get.to(() => const GradeNotiView());
-        } else if (item['title'] == 'Booking Confirmed') {
-          Get.to(() => const BookingDetailView());
-        }
+        Get.to(() => NotificationDetailView(
+              notification: item['model'] as NotificationModel,
+              receivedAt: item['timestamp'] as DateTime?,
+            ));
       },
     );
   }

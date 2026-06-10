@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'app_avatar.dart';
 import 'app_colors.dart';
 import 'app_shell.dart';
 
@@ -54,14 +55,17 @@ class AppGreetingHeader extends StatelessWidget {
   }
 }
 
-/// Profile header — circular avatar (image or initials) plus name + two
-/// metadata lines, wrapped in a white surface card.
+/// Profile header — circular avatar (the user's photo, or the bundled
+/// placeholder) plus name + two metadata lines, wrapped in a white surface
+/// card.
 class AppProfileHeader extends StatelessWidget {
   final String name;
   final String? subtitle;
   final String? caption;
-  final ImageProvider? avatarImage;
-  final String? avatarFallback;
+
+  /// Stored teacher/student `photo` path or URL. Missing/broken photos fall
+  /// back to [AssetImages.profilePlaceholder] via [AppAvatar].
+  final String? photo;
   final Color? captionColor;
 
   const AppProfileHeader({
@@ -69,36 +73,17 @@ class AppProfileHeader extends StatelessWidget {
     required this.name,
     this.subtitle,
     this.caption,
-    this.avatarImage,
-    this.avatarFallback,
+    this.photo,
     this.captionColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    final initial = (avatarFallback != null && avatarFallback!.isNotEmpty)
-        ? avatarFallback!.substring(0, 1).toUpperCase()
-        : (name.isNotEmpty ? name.substring(0, 1).toUpperCase() : '?');
-
     return AppSurfaceCard(
       padding: const EdgeInsets.all(15),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 35,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-            backgroundImage: avatarImage,
-            child: avatarImage == null
-                ? Text(
-                    initial,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
-                  )
-                : null,
-          ),
+          AppAvatar(photo: photo, radius: 35),
           const SizedBox(width: 15),
           Expanded(
             child: Column(
@@ -217,7 +202,8 @@ class AppActionTile extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        trailing: trailing ??
+        trailing:
+            trailing ??
             const Icon(
               Icons.arrow_forward_ios,
               size: 16,
@@ -372,7 +358,7 @@ class AppStatsBanner extends StatelessWidget {
   }
 }
 
-/// Generic class / schedule list card with a colored left border, title row
+/// Generic class / schedule list card with a tinted leading icon, title row
 /// (with optional trailing time), subtitle, and a meta row (time / instructor
 /// / location).
 class AppClassCard extends StatelessWidget {
@@ -402,7 +388,6 @@ class AppClassCard extends StatelessWidget {
     return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
-      borderLeftColor: color,
       onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

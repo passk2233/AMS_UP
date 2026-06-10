@@ -52,6 +52,9 @@ dependencies:
   badges: ^3.2.0
   file_picker: ^11.0.2
   url_launcher: ^6.3.2
+  # Persistent (disk + memory) cache for remote avatars / attachments so they
+  # aren't re-downloaded on every cold start — important on slow campus / 3G.
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:

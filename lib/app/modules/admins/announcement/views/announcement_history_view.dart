@@ -136,7 +136,7 @@ class _HistorySortFilterRow extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               _SortChip(
-                label: 'ຫົວຂໍ້ A-Z',
+                label: 'ຫົວຂໍ້ ກ-ຮ',
                 mode: AnnouncementSortMode.titleAZ,
                 controller: controller,
               ),
@@ -185,39 +185,41 @@ class _SortChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = controller.historySortMode.value == mode;
-    return GestureDetector(
-      onTap: () => controller.setHistorySortMode(mode),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.laoBlue : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected ? AppColors.laoBlue : Colors.grey.shade300,
+    return Obx(() {
+      final selected = controller.historySortMode.value == mode;
+      return GestureDetector(
+        onTap: () => controller.setHistorySortMode(mode),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: selected ? AppColors.laoBlue : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? AppColors.laoBlue : Colors.grey.shade300,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.sort_rounded,
+                size: 14,
+                color: selected ? Colors.white : Colors.grey.shade500,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: selected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ],
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.sort_rounded,
-              size: 14,
-              color: selected ? Colors.white : Colors.grey.shade500,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: selected ? Colors.white : AppColors.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+      );
+    });
   }
 }
 
@@ -240,32 +242,34 @@ class _TypeFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selected = controller.historyFilterType.value == typeValue;
-    return GestureDetector(
-      onTap: () => controller.setHistoryFilterType(typeValue),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.borderApproved.withValues(alpha: 0.1)
-              : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: selected ? AppColors.borderApproved : Colors.grey.shade300,
-          ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
+    return Obx(() {
+      final selected = controller.historyFilterType.value == typeValue;
+      return GestureDetector(
+        onTap: () => controller.setHistoryFilterType(typeValue),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
             color: selected
-                ? AppColors.borderApproved
-                : AppColors.textSecondary,
+                ? AppColors.borderApproved.withValues(alpha: 0.1)
+                : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: selected ? AppColors.borderApproved : Colors.grey.shade300,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: selected
+                  ? AppColors.borderApproved
+                  : AppColors.textSecondary,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    });
   }
 }
 

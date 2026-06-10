@@ -5,11 +5,10 @@ import 'package:flutter/material.dart';
 // types win for the multipart upload below.
 import 'package:get/get.dart' hide Response, FormData, MultipartFile;
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_colors.dart';
 import '../../../../widgets/app_dialogs.dart';
-import '../../../../widgets/app_spacing.dart';
 import '../../../data/data_exporter.dart';
+import '../views/announcement_dialogs.dart';
 
 /// Audience identifier accepted by the backend's `audience` parameter.
 abstract class AnnouncementAudience {
@@ -50,14 +49,27 @@ abstract class AnnouncementSortMode {
 /// - Send / delete / edit / resend notification flows.
 /// - Paginated, search-able, filterable history list.
 class AnnouncementController extends GetxController {
+  AnnouncementController({
+    NotificationProvider? notification,
+    PeopleProvider? people,
+    ReferenceProvider? reference,
+  })  : _noti = notification ?? NotificationProvider(),
+        _people = people ?? PeopleProvider(),
+        _reference = reference ?? ReferenceProvider();
+
+  final NotificationProvider _noti;
+  final PeopleProvider _people;
+  final ReferenceProvider _reference;
+
   /// Compose form — notification title.
   final TextEditingController titleCtrl = TextEditingController();
 
   /// Compose form — notification body / message.
   final TextEditingController messageCtrl = TextEditingController();
 
-  /// Compose form — student ID typed into the individual lookup field.
-  final TextEditingController individualIdCtrl = TextEditingController();
+  /// Compose form — student code or name typed into the individual lookup
+  /// field. The numeric primary key is never typed by the admin.
+  final TextEditingController individualSearchCtrl = TextEditingController();
 
   /// Edit dialog — title field, reused via [_EditNotificationDialog].
   final TextEditingController editTitleCtrl = TextEditingController();
@@ -92,8 +104,20 @@ class AnnouncementController extends GetxController {
   /// Extensions accepted by the picker — must stay within the backend's
   /// `allowedUploadExt` allow-list.
   static const List<String> allowedUploadExtensions = [
-    'jpg', 'jpeg', 'png', 'gif', 'webp',
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'csv',
+    'jpg',
+    'jpeg',
+    'png',
+    'gif',
+    'webp',
+    'pdf',
+    'doc',
+    'docx',
+    'xls',
+    'xlsx',
+    'ppt',
+    'pptx',
+    'txt',
+    'csv',
   ];
 
   /// Active audience tab — see [AnnouncementAudience].
@@ -117,15 +141,15 @@ class AnnouncementController extends GetxController {
   final RxList<StudentGroupModel> studentGroups = <StudentGroupModel>[].obs;
 
   /// Currently selected student group, or `null` for "all".
-  final Rx<StudentGroupModel?> selectedStudentGroup =
-      Rx<StudentGroupModel?>(null);
+  final Rx<StudentGroupModel?> selectedStudentGroup = Rx<StudentGroupModel?>(
+    null,
+  );
 
   /// Student types fetched from `/student-types`.
   final RxList<StudentTypeModel> studentTypes = <StudentTypeModel>[].obs;
 
   /// Currently selected student type, or `null` for "all".
-  final Rx<StudentTypeModel?> selectedStudentType =
-      Rx<StudentTypeModel?>(null);
+  final Rx<StudentTypeModel?> selectedStudentType = Rx<StudentTypeModel?>(null);
 
   /// Year-level filter index — 0 = all years, 1..4 = specific year.
   final RxInt selectedYear = 0.obs;
@@ -139,11 +163,16 @@ class AnnouncementController extends GetxController {
     'ປີ 4',
   ];
 
-  /// Most recent successful result of [searchStudentById]. `null` when the
-  /// search field is empty or the last lookup failed.
+  /// The student the admin has confirmed as the individual recipient. `null`
+  /// until one of [searchResults] is selected (or an exact single match is
+  /// auto-selected).
   final Rx<StudentModel?> foundStudent = Rx<StudentModel?>(null);
 
-  /// `true` while [searchStudentById] is in flight.
+  /// Matches returned by the last [searchStudents] call (by code or name).
+  /// The admin taps one to set [foundStudent]; empty when no search has run.
+  final RxList<StudentModel> searchResults = <StudentModel>[].obs;
+
+  /// `true` while [searchStudents] is in flight.
   final RxBool isSearching = false.obs;
 
   /// `true` while [sendNotification] / [resendNotification] are in flight.
@@ -193,8 +222,6 @@ class AnnouncementController extends GetxController {
   static const int _pageSize = 20;
   int _currentPage = 1;
 
-  Dio get _dio => ApiClient.dio;
-
   @override
   void onInit() {
     super.onInit();
@@ -208,7 +235,7 @@ class AnnouncementController extends GetxController {
   void onClose() {
     titleCtrl.dispose();
     messageCtrl.dispose();
-    individualIdCtrl.dispose();
+    individualSearchCtrl.dispose();
     editTitleCtrl.dispose();
     editMessageCtrl.dispose();
     searchHistoryCtrl.dispose();
@@ -218,48 +245,29 @@ class AnnouncementController extends GetxController {
   // ───────────────────────────────────────────── reference data ──
 
   /// GET `/departments` and populate [departments].
-  Future<void> fetchDepartments() => _fetchInto<DepartmentModel>(
-        path: '/departments',
-        queryParameters: const {'limit': 50},
-        parse: DepartmentModel.fromJson,
-        target: departments,
-        label: 'fetchDepartments',
-      );
+  Future<void> fetchDepartments() async {
+    try {
+      departments.assignAll(await _reference.fetchDepartments());
+    } on DioException catch (e) {
+      debugPrint('fetchDepartments error: ${e.message}');
+    }
+  }
 
   /// GET `/student-groups` and populate [studentGroups].
-  Future<void> fetchStudentGroups() => _fetchInto<StudentGroupModel>(
-        path: '/student-groups',
-        queryParameters: const {'limit': 100},
-        parse: StudentGroupModel.fromJson,
-        target: studentGroups,
-        label: 'fetchStudentGroups',
-      );
+  Future<void> fetchStudentGroups() async {
+    try {
+      studentGroups.assignAll(await _reference.fetchStudentGroups());
+    } on DioException catch (e) {
+      debugPrint('fetchStudentGroups error: ${e.message}');
+    }
+  }
 
   /// GET `/student-types` and populate [studentTypes].
-  Future<void> fetchStudentTypes() => _fetchInto<StudentTypeModel>(
-        path: '/student-types',
-        parse: StudentTypeModel.fromJson,
-        target: studentTypes,
-        label: 'fetchStudentTypes',
-      );
-
-  Future<void> _fetchInto<T>({
-    required String path,
-    required T Function(Map<String, dynamic>) parse,
-    required RxList<T> target,
-    required String label,
-    Map<String, dynamic>? queryParameters,
-  }) async {
+  Future<void> fetchStudentTypes() async {
     try {
-      final response = await _dio.get(path, queryParameters: queryParameters);
-      if (response.statusCode != 200) return;
-      target.assignAll(
-        _extractList(response.data)
-            .map((j) => parse(j as Map<String, dynamic>))
-            .toList(),
-      );
+      studentTypes.assignAll(await _reference.fetchStudentTypes());
     } on DioException catch (e) {
-      debugPrint('$label error: ${e.message}');
+      debugPrint('fetchStudentTypes error: ${e.message}');
     }
   }
 
@@ -272,15 +280,8 @@ class AnnouncementController extends GetxController {
     _currentPage = 1;
     hasMore.value = true;
     try {
-      final response = await _dio.get(
-        '/notifications',
-        queryParameters: {'limit': _pageSize, 'page': _currentPage},
-      );
-      if (response.statusCode != 200) return;
-
-      final parsed = _extractList(response.data)
-          .map((j) => NotificationModel.fromJson(j))
-          .toList();
+      final parsed =
+          await _noti.fetchHistory(page: _currentPage, limit: _pageSize);
       notifications.assignAll(parsed);
       hasMore.value = parsed.length >= _pageSize;
       _applyHistoryFilters();
@@ -302,15 +303,8 @@ class AnnouncementController extends GetxController {
     isLoadingMore.value = true;
     try {
       final nextPage = _currentPage + 1;
-      final response = await _dio.get(
-        '/notifications',
-        queryParameters: {'limit': _pageSize, 'page': nextPage},
-      );
-      if (response.statusCode != 200) return;
-
-      final parsed = _extractList(response.data)
-          .map((j) => NotificationModel.fromJson(j))
-          .toList();
+      final parsed =
+          await _noti.fetchHistory(page: nextPage, limit: _pageSize);
       if (parsed.isEmpty) {
         hasMore.value = false;
       } else {
@@ -328,53 +322,61 @@ class AnnouncementController extends GetxController {
 
   // ──────────────────────────────────── individual student lookup ──
 
-  /// Look up a single student by ID typed into [individualIdCtrl]. Updates
-  /// [foundStudent] on success; clears it (and surfaces a warning) on 404.
-  Future<void> searchStudentById() async {
-    final idText = individualIdCtrl.text.trim();
-    if (idText.isEmpty) {
+  /// Search students by code or name using the term in [individualSearchCtrl].
+  /// Populates [searchResults]; auto-selects [foundStudent] on a single match
+  /// and surfaces a warning when nothing matches. The numeric primary key is
+  /// never entered by the admin.
+  Future<void> searchStudents() async {
+    final term = individualSearchCtrl.text.trim();
+    if (term.isEmpty) {
+      searchResults.clear();
       foundStudent.value = null;
-      return;
-    }
-
-    final id = int.tryParse(idText);
-    if (id == null) {
       AppDialogs.showWarning(
-        title: 'ID ບໍ່ຖືກຕ້ອງ',
-        message: 'ກະລຸນາໃສ່ ID ເປັນຕົວເລກ.',
+        title: 'ກະລຸນາໃສ່ຄຳຄົ້ນຫາ',
+        message: 'ໃສ່ລະຫັດນັກສຶກສາ ຫຼື ຊື່ ເພື່ອຄົ້ນຫາ.',
       );
       return;
     }
 
     isSearching.value = true;
+    foundStudent.value = null;
     try {
-      final response = await _dio.get('/students/$id');
-      if (response.statusCode != 200) return;
-      foundStudent.value = _parseStudent(response.data);
-    } on DioException catch (e) {
-      foundStudent.value = null;
-      if (e.response?.statusCode == 404) {
+      final results = await _people.fetchStudents(
+        filters: {'search': term},
+        limit: 20,
+      );
+      searchResults.assignAll(results);
+      if (results.isEmpty) {
         AppDialogs.showWarning(
           title: 'ບໍ່ພົບນັກສຶກສາ',
-          message: 'ບໍ່ພົບນັກສຶກສາ ID: $id ໃນລະບົບ.',
+          message: 'ບໍ່ພົບນັກສຶກສາທີ່ກົງກັບ "$term" ໃນລະບົບ.',
         );
-      } else {
-        AppDialogs.showError(
-          title: 'ຄົ້ນຫາລົ້ມເຫຼວ',
-          message: 'ບໍ່ສາມາດຄົ້ນຫານັກສຶກສາໄດ້.',
-          detail: AppDialogs.buildDioErrorDetail(e),
-        );
+      } else if (results.length == 1) {
+        foundStudent.value = results.first;
       }
+    } on DioException catch (e) {
+      searchResults.clear();
+      foundStudent.value = null;
+      AppDialogs.showError(
+        title: 'ຄົ້ນຫາລົ້ມເຫຼວ',
+        message: 'ບໍ່ສາມາດຄົ້ນຫານັກສຶກສາໄດ້.',
+        detail: AppDialogs.buildDioErrorDetail(e),
+      );
     } finally {
       isSearching.value = false;
     }
   }
 
-  StudentModel? _parseStudent(dynamic data) {
-    if (data is! Map<String, dynamic>) return null;
-    final inner = data['data'];
-    if (inner is Map<String, dynamic>) return StudentModel.fromJson(inner);
-    return StudentModel.fromJson(data);
+  /// Confirm [student] as the individual recipient (from a multi-match list).
+  void selectStudent(StudentModel student) {
+    foundStudent.value = student;
+  }
+
+  /// Clear the current individual selection and any pending search results.
+  void clearIndividualSelection() {
+    foundStudent.value = null;
+    searchResults.clear();
+    individualSearchCtrl.clear();
   }
 
   // ─────────────────────────────────────────────── reach estimate ──
@@ -398,11 +400,7 @@ class AnnouncementController extends GetxController {
       params.addAll(_buildFilters());
 
       try {
-        final resp = await _dio.get(
-          '/notifications/estimate-reach',
-          queryParameters: params,
-        );
-        final count = _extractReachCount(resp.data);
+        final count = await _noti.estimateReach(params);
         if (count != null) {
           estimatedReach.value = count;
           return;
@@ -420,32 +418,24 @@ class AnnouncementController extends GetxController {
     }
   }
 
-  int? _extractReachCount(dynamic data) {
-    if (data is int) return data;
-    if (data is Map) {
-      final raw = data['count'] ?? data['total'] ?? data['data'];
-      if (raw is int) return raw;
-      if (raw is num) return raw.toInt();
-    }
-    return null;
-  }
-
   Future<int> _countByPaginatedFallback() async {
     var total = 0;
     final audience = selectedAudience.value;
     if (audience == AnnouncementAudience.all ||
         audience == AnnouncementAudience.students) {
-      final p = <String, dynamic>{'limit': 5000, ..._buildFilters()};
-      final resp = await _dio.get('/students', queryParameters: p);
-      total += _extractList(resp.data).length;
+      total += (await _people.fetchStudents(
+        filters: _buildFilters(),
+        limit: 5000,
+      ))
+          .length;
     }
     if (audience == AnnouncementAudience.all ||
         audience == AnnouncementAudience.teachers) {
-      final p = <String, dynamic>{'limit': 5000};
-      final deptId = selectedDepartment.value?.id;
-      if (deptId != null) p['dept_id'] = deptId;
-      final resp = await _dio.get('/teachers', queryParameters: p);
-      total += _extractList(resp.data).length;
+      total += (await _people.fetchTeachers(
+        deptId: selectedDepartment.value?.id,
+        limit: 5000,
+      ))
+          .length;
     }
     return total;
   }
@@ -535,25 +525,7 @@ class AnnouncementController extends GetxController {
 
     isUploading.value = true;
     try {
-      final response = await _dio.post(
-        '/notifications/upload',
-        data: form,
-        options: Options(contentType: 'multipart/form-data'),
-      );
-      final data = response.data;
-      if (data is Map && data['files'] is List) {
-        return (data['files'] as List)
-            .whereType<Map>()
-            .where((m) => m['path'] is String && (m['path'] as String).isNotEmpty)
-            .map<Map<String, dynamic>>((m) => {
-                  'path': m['path'],
-                  'name': m['name'],
-                  if (m['mime'] != null) 'mime': m['mime'],
-                  if (m['size'] != null) 'size': m['size'],
-                })
-            .toList();
-      }
-      return null;
+      return await _noti.uploadAttachments(form);
     } finally {
       isUploading.value = false;
     }
@@ -590,7 +562,7 @@ class AnnouncementController extends GetxController {
 
     await _refreshEstimatedReach();
     final confirmed = await Get.dialog<bool>(
-      _SendConfirmationDialog(controller: this),
+      SendConfirmationDialog(controller: this),
       barrierDismissible: false,
     );
     if (confirmed != true) return;
@@ -606,8 +578,11 @@ class AnnouncementController extends GetxController {
         try {
           uploaded = await _uploadPickedFiles();
         } on DioException catch (e) {
-          _showDioError('ອັບໂຫຼດໄຟລ໌ລົ້ມເຫຼວ', e,
-              fallback: 'ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້.');
+          _showDioError(
+            'ອັບໂຫຼດໄຟລ໌ລົ້ມເຫຼວ',
+            e,
+            fallback: 'ບໍ່ສາມາດອັບໂຫຼດໄຟລ໌ໄດ້.',
+          );
           return;
         }
         if (uploaded == null) {
@@ -620,9 +595,8 @@ class AnnouncementController extends GetxController {
         fileRefs = uploaded;
       }
 
-      final response = await _dio.post(
-        '/notifications',
-        queryParameters: _buildSendQuery(),
+      await _noti.send(
+        query: _buildSendQuery(),
         data: {
           'title': titleCtrl.text.trim(),
           'message': messageCtrl.text.trim(),
@@ -630,17 +604,18 @@ class AnnouncementController extends GetxController {
           'files': fileRefs,
         },
       );
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        _resetForm();
-        fetchNotifications();
-        AppDialogs.showSuccess(
-          title: 'ສົ່ງສຳເລັດ',
-          message: 'ການແຈ້ງເຕືອນໄດ້ຖືກສົ່ງອອກແລ້ວ.',
-        );
-      }
+      _resetForm();
+      fetchNotifications();
+      AppDialogs.showSuccess(
+        title: 'ສົ່ງສຳເລັດ',
+        message: 'ການແຈ້ງເຕືອນໄດ້ຖືກສົ່ງອອກແລ້ວ.',
+      );
     } on DioException catch (e) {
-      _showDioError('ສົ່ງລົ້ມເຫຼວ', e,
-          fallback: 'ບໍ່ສາມາດສົ່ງການແຈ້ງເຕືອນໄດ້.');
+      _showDioError(
+        'ສົ່ງລົ້ມເຫຼວ',
+        e,
+        fallback: 'ບໍ່ສາມາດສົ່ງການແຈ້ງເຕືອນໄດ້.',
+      );
     } finally {
       isSending.value = false;
     }
@@ -659,7 +634,7 @@ class AnnouncementController extends GetxController {
     if (confirmed != true) return;
 
     try {
-      await _dio.delete('/notifications/$notiId');
+      await _noti.delete(notiId);
       notifications.removeWhere((n) => n.notiId == notiId);
       _applyHistoryFilters();
       AppDialogs.showSuccess(
@@ -667,8 +642,7 @@ class AnnouncementController extends GetxController {
         message: 'ການແຈ້ງເຕືອນໄດ້ຖືກລຶບແລ້ວ.',
       );
     } on DioException catch (e) {
-      _showDioError('ລຶບລົ້ມເຫຼວ', e,
-          fallback: 'ບໍ່ສາມາດລຶບການແຈ້ງເຕືອນໄດ້.');
+      _showDioError('ລຶບລົ້ມເຫຼວ', e, fallback: 'ບໍ່ສາມາດລຶບການແຈ້ງເຕືອນໄດ້.');
     }
   }
 
@@ -681,7 +655,7 @@ class AnnouncementController extends GetxController {
     editRemoveFile.value = false;
 
     final confirmed = await Get.dialog<bool>(
-      _EditNotificationDialog(controller: this),
+      EditNotificationDialog(controller: this),
       barrierDismissible: false,
     );
     if (confirmed != true) return;
@@ -700,30 +674,19 @@ class AnnouncementController extends GetxController {
             : noti.files.map((f) => f.toUploadRef()).toList(),
       };
 
-      Response? response;
-      try {
-        response = await _dio.put('/notifications/${noti.notiId}', data: body);
-      } on DioException catch (e) {
-        final code = e.response?.statusCode;
-        if (code == 404 || code == 405) {
-          await _dio.delete('/notifications/${noti.notiId}');
-          response = await _dio.post('/notifications', data: body);
-        } else {
-          rethrow;
-        }
-      }
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchNotifications();
-        _applyHistoryFilters();
-        AppDialogs.showSuccess(
-          title: 'ແກ້ໄຂສຳເລັດ',
-          message: 'ການແຈ້ງເຕືອນໄດ້ຖືກອັບເດດແລ້ວ.',
-        );
-      }
+      await _noti.updateOrRecreate(notiId: noti.notiId, data: body);
+      await fetchNotifications();
+      _applyHistoryFilters();
+      AppDialogs.showSuccess(
+        title: 'ແກ້ໄຂສຳເລັດ',
+        message: 'ການແຈ້ງເຕືອນໄດ້ຖືກອັບເດດແລ້ວ.',
+      );
     } on DioException catch (e) {
-      _showDioError('ແກ້ໄຂລົ້ມເຫຼວ', e,
-          fallback: 'ບໍ່ສາມາດແກ້ໄຂການແຈ້ງເຕືອນໄດ້.');
+      _showDioError(
+        'ແກ້ໄຂລົ້ມເຫຼວ',
+        e,
+        fallback: 'ບໍ່ສາມາດແກ້ໄຂການແຈ້ງເຕືອນໄດ້.',
+      );
     } finally {
       isEditing.value = false;
     }
@@ -742,23 +705,24 @@ class AnnouncementController extends GetxController {
 
     isSending.value = true;
     try {
-      final response = await _dio.post('/notifications', data: {
+      await _noti.send(data: {
         'title': noti.title,
         'message': noti.message,
         'type': noti.type ?? '',
         'files': noti.files.map((f) => f.toUploadRef()).toList(),
       });
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        await fetchNotifications();
-        _applyHistoryFilters();
-        AppDialogs.showSuccess(
-          title: 'ສົ່ງຊ້ຳສຳເລັດ',
-          message: 'ການແຈ້ງເຕືອນໄດ້ຖືກສົ່ງອີກຄັ້ງ.',
-        );
-      }
+      await fetchNotifications();
+      _applyHistoryFilters();
+      AppDialogs.showSuccess(
+        title: 'ສົ່ງຊ້ຳສຳເລັດ',
+        message: 'ການແຈ້ງເຕືອນໄດ້ຖືກສົ່ງອີກຄັ້ງ.',
+      );
     } on DioException catch (e) {
-      _showDioError('ສົ່ງຊ້ຳລົ້ມເຫຼວ', e,
-          fallback: 'ບໍ່ສາມາດສົ່ງການແຈ້ງເຕືອນຊ້ຳໄດ້.');
+      _showDioError(
+        'ສົ່ງຊ້ຳລົ້ມເຫຼວ',
+        e,
+        fallback: 'ບໍ່ສາມາດສົ່ງການແຈ້ງເຕືອນຊ້ຳໄດ້.',
+      );
     } finally {
       isSending.value = false;
     }
@@ -880,7 +844,8 @@ class AnnouncementController extends GetxController {
     if (selectedAudience.value == AnnouncementAudience.individual &&
         foundStudent.value != null) {
       final s = foundStudent.value!;
-      return 'ບຸກຄົນສະເພາະ | ID: ${s.id} | ${s.nameLao}';
+      return 'ບຸກຄົນສະເພາະ | ${s.stdCode} | ${s.nameLao} ${s.surnameLao ?? ''}'
+          .trim();
     }
 
     final dept = selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ';
@@ -925,7 +890,7 @@ class AnnouncementController extends GetxController {
     return f;
   }
 
-  /// Build the audience-summary row list used by [_SendConfirmationDialog].
+  /// Build the audience-summary row list used by [SendConfirmationDialog].
   /// Exposed (not private) so the dialog widget can render it without
   /// coupling to controller internals.
   List<AnnouncementInfoRow> buildConfirmationRows() {
@@ -939,36 +904,58 @@ class AnnouncementController extends GetxController {
         if (s != null) {
           rows
             ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ບຸກຄົນສະເພາະ'))
-            ..add(AnnouncementInfoRow('ID', '${s.id}'))
             ..add(AnnouncementInfoRow('ລະຫັດ', s.stdCode))
-            ..add(AnnouncementInfoRow(
-                'ຊື່', '${s.nameLao} ${s.surnameLao ?? ''}'))
-            ..add(AnnouncementInfoRow(
-                'ກຸ່ມ', s.studentGroup?.stdGroupName ?? '-'))
-            ..add(AnnouncementInfoRow(
-                'ປະເພດ', s.studentType?.stdTypeNameLao ?? '-'));
+            ..add(
+              AnnouncementInfoRow('ຊື່', '${s.nameLao} ${s.surnameLao ?? ''}'),
+            )
+            ..add(
+              AnnouncementInfoRow('ກຸ່ມ', s.studentGroup?.stdGroupName ?? '-'),
+            )
+            ..add(
+              AnnouncementInfoRow(
+                'ປະເພດ',
+                s.studentType?.stdTypeNameLao ?? '-',
+              ),
+            );
         }
         break;
       case AnnouncementAudience.students:
         rows
           ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ນັກສຶກສາ'))
-          ..add(AnnouncementInfoRow(
-              'ພາກວິຊາ', selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ'))
-          ..add(AnnouncementInfoRow(
-              'ກຸ່ມ', selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ'))
-          ..add(AnnouncementInfoRow('ປະເພດ',
-              selectedStudentType.value?.stdTypeNameLao ?? 'ທັງໝົດ'))
-          ..add(AnnouncementInfoRow(
-              'ຊັ້ນປີ', yearLabels[selectedYear.value]));
+          ..add(
+            AnnouncementInfoRow(
+              'ພາກວິຊາ',
+              selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ',
+            ),
+          )
+          ..add(
+            AnnouncementInfoRow(
+              'ກຸ່ມ',
+              selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ',
+            ),
+          )
+          ..add(
+            AnnouncementInfoRow(
+              'ປະເພດ',
+              selectedStudentType.value?.stdTypeNameLao ?? 'ທັງໝົດ',
+            ),
+          )
+          ..add(AnnouncementInfoRow('ຊັ້ນປີ', yearLabels[selectedYear.value]));
         break;
       case AnnouncementAudience.teachers:
         rows
           ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ອາຈານ'))
-          ..add(AnnouncementInfoRow(
-              'ພາກວິຊາ', selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ'));
+          ..add(
+            AnnouncementInfoRow(
+              'ພາກວິຊາ',
+              selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ',
+            ),
+          );
         break;
       default:
-        rows.add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ທັງໝົດ (ນັກສຶກສາ + ອາຈານ)'));
+        rows.add(
+          const AnnouncementInfoRow('ສົ່ງຫາ', 'ທັງໝົດ (ນັກສຶກສາ + ອາຈານ)'),
+        );
     }
     return rows;
   }
@@ -976,7 +963,8 @@ class AnnouncementController extends GetxController {
   void _resetForm() {
     titleCtrl.clear();
     messageCtrl.clear();
-    individualIdCtrl.clear();
+    individualSearchCtrl.clear();
+    searchResults.clear();
     pickedFiles.clear();
     selectedAudience.value = AnnouncementAudience.all;
     selectedDepartment.value = null;
@@ -999,14 +987,9 @@ class AnnouncementController extends GetxController {
     );
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
-  }
 }
 
-/// One row of the confirmation summary rendered by [_SendConfirmationDialog].
+/// One row of the confirmation summary rendered by [SendConfirmationDialog].
 class AnnouncementInfoRow {
   /// Left-side label.
   final String label;
@@ -1017,441 +1000,3 @@ class AnnouncementInfoRow {
   const AnnouncementInfoRow(this.label, this.value);
 }
 
-/// Confirmation dialog rendered before [AnnouncementController.sendNotification]
-/// POSTs the payload.
-class _SendConfirmationDialog extends StatelessWidget {
-  /// Source of reactive state — provides the rows + reach estimate.
-  final AnnouncementController controller;
-
-  const _SendConfirmationDialog({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(22),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const _SendIconBadge(),
-            const SizedBox(height: 14),
-            const Text(
-              'ຢືນຢັນການສົ່ງ',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'ກະລຸນາກວດສອບລາຍລະອຽດ',
-              style: TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
-            ),
-            const SizedBox(height: 14),
-            _ConfirmationRows(rows: controller.buildConfirmationRows()),
-            const SizedBox(height: 10),
-            Obx(
-              () => _EstimatedReachPill(
-                count: controller.estimatedReach.value,
-                loading: controller.isEstimatingReach.value,
-              ),
-            ),
-            const SizedBox(height: 18),
-            _DialogFooter(
-              cancelLabel: 'ຍົກເລີກ',
-              confirmLabel: 'ສົ່ງ',
-              confirmIcon: Icons.send_rounded,
-              confirmColor: AppColors.laoBlue,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Indigo icon badge at the top of [_SendConfirmationDialog].
-class _SendIconBadge extends StatelessWidget {
-  const _SendIconBadge();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.laoBlue.withValues(alpha: 0.1),
-        shape: BoxShape.circle,
-      ),
-      child: const Icon(
-        Icons.send_rounded,
-        color: AppColors.laoBlue,
-        size: 36,
-      ),
-    );
-  }
-}
-
-/// Boxed list of `label : value` rows inside [_SendConfirmationDialog].
-class _ConfirmationRows extends StatelessWidget {
-  /// Pre-built label/value rows from [AnnouncementController.buildConfirmationRows].
-  final List<AnnouncementInfoRow> rows;
-
-  const _ConfirmationRows({required this.rows});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final r in rows)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 80,
-                    child: Text(
-                      '${r.label}:',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF374151),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      r.value,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Pill below the confirmation rows that announces the estimated recipient
-/// count, or a loading placeholder while the count is being fetched.
-class _EstimatedReachPill extends StatelessWidget {
-  /// Last computed count; `null` means "couldn't estimate".
-  final int? count;
-
-  /// Whether the estimate is currently in flight.
-  final bool loading;
-
-  const _EstimatedReachPill({required this.count, required this.loading});
-
-  @override
-  Widget build(BuildContext context) {
-    final label = loading
-        ? 'ກຳລັງປະເມີນຜູ້ຮັບ...'
-        : (count == null ? 'ປະເມີນຜູ້ຮັບບໍ່ໄດ້' : 'ຈະສົ່ງຫາປະມານ $count ຄົນ');
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.laoBlue.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: AppColors.laoBlue.withValues(alpha: 0.25),
-        ),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.groups_2_rounded,
-              color: AppColors.laoBlue, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.laoBlue,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Edit-notification dialog rendered by [AnnouncementController.editNotification].
-class _EditNotificationDialog extends StatelessWidget {
-  /// Source of the title / message text controllers.
-  final AnnouncementController controller;
-
-  const _EditNotificationDialog({required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'ແກ້ໄຂການແຈ້ງເຕືອນ',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 14),
-            const _FieldLabel('ຫົວຂໍ້'),
-            const SizedBox(height: 4),
-            _DialogTextField(controller: controller.editTitleCtrl),
-            const SizedBox(height: 10),
-            const _FieldLabel('ເນື້ອຫາ'),
-            const SizedBox(height: 4),
-            _DialogTextField(
-              controller: controller.editMessageCtrl,
-              maxLines: 4,
-            ),
-            Obx(() {
-              final count = controller.editingFilesCount.value;
-              if (count == 0) return const SizedBox.shrink();
-              return Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: _EditRemoveFileRow(controller: controller, count: count),
-              );
-            }),
-            const SizedBox(height: 16),
-            _DialogFooter(
-              cancelLabel: 'ຍົກເລີກ',
-              confirmLabel: 'ບັນທຶກ',
-              confirmColor: AppColors.laoBlue,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Row inside [_EditNotificationDialog] showing how many attachments the
-/// notification has, with a toggle to clear them on save. Tapping "ລຶບ" flips
-/// [AnnouncementController.editRemoveFile]; the row reflects the pending
-/// removal with a strikethrough so the choice is reversible before saving.
-class _EditRemoveFileRow extends StatelessWidget {
-  /// Owner of [AnnouncementController.editRemoveFile].
-  final AnnouncementController controller;
-
-  /// Number of existing attachments.
-  final int count;
-
-  const _EditRemoveFileRow({required this.controller, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Obx(() {
-      final remove = controller.editRemoveFile.value;
-      final muted = Colors.grey.shade400;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF9FAFB),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          children: [
-            Icon(
-              Icons.attach_file_rounded,
-              size: 18,
-              color: remove ? muted : AppColors.laoBlue,
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                '$count ໄຟລ໌ແນບ',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: remove ? muted : const Color(0xFF374151),
-                  decoration: remove ? TextDecoration.lineThrough : null,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: controller.editRemoveFile.toggle,
-              icon: Icon(
-                remove ? Icons.undo_rounded : Icons.delete_outline_rounded,
-                size: 16,
-                color: remove ? AppColors.laoBlue : AppColors.rejectRed,
-              ),
-              label: Text(
-                remove ? 'ກູ້ຄືນ' : 'ລຶບ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: remove ? AppColors.laoBlue : AppColors.rejectRed,
-                ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: const Size(0, 36),
-              ),
-            ),
-          ],
-        ),
-      );
-    });
-  }
-}
-
-/// Small caption used as a field label inside [_EditNotificationDialog].
-class _FieldLabel extends StatelessWidget {
-  /// Caption text.
-  final String text;
-
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: Color(0xFF6B7280),
-      ),
-    );
-  }
-}
-
-/// Filled, rounded text field used inside [_EditNotificationDialog].
-class _DialogTextField extends StatelessWidget {
-  /// Backing text controller.
-  final TextEditingController controller;
-
-  /// Vertical line count.
-  final int maxLines;
-
-  const _DialogTextField({
-    required this.controller,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        filled: true,
-        fillColor: AppColors.scaffoldBg,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: maxLines > 1 ? 12 : 10,
-        ),
-      ),
-    );
-  }
-}
-
-/// Two-button footer (cancel + confirm) reused by both dialogs.
-class _DialogFooter extends StatelessWidget {
-  /// Cancel button caption — returns `false`.
-  final String cancelLabel;
-
-  /// Confirm button caption — returns `true`.
-  final String confirmLabel;
-
-  /// Tint applied to the confirm button.
-  final Color confirmColor;
-
-  /// Optional leading icon for the confirm button.
-  final IconData? confirmIcon;
-
-  const _DialogFooter({
-    required this.cancelLabel,
-    required this.confirmLabel,
-    required this.confirmColor,
-    this.confirmIcon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final confirmChild = confirmIcon == null
-        ? Text(confirmLabel, style: const TextStyle(fontSize: 15))
-        : null;
-    return Row(
-      children: [
-        Expanded(
-          child: OutlinedButton(
-            onPressed: () => Get.back(result: false),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF6B7280),
-              side: const BorderSide(color: Color(0xFFD1D5DB)),
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.s + 4),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            child: Text(cancelLabel, style: const TextStyle(fontSize: 15)),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.s + 4),
-        Expanded(
-          child: confirmIcon == null
-              ? ElevatedButton(
-                  onPressed: () => Get.back(result: true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: confirmColor,
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s + 4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: confirmChild!,
-                )
-              : ElevatedButton.icon(
-                  onPressed: () => Get.back(result: true),
-                  icon: Icon(confirmIcon, size: 18),
-                  label: Text(confirmLabel,
-                      style: const TextStyle(fontSize: 15)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: confirmColor,
-                    foregroundColor: Colors.white,
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSpacing.s + 4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
-        ),
-      ],
-    );
-  }
-}

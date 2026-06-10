@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/faculty_feedback_controller.dart';
-import 'faculty_model.dart';
+import 'package:frontend/app/modules/data/models/faculty_model.dart';
 import 'package:frontend/app/routes/app_pages.dart';
 
 class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
@@ -14,69 +14,101 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
       builder: (controller) => LayoutBuilder(
         builder: (context, constraints) {
           return Scaffold(
-      backgroundColor: AppColors.scaffoldBg,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: AppColors.textPrimary),
-          onPressed: () => Get.back(),
-        ),
-        title: const Text(
-          'ປະເມີນອາຈານ',
-          style: TextStyle(
-              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.m),
-            child: Obx(
-              () => AppSearchBar(
-                hint: 'ຄົ້ນຫາອາຈານ ຫຼື ວິຊາ...',
-                onChanged: (v) => controller.query.value = v,
-                currentQuery: controller.query.value,
-                onClear: () => controller.query.value = '',
+            backgroundColor: AppColors.scaffoldBg,
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(
+                  Icons.arrow_back_ios,
+                  color: AppColors.textPrimary,
+                ),
+                onPressed: () => Get.back(),
               ),
+              title: const Text(
+                'ປະເມີນອາຈານ',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              centerTitle: true,
             ),
-          ),
-          Expanded(
-            child: Obx(
-              () {
-                if (controller.isLoading.value) {
-                  return const AppLoading.facultyList();
-                }
-                if (controller.errorMessage.value.isNotEmpty) {
-                  return AppErrorState(
-                    message: controller.errorMessage.value,
-                    onRetry: () => controller.onInit(),
-                  );
-                }
-                if (!controller.isEvaluationOpen.value) {
-                  return _buildClosedState(controller);
-                }
-                final list = controller.filteredFacultyList;
-                if (list.isEmpty) {
-                  return const AppEmptyState(
-                    icon: Icons.school_outlined,
-                    title: 'ບໍ່ພົບອາຈານ',
-                    subtitle: 'ລອງຄົ້ນຫາດ້ວຍຄຳອື່ນ',
-                  );
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: list.length,
-                  itemBuilder: (context, index) =>
-                      _buildFacultyCard(list[index]),
-                );
-              },
+            body: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(AppSpacing.m),
+                  child: Obx(
+                    () => AppSearchBar(
+                      hint: 'ຄົ້ນຫາອາຈານ ຫຼື ວິຊາ...',
+                      onChanged: (v) => controller.query.value = v,
+                      currentQuery: controller.query.value,
+                      onClear: () => controller.query.value = '',
+                    ),
+                  ),
+                ),
+                // Anonymity reassurance — the product's core trust guarantee, stated
+                // where the student is about to act on it.
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppSpacing.m,
+                    0,
+                    AppSpacing.m,
+                    AppSpacing.s,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 15,
+                        color: AppColors.textSecondary,
+                      ),
+                      SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'ຄຳຕອບຂອງທ່ານເປັນຄວາມລັບ — ອາຈານຈະບໍ່ເຫັນຊື່ຜູ້ປະເມີນ',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Obx(() {
+                    if (controller.isLoading.value) {
+                      return const AppLoading.facultyList();
+                    }
+                    if (controller.errorMessage.value.isNotEmpty) {
+                      return AppErrorState(
+                        message: controller.errorMessage.value,
+                        onRetry: () => controller.onInit(),
+                      );
+                    }
+                    if (!controller.isEvaluationOpen.value) {
+                      return _buildClosedState(controller);
+                    }
+                    final list = controller.filteredFacultyList;
+                    if (list.isEmpty) {
+                      return const AppEmptyState(
+                        icon: Icons.school_outlined,
+                        title: 'ບໍ່ພົບອາຈານ',
+                        subtitle: 'ລອງຄົ້ນຫາດ້ວຍຄຳອື່ນ',
+                      );
+                    }
+                    return ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      itemCount: list.length,
+                      itemBuilder: (context, index) =>
+                          _buildFacultyCard(list[index]),
+                    );
+                  }),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
+          );
         },
       ),
     );
@@ -90,18 +122,7 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                child: Text(
-                  faculty.initials,
-                  style: const TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-              ),
+              AppAvatar(photo: faculty.photo, radius: 30),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -145,8 +166,7 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
     return AppPrimaryButton(
       label: 'ປະເມີນ',
       icon: Icons.rate_review_rounded,
-      onPressed: () =>
-          Get.toNamed(Routes.EVALUATION_FORM, arguments: faculty),
+      onPressed: () => Get.toNamed(Routes.EVALUATION_FORM, arguments: faculty),
     );
   }
 
@@ -156,11 +176,10 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
     if (window != null && window.openTime != null) {
       final dt = window.openTime!;
       String two(int n) => n.toString().padLeft(2, '0');
-      final fmt = '${two(dt.day)}/${two(dt.month)}/${dt.year} '
+      final fmt =
+          '${two(dt.day)}/${two(dt.month)}/${dt.year} '
           '${two(dt.hour)}:${two(dt.minute)}';
-      hint = window.isOpenNow
-          ? null
-          : 'ໄລຍະຕໍ່ໄປຈະເປີດໃນ $fmt';
+      hint = window.isOpenNow ? null : 'ໄລຍະຕໍ່ໄປຈະເປີດໃນ $fmt';
     }
     return Padding(
       padding: const EdgeInsets.all(24),
@@ -207,10 +226,7 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary,
               side: const BorderSide(color: AppColors.primary),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 10,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -231,8 +247,11 @@ class FacultyFeedbackView extends GetView<FacultyFeedbackController> {
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.check_circle_outline,
-              color: AppColors.borderApproved, size: 20),
+          Icon(
+            Icons.check_circle_outline,
+            color: AppColors.borderApproved,
+            size: 20,
+          ),
           SizedBox(width: 8),
           Text(
             'ສົ່ງແລ້ວ',

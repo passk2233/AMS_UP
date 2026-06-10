@@ -4,9 +4,23 @@ import 'package:get/get.dart';
 
 import '../../../data/data_exporter.dart';
 import '../../../../widgets/app_dialogs.dart';
-import '../../../../services/api_client.dart';
 
 class TeacherEvaluationController extends GetxController {
+  TeacherEvaluationController({
+    AuthProvider? auth,
+    PeopleProvider? people,
+    AcademicProvider? academic,
+    EvaluationProvider? evaluation,
+  })  : _auth = auth ?? AuthProvider(),
+        _people = people ?? PeopleProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _eval = evaluation ?? EvaluationProvider();
+
+  final AuthProvider _auth;
+  final PeopleProvider _people;
+  final AcademicProvider _academic;
+  final EvaluationProvider _eval;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -17,8 +31,6 @@ class TeacherEvaluationController extends GetxController {
   // Current teacher info
   final Rx<TeacherModel?> currentTeacher = Rx<TeacherModel?>(null);
   int? _currentTeacherId;
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -31,96 +43,40 @@ class TeacherEvaluationController extends GetxController {
     errorMessage.value = '';
     try {
       // 1. Get current user to find teacher ID
-      final meResp = await _dio.get('/auth/me');
-      if (meResp.statusCode == 200 && meResp.data is Map<String, dynamic>) {
-        final user = UserModel.fromJson(meResp.data);
-        _currentTeacherId = user.teacherId;
-      }
-
-      if (_currentTeacherId == null) {
+      _currentTeacherId = (await _auth.me())?.teacherId;
+      final teacherId = _currentTeacherId;
+      if (teacherId == null) {
         errorMessage.value = 'ບໍ່ພົບຂໍ້ມູນອາຈານ';
         return;
       }
 
       // 2. Fetch teacher info
-      final teacherResp = await _dio.get('/teachers/$_currentTeacherId');
-      if (teacherResp.statusCode == 200) {
-        currentTeacher.value = TeacherModel.fromJson(
-          teacherResp.data is Map && teacherResp.data['data'] != null
-              ? teacherResp.data['data']
-              : teacherResp.data,
-        );
-      }
+      currentTeacher.value = await _people.fetchTeacherById(teacherId);
 
       // 3. Fetch study plans for this teacher (with preloads)
-      final spResp = await _dio.get('/study-plans', queryParameters: {
-        'teacher_id': _currentTeacherId,
-        'limit': 200,
-      });
-      final Map<int, StudyPlanModel> spMap = {};
-      if (spResp.statusCode == 200) {
-        final data = spResp.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-        for (final j in items) {
-          final sp = StudyPlanModel.fromJson(j);
-          spMap[sp.id] = sp;
-        }
+      final spMap = {
+        for (final sp
+            in await _academic.fetchStudyPlans(teacherId: teacherId, limit: 200))
+          sp.id: sp,
+      };
+
+      // 4. Fetch evaluation results — the backend scopes non-admin callers
+      //    to their own teacher_id (joined through study_plan) and returns
+      //    the anonymised projection without student_id. The client-side
+      //    spMap intersect below stays as belt-and-braces.
+      final myResults = (await _eval.fetchResults(teacherId: teacherId))
+          .where((r) => spMap.containsKey(r.studyPlanId))
+          .toList();
+
+      // Enrich with study plan data
+      for (final r in myResults) {
+        final sp = spMap[r.studyPlanId];
+        if (sp != null) r.studyPlan = sp;
       }
-
-      // 4. Fetch evaluation results — server filters by teacher_id so the
-      //    response only contains evaluations of THIS teacher (and, by
-      //    contract, with student_id stripped). The client-side spMap
-      //    intersect below is belt-and-braces in case the backend ignores
-      //    the filter.
-      final evalResp = await _dio.get('/evaluation-results', queryParameters: {
-        'teacher_id': _currentTeacherId,
-        'limit': 500,
-      });
-      if (evalResp.statusCode == 200) {
-        final data = evalResp.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-        final allResults =
-            items.map((j) => EvaluationResultModel.fromJson(j)).toList();
-
-        // Only keep results for this teacher's study plans — last line of
-        // defence if the backend hasn't applied teacher_id.
-        final myResults = allResults.where((r) {
-          return spMap.containsKey(r.studyPlanId);
-        }).toList();
-
-        // Enrich with study plan data
-        for (final r in myResults) {
-          final sp = spMap[r.studyPlanId];
-          if (sp != null) r.studyPlan = sp;
-        }
-
-        results.assignAll(myResults);
-      }
+      results.assignAll(myResults);
 
       // 5. Fetch questions
-      final qResp = await _dio.get('/evaluation-questions');
-      if (qResp.statusCode == 200) {
-        final data = qResp.data;
-        List<dynamic> items = [];
-        if (data is List) {
-          items = data;
-        } else if (data is Map && data['data'] != null) {
-          items = data['data'];
-        }
-        questions.assignAll(
-          items.map((j) => EvaluationQuestionModel.fromJson(j)).toList(),
-        );
-      }
+      questions.assignAll(await _eval.fetchQuestions());
 
       _buildSubjectGroups(spMap);
     } on DioException catch (e) {

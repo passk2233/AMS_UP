@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/app/utilities/assets.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/profile_student_controller.dart';
@@ -41,7 +40,7 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                       name: controller.displayName,
                       subtitle: "ລະຫັດ: ${controller.studentCode}",
                       caption: controller.program,
-                      avatarImage: const AssetImage(AssetImages.profile2),
+                      photo: controller.photo,
                     ),
                     const SizedBox(height: 25),
 

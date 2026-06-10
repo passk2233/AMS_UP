@@ -75,7 +75,7 @@ class _TeacherProfileContent extends StatelessWidget {
             name: displayName,
             subtitle: email,
             caption: roles.join(', '),
-            avatarFallback: displayName.isNotEmpty ? displayName : '?',
+            photo: user?.teacher?.photo,
           ),
           const SizedBox(height: 25),
           const AppSectionTitle('ຂໍ້ມູນບັນຊີ'),

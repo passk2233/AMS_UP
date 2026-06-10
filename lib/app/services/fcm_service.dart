@@ -52,8 +52,8 @@ class FCMService {
   /// A mismatch makes Android fall back to a low-importance channel that never
   /// produces a heads-up banner.
   static const _androidChannelId = 'ams_high_importance';
-  static const _androidChannelName = 'AMS Alerts';
-  static const _androidChannelDesc = 'Important AMS notifications';
+  static const _androidChannelName = 'ການແຈ້ງເຕືອນ AMS';
+  static const _androidChannelDesc = 'ການແຈ້ງເຕືອນສຳຄັນຈາກລະບົບ AMS';
 
   /// Prefix prepended to every role-derived FCM topic
   /// (e.g. `role_admin`, `role_teacher`, `role_student`).
@@ -259,7 +259,8 @@ class FCMService {
     notiBadge.fetchUnread();
 
     if (GetPlatform.isAndroid) {
-      _showForegroundSystemNotification(message, title ?? 'AMS', body ?? '');
+      _showForegroundSystemNotification(
+          message, title ?? 'ການແຈ້ງເຕືອນໃໝ່', body ?? '');
     }
 
     final category = message.data['category']?.toString() ?? '';

@@ -84,11 +84,7 @@ class NotiBellButton extends StatelessWidget {
   /// Optional tint for the bell glyph; defaults to the bubble's primary text.
   final Color? color;
 
-  const NotiBellButton({
-    super.key,
-    required this.route,
-    this.color,
-  });
+  const NotiBellButton({super.key, required this.route, this.color});
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +93,7 @@ class NotiBellButton extends StatelessWidget {
       () => AppIconBubble(
         icon: Icons.notifications_none_rounded,
         color: color,
+        semanticLabel: 'ການແຈ້ງເຕືອນ',
         badgeCount: badge.unreadCount.value,
         onTap: () async {
           await Get.toNamed(route);

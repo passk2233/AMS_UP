@@ -17,3 +17,13 @@ export 'models/evaluation_result_model.dart';
 export 'models/open_evaluation_model.dart';
 export 'models/study_plan_model.dart';
 export 'models/enrollment_model.dart';
+export 'models/faculty_model.dart';
+
+// Providers — data-access layer (one per resource).
+export 'providers/academic_provider.dart';
+export 'providers/auth_provider.dart';
+export 'providers/booking_provider.dart';
+export 'providers/evaluation_provider.dart';
+export 'providers/notification_provider.dart';
+export 'providers/people_provider.dart';
+export 'providers/reference_provider.dart';

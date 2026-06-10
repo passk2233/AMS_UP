@@ -101,8 +101,7 @@ class _ModeToggle extends StatelessWidget {
               icon: Icons.event_available_outlined,
               label: 'ໄລຍະເວລາ',
               selected: controller.pageMode.value == EvalutionPageMode.window,
-              onTap: () =>
-                  controller.pageMode.value = EvalutionPageMode.window,
+              onTap: () => controller.pageMode.value = EvalutionPageMode.window,
             ),
             _ToggleButton(
               icon: Icons.bar_chart_rounded,
@@ -244,8 +243,10 @@ class _QuestionListSection extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.laoBlue,
                   foregroundColor: Colors.white,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
@@ -302,7 +303,9 @@ class _QuestionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final active = question.isActive == 1;
-    final borderColor = active ? AppColors.borderApproved : Colors.grey.shade300;
+    final borderColor = active
+        ? AppColors.borderApproved
+        : Colors.grey.shade300;
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
@@ -326,8 +329,7 @@ class _QuestionCard extends StatelessWidget {
               children: [
                 _NumberBubble(number: index + 1),
                 const SizedBox(width: 8),
-                if (question.category != null &&
-                    question.category!.isNotEmpty)
+                if (question.category != null && question.category!.isNotEmpty)
                   _CategoryChip(category: question.category!),
                 const Spacer(),
                 _ActiveToggle(
@@ -414,7 +416,7 @@ class _CategoryChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F4F6),
+        color: AppColors.scaffoldBg,
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -672,8 +674,10 @@ class _TeacherCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       '${summary.subjectNames.length} ວິຊາ • ${summary.totalResponses} ການປະເມີນ',
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 6),
                     Row(
@@ -766,7 +770,8 @@ class _RatingTag extends StatelessWidget {
         style: TextStyle(
           fontSize: 10,
           fontWeight: FontWeight.w600,
-          color: color,
+          // Amber text on its own 10% tint fails AA; ink for that band.
+          color: color == AppColors.warning ? AppColors.textPrimary : color,
         ),
       ),
     );
@@ -913,18 +918,17 @@ class _TeacherSummaryCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   teacher.teacherCode,
-                  style:
-                      TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     _StarRow(score: avg),
                     const SizedBox(width: 8),
-                    _RatingTag(
-                      label: _EvalScoring.labelFor(avg),
-                      color: color,
-                    ),
+                    _RatingTag(label: _EvalScoring.labelFor(avg), color: color),
                   ],
                 ),
               ],
@@ -1050,8 +1054,9 @@ class _SubjectCard extends StatelessWidget {
             const Divider(height: 1),
             const SizedBox(height: 8),
             _QuestionBreakdown(scores: subject.questionScores),
-            if (subject.evaluationDetails
-                .any((d) => d.comment != null && d.comment!.isNotEmpty)) ...[
+            if (subject.evaluationDetails.any(
+              (d) => d.comment != null && d.comment!.isNotEmpty,
+            )) ...[
               const SizedBox(height: 8),
               const Divider(height: 1),
               const SizedBox(height: 8),
@@ -1223,7 +1228,7 @@ class _QuestionBreakdown extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
-                    color: _EvalScoring.colorFor(entry.value.average),
+                    color: _EvalScoring.textColorFor(entry.value.average),
                   ),
                 ),
                 const Text(
@@ -1255,8 +1260,11 @@ class _CommentsSection extends StatelessWidget {
       children: [
         const Row(
           children: [
-            Icon(Icons.comment_outlined, size: 14,
-                color: AppColors.textSecondary),
+            Icon(
+              Icons.comment_outlined,
+              size: 14,
+              color: AppColors.textSecondary,
+            ),
             SizedBox(width: 4),
             Text(
               'ຄຳເຫັນ (ບໍ່ລະບຸຕົວຕົນ)',
@@ -1294,8 +1302,11 @@ class _CommentTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.format_quote_rounded, size: 14,
-              color: AppColors.textSecondary),
+          Icon(
+            Icons.format_quote_rounded,
+            size: 14,
+            color: AppColors.textSecondary,
+          ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
@@ -1325,17 +1336,24 @@ class _StarRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const amber = Color(0xFFF59E0B);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         for (var i = 0; i < 5; i++)
           if (i < score.floor())
-            const Icon(Icons.star_rounded, size: 16, color: amber)
+            const Icon(Icons.star_rounded, size: 16, color: AppColors.warning)
           else if (i < score)
-            const Icon(Icons.star_half_rounded, size: 16, color: amber)
+            const Icon(
+              Icons.star_half_rounded,
+              size: 16,
+              color: AppColors.warning,
+            )
           else
-            Icon(Icons.star_outline_rounded, size: 16, color: Colors.grey.shade300),
+            Icon(
+              Icons.star_outline_rounded,
+              size: 16,
+              color: Colors.grey.shade300,
+            ),
       ],
     );
   }
@@ -1350,10 +1368,18 @@ abstract class _EvalScoring {
   /// - 2.0+ → amber
   /// - else → red
   static Color colorFor(double s) {
-    if (s >= 4.0) return AppColors.borderApproved;
-    if (s >= 3.0) return const Color(0xFF3B82F6);
-    if (s >= 2.0) return const Color(0xFFF59E0B);
-    return AppColors.rejectRed;
+    if (s >= 4.0) return AppColors.success;
+    if (s >= 3.0) return AppColors.info; // was off-palette #3B82F6
+    if (s >= 2.0) return AppColors.warning; // was raw #F59E0B
+    return AppColors.danger;
+  }
+
+  /// AA-safe foreground for a score used as TEXT on a white / tinted surface.
+  /// Amber (#f59e0b) is ~2:1 on white and fails; the amber band falls back to
+  /// ink. Use this anywhere [colorFor] would be a text color, not a fill/tint.
+  static Color textColorFor(double s) {
+    final c = colorFor(s);
+    return c == AppColors.warning ? AppColors.textPrimary : c;
   }
 
   /// Lao rating label matching [colorFor].
@@ -1425,10 +1451,13 @@ class _WindowStatusCard extends StatelessWidget {
     return Obx(() {
       final current = controller.currentWindow;
       final isOpen = controller.isEvaluationOpen;
-      final accent = isOpen ? AppColors.borderApproved : AppColors.textSecondary;
+      final accent = isOpen
+          ? AppColors.borderApproved
+          : AppColors.textSecondary;
       final statusLabel = isOpen ? 'ເປີດໃຊ້ງານຢູ່' : 'ປິດ';
-      final icon =
-          isOpen ? Icons.lock_open_rounded : Icons.lock_outline_rounded;
+      final icon = isOpen
+          ? Icons.lock_open_rounded
+          : Icons.lock_outline_rounded;
 
       return Container(
         padding: const EdgeInsets.all(18),
@@ -1544,10 +1573,7 @@ class _WindowRow extends StatelessWidget {
         Expanded(
           child: Text(
             value,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textPrimary,
-            ),
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
           ),
         ),
       ],
@@ -1733,16 +1759,13 @@ class _WindowFormDialog extends StatelessWidget {
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1F2937),
+                color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 4),
             const Text(
               'ນັກສຶກສາຈະປະເມີນອາຈານໄດ້ພາຍໃນຊ່ວງເວລານີ້.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 14),
             _WindowTimePicker(
@@ -1822,7 +1845,7 @@ class _WindowTimePicker extends StatelessWidget {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Color(0xFF6B7280),
+            color: AppColors.textSecondary,
           ),
         ),
         const SizedBox(height: 4),
@@ -1856,8 +1879,11 @@ class _WindowTimePicker extends StatelessWidget {
                       ),
                     ),
                   ),
-                  Icon(Icons.chevron_right_rounded,
-                      size: 18, color: AppColors.textSecondary),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
                 ],
               ),
             ),

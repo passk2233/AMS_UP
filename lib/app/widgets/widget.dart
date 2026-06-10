@@ -8,6 +8,7 @@ export 'app_error_state.dart';
 export 'app_empty_state.dart';
 export 'app_bottom_nav.dart';
 export 'app_shell.dart';
+export 'app_avatar.dart';
 export 'noti_bell.dart';
 export 'notification_attachments.dart';
 export 'app_cards.dart';
