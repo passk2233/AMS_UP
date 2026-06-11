@@ -1,24 +1,28 @@
 import 'package:frontend/app/modules/data/data_exporter.dart';
 
-/// A booking occurrence generated from a [StudyPlanModel].
+/// One occurrence of a recurring [StudyPlanModel] slot on a concrete date.
 ///
-/// Study plans are weekly. Each plan expands into one [FixedBooking] per
-/// matching weekday between the active semester's start and end dates. Each
-/// occurrence is persisted as a `room_booking` row with status `approved`;
-/// when the teacher cancels, the same row flips to status `cancelled` and the
-/// cancellation reason is stored in `purpose`.
+/// Study plans are weekly; each plan expands into one [FixedBooking] per
+/// matching weekday between the active semester's start and end dates —
+/// purely client-side, via [expandPlanDates]. Nothing is written to
+/// `room_booking`: the backend's conflict check already treats class slots
+/// as occupied, and a single-date cancellation is a `class_cancellations`
+/// row (carried here as [cancellationId] + [cancelReason]).
 class FixedBooking {
   final StudyPlanModel plan;
   final DateTime date;
   final bool cancelled;
-  final int? bookingId;
+
+  /// `class_cancellations.id` backing [cancelled]; null for active
+  /// occurrences. Needed to restore (DELETE) the cancellation.
+  final int? cancellationId;
   final String? cancelReason;
 
   FixedBooking({
     required this.plan,
     required this.date,
     this.cancelled = false,
-    this.bookingId,
+    this.cancellationId,
     this.cancelReason,
   });
 
@@ -28,45 +32,6 @@ class FixedBooking {
   int get planId => plan.id;
   int get stdGroupId => plan.stdGroupId;
   int get teacherId => plan.teacherId;
-}
-
-/// Sentinel stored in `room_booking.purpose` for a persisted, non-cancelled
-/// study-plan occurrence. Format: `__sp_fixed:<plan_id>`.
-String fixedActivePurpose(int planId) => '__sp_fixed:$planId';
-
-/// Returns the plan id encoded in an active fixed-booking marker, or null.
-int? parseFixedActivePurpose(String? purpose) {
-  if (purpose == null) return null;
-  final m = RegExp(r'^__sp_fixed:(\d+)$').firstMatch(purpose.trim());
-  if (m == null) return null;
-  return int.tryParse(m.group(1) ?? '');
-}
-
-/// Sentinel stored in `room_booking.purpose` once the teacher cancels an
-/// occurrence. Format: `__sp_cancel:<plan_id>|<reason>` (reason optional).
-String fixedCancelPurpose(int planId, [String? reason]) {
-  final r = (reason ?? '').trim();
-  return r.isEmpty ? '__sp_cancel:$planId' : '__sp_cancel:$planId|$r';
-}
-
-/// Returns the plan id encoded in a fixed-cancel purpose marker, or null.
-int? parseFixedCancelPurpose(String? purpose) {
-  if (purpose == null) return null;
-  final m =
-      RegExp(r'^__sp_cancel:(\d+)(?:\|.*)?$').firstMatch(purpose.trim());
-  if (m == null) return null;
-  return int.tryParse(m.group(1) ?? '');
-}
-
-/// Returns the teacher-supplied reason text from a fixed-cancel purpose, or
-/// null when no reason was stored.
-String? parseFixedCancelReason(String? purpose) {
-  if (purpose == null) return null;
-  final m =
-      RegExp(r'^__sp_cancel:\d+\|(.*)$').firstMatch(purpose.trim());
-  if (m == null) return null;
-  final r = (m.group(1) ?? '').trim();
-  return r.isEmpty ? null : r;
 }
 
 int dayOfWeekToWeekday(String? raw) {
@@ -115,6 +80,17 @@ int timeToMinutes(String? value) {
 }
 
 DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+
+/// `booking_date` wire format: RFC3339 at midnight UTC of the chosen calendar
+/// day, e.g. `2026-05-18T00:00:00.000Z`.
+///
+/// Anchoring to UTC midnight of the picked day keeps the date stable across
+/// timezones — calling `.toUtc()` on the picker's local-midnight DateTime
+/// instead would shift it to the *previous* day for any timezone east of UTC.
+String bookingDatePayload(DateTime d) {
+  final dd = dateOnly(d);
+  return DateTime.utc(dd.year, dd.month, dd.day).toIso8601String();
+}
 
 bool sameDate(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;

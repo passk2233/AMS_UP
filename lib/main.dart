@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:frontend/app/modules/student/student_home/bindings/home_student_binding.dart';
 import 'package:frontend/app/routes/app_pages.dart';
 import 'package:frontend/app/widgets/app_colors.dart';
 import 'package:frontend/app/widgets/app_typography.dart';
@@ -26,7 +25,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  // isOptional: a missing/empty .env (fresh clone — copy .env.example) must
+  // not crash boot; the splash screen's backend-reachability check is what
+  // surfaces an unset API_URL to the user.
+  await dotenv.load(fileName: ".env", isOptional: true);
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -135,9 +137,6 @@ class MyApp extends StatelessWidget {
           child: child ?? const SizedBox.shrink(),
         );
       },
-      initialBinding: BindingsBuilder(() {
-        Get.put(HomeStudentBinding());
-      }),
     );
   }
 }

@@ -1,0 +1,32 @@
+/// Barrel file for all admin-only widgets.
+library;
+
+export 'announcement/announcement_form_blocks.dart';
+export 'announcement/attachment_card.dart';
+export 'announcement/compose_card.dart';
+export 'announcement/compose_header.dart';
+export 'announcement/history_header.dart';
+export 'announcement/history_list.dart';
+export 'announcement/history_sort_filter_row.dart';
+export 'announcement/history_tile.dart';
+export 'announcement/individual_search_section.dart';
+export 'announcement/target_audience_card.dart';
+export 'approve/approve_booking_list.dart';
+export 'approve/approve_filter_tabs.dart';
+export 'approve/approve_search_header.dart';
+export 'approve/approve_stats_row.dart';
+export 'approve/bulk_action_bar.dart';
+export 'evalutions/eval_mode_toggle.dart';
+export 'evalutions/eval_question_card.dart';
+export 'evalutions/eval_questions_page.dart';
+export 'evalutions/eval_results_page.dart';
+export 'evalutions/eval_scoring.dart';
+export 'evalutions/eval_subject_card.dart';
+export 'evalutions/eval_teacher_card.dart';
+export 'evalutions/eval_teacher_detail_page.dart';
+export 'evalutions/eval_window_form_dialog.dart';
+export 'evalutions/eval_window_page.dart';
+export 'profile/profile_hero_card.dart';
+export 'profile/profile_info_cards.dart';
+export 'profile/profile_section_card.dart';
+export 'profile/role_list_card.dart';

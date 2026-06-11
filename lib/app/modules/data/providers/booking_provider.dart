@@ -46,6 +46,25 @@ class BookingProvider {
     );
   }
 
+  /// POST `/room-bookings/check-availability` — the backend's authoritative
+  /// pre-flight (spec §6.1): it checks the slot against fixed class schedules
+  /// AND pending/approved bookings. Completes normally when the slot is free;
+  /// throws a [DioException] with `statusCode == 409` when it is taken (the
+  /// response body carries `conflict: "booking" | "class"`).
+  Future<void> checkAvailability({
+    required int roomId,
+    required String bookingDate,
+    required String startTime,
+    required String endTime,
+  }) async {
+    await _dio.post('/room-bookings/check-availability', data: {
+      'room_id': roomId,
+      'booking_date': bookingDate,
+      'start_time': startTime,
+      'end_time': endTime,
+    });
+  }
+
   /// POST `/room-bookings`. `user_id` is intentionally omitted — the backend
   /// derives the booker from the JWT subject. [bookingDate] is sent as the
   /// caller pre-formatted it. Returns the new `booking_id` when the server
@@ -68,26 +87,28 @@ class BookingProvider {
     return (data is Map<String, dynamic>) ? data['booking_id'] as int? : null;
   }
 
+  /// GET `/room-bookings/stats` — whole-table aggregates for the admin
+  /// dashboard (admin-only; 403 otherwise). [date] anchors the rooms-in-use
+  /// count to the caller's calendar day; defaults to the server's today.
+  Future<BookingStatsModel> fetchBookingStats({DateTime? date}) async {
+    final query = <String, dynamic>{};
+    if (date != null) {
+      query['date'] =
+          '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    }
+    final resp =
+        await _dio.get('/room-bookings/stats', queryParameters: query);
+    final data = resp.data;
+    return BookingStatsModel.fromJson(
+        data is Map<String, dynamic> ? data : const {});
+  }
+
   /// Fetch the room catalog.
   Future<List<RoomModel>> fetchRooms({int limit = 100}) async {
     final response = await _dio.get('/rooms', queryParameters: {'limit': limit});
     return _extractList(response.data)
         .map((json) => RoomModel.fromJson(json as Map<String, dynamic>))
         .toList();
-  }
-
-  /// Total number of rooms — prefers the server's `meta.total`, falling back
-  /// to the returned page length.
-  Future<int> countRooms({int limit = 100}) async {
-    final response = await _dio.get('/rooms', queryParameters: {'limit': limit});
-    final raw = response.data;
-    if (raw is Map) {
-      final metaTotal = raw['meta']?['total'] as int?;
-      if (metaTotal != null && metaTotal > 0) return metaTotal;
-      if (raw['data'] is List) return (raw['data'] as List).length;
-    }
-    if (raw is List) return raw.length;
-    return 0;
   }
 
   /// Unwrap either a bare JSON array or a `{ "data": [...] }` envelope into a

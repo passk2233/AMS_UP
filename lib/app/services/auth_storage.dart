@@ -20,9 +20,9 @@ class AuthStorage {
   static const _kRememberUntil = 'remember_until';
   static const _kRolesSeparator = '|';
 
-  static final FlutterSecureStorage _secure = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  // No AndroidOptions: `encryptedSharedPreferences` is deprecated (ignored,
+  // removed in v11) — the plugin migrates existing data to its own ciphers.
+  static final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
   /// Read the JWT, migrating from legacy [SharedPreferences] if necessary.
   /// Returns `null` when no token is stored.

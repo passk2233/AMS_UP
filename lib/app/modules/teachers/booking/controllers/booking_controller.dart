@@ -33,6 +33,8 @@ class BookingController extends GetxController {
   final RxList<RoomBookingModel> _allBookings = <RoomBookingModel>[].obs;
   final RxList<StudyPlanModel> studyPlans = <StudyPlanModel>[].obs;
   final RxList<FixedBooking> fixedBookings = <FixedBooking>[].obs;
+  final RxList<ClassCancellationModel> classCancellations =
+      <ClassCancellationModel>[].obs;
 
   /// UI filter for `myBookings`. One of: all | upcoming | pending | approved
   /// | cancelled | past.
@@ -44,28 +46,6 @@ class BookingController extends GetxController {
 
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
-
-  /// Re-entrancy guard for [_ensureFixedBookingsPersisted]. Prevents two
-  /// concurrent refreshes from racing and creating duplicate marker rows.
-  bool _persisting = false;
-
-  /// Diagnostic snapshot of the last [_ensureFixedBookingsPersisted] run.
-  /// Surfaced by the booking view's diagnostic banner so a teacher (or the
-  /// developer) can see *why* no fixed bookings appeared, instead of staring
-  /// at an empty list and a silent debug log.
-  ///
-  /// `persistBailReason` is a short human-readable label for the early-return
-  /// path that aborted persist (e.g. 'no active semester', 'no teacher id').
-  /// Empty when persist ran the full loop.
-  final RxString persistBailReason = ''.obs;
-  final RxString persistLastError = ''.obs;
-  final RxInt persistPlansConsidered = 0.obs;
-  final RxInt persistPlansForMe = 0.obs;
-  final RxInt persistPlansComplete = 0.obs;
-  final RxInt persistSlotsSkippedExisting = 0.obs;
-  final RxInt persistSlotsSkippedTaken = 0.obs;
-  final RxInt persistRowsCreated = 0.obs;
-  final RxInt persistMarkerRowsInDb = 0.obs;
 
   @override
   void onInit() {
@@ -91,20 +71,8 @@ class BookingController extends GetxController {
       await _reloadBookings();
 
       await _loadStudyPlans();
-      await _ensureFixedBookingsPersisted();
+      await _loadClassCancellations();
       _rebuildFixedBookings();
-
-      // Make persist failures visible. Initial-load dialog fires only when
-      // persist actually attempted a POST and got a backend error — quiet
-      // for happy-path loads where everything was already persisted.
-      if (persistLastError.value.isNotEmpty &&
-          persistRowsCreated.value == 0) {
-        AppDialogs.showError(
-          title: 'ບໍ່ສາມາດສ້າງຄາບການຮຽນ',
-          message: 'API ປະຕິເສດການສ້າງຄາບປະຈຳ. ກວດສອບ backend logs.',
-          detail: persistLastError.value,
-        );
-      }
     } on DioException catch (e) {
       debugPrint('Booking Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
@@ -240,231 +208,77 @@ class BookingController extends GetxController {
   }
 
   /// Reload `/room-bookings` into [_allBookings] and rebuild [myBookings].
-  /// Fixed-booking marker rows (both active and cancelled) are excluded from
-  /// the teacher's "my bookings" list — they live in the fixed section above.
   Future<void> _reloadBookings() async {
     final user = currentUser.value;
     if (user == null) return;
     final all = await _booking.fetchBookings(limit: 500);
     _allBookings.assignAll(all);
 
-    final mine = all
-        .where((b) =>
-            b.userId == user.id &&
-            parseFixedCancelPurpose(b.purpose) == null &&
-            parseFixedActivePurpose(b.purpose) == null)
-        .toList()
+    final mine = all.where((b) => b.userId == user.id).toList()
       ..sort((a, b) => b.bookingDate.compareTo(a.bookingDate));
     myBookings.assignAll(mine);
   }
 
-  /// Persist any study-plan occurrence that does not yet have a corresponding
-  /// `room_booking` row. Each new row is created with the active marker
-  /// purpose and PATCHed to status `approved`. Existing rows (active or
-  /// cancelled) are left untouched.
-  ///
-  /// Guarded against concurrent invocations via [_persisting] — a second
-  /// refresh while the first persist is still in flight is a no-op so we
-  /// never double-create the same marker row.
-  Future<void> _ensureFixedBookingsPersisted() async {
-    if (_persisting) return;
-
-    persistBailReason.value = '';
-    persistLastError.value = '';
-    persistPlansConsidered.value = 0;
-    persistPlansForMe.value = 0;
-    persistPlansComplete.value = 0;
-    persistSlotsSkippedExisting.value = 0;
-    persistSlotsSkippedTaken.value = 0;
-    persistRowsCreated.value = 0;
-    persistMarkerRowsInDb.value = 0;
-
-    final sem = activeSemester.value;
-    final user = currentUser.value;
-    if (user == null) {
-      persistBailReason.value = 'ບໍ່ມີຜູ້ໃຊ້ (no current user)';
-      return;
-    }
-    if (sem == null) {
-      persistBailReason.value = 'ບໍ່ມີພາກຮຽນກຳລັງດຳເນີນ (no active semester)';
-      return;
-    }
-    if (sem.startDate == null || sem.endDate == null) {
-      persistBailReason.value =
-          'ພາກຮຽນບໍ່ມີວັນທີເລີ່ມ/ສິ້ນສຸດ (semester missing start/end date)';
-      return;
-    }
-    final teacherId = user.teacherId;
-    if (teacherId == null) {
-      persistBailReason.value =
-          'ບັນຊີນີ້ບໍ່ມີ teacher_id (user is not a teacher)';
-      return;
-    }
-
-    _persisting = true;
+  /// Load the single-date study-plan exceptions for the semester window.
+  /// These drive both the struck-out occurrences in the fixed list and the
+  /// "cancelled class frees its room" rule in [conflictReason].
+  Future<void> _loadClassCancellations() async {
     try {
-      final existing = <int, Set<String>>{};
-      var markerRows = 0;
-      for (final b in _allBookings) {
-        final pid = parseFixedActivePurpose(b.purpose) ??
-            parseFixedCancelPurpose(b.purpose);
-        if (pid == null) continue;
-        markerRows++;
-        existing
-            .putIfAbsent(pid, () => <String>{})
-            .add(_dateKey(b.bookingDate.toLocal()));
-      }
-      persistMarkerRowsInDb.value = markerRows;
-      persistPlansConsidered.value = studyPlans.length;
-
-      var plansForMe = 0;
-      var plansComplete = 0;
-      var skippedExisting = 0;
-      var skippedTaken = 0;
-      final today = dateOnly(DateTime.now());
-      var created = 0;
-      for (final p in studyPlans) {
-        if (p.teacherId != teacherId) continue;
-        plansForMe++;
-        if (p.roomId == null || p.startTime == null || p.endTime == null) {
-          continue;
-        }
-        plansComplete++;
-        final dates = expandPlanDates(p, sem.startDate!, sem.endDate!);
-        for (final d in dates) {
-          if (d.isBefore(today.subtract(const Duration(days: 1)))) continue;
-          final key = _dateKey(d);
-          if (existing[p.id]?.contains(key) ?? false) {
-            skippedExisting++;
-            continue;
-          }
-
-          // Skip when another non-marker booking already occupies this slot.
-          // Without this guard a teacher who manually pre-booked the room for
-          // their class would end up with two rows for the same period.
-          final slotTaken = _allBookings.any((b) {
-            if (b.roomId != p.roomId) return false;
-            if (!sameDate(b.bookingDate.toLocal(), d)) return false;
-            if (parseFixedActivePurpose(b.purpose) != null) return false;
-            if (parseFixedCancelPurpose(b.purpose) != null) return false;
-            final s = b.status.toLowerCase();
-            if (s != 'approved' && s != 'pending') return false;
-            return timeRangesOverlap(
-                p.startTime ?? '', p.endTime ?? '', b.startTime, b.endTime);
-          });
-          if (slotTaken) {
-            skippedTaken++;
-            continue;
-          }
-
-          try {
-            // user_id intentionally omitted — backend derives from JWT.
-            final newId = await _booking.createBooking(
-              roomId: p.roomId!,
-              bookingDate: _bookingDatePayload(d),
-              startTime: p.startTime!,
-              endTime: p.endTime!,
-              purpose: fixedActivePurpose(p.id),
-            );
-            if (newId != null) {
-              try {
-                await _booking.updateStatus(newId, 'approved');
-              } catch (_) {
-                // Status PATCH may be rejected; row will surface as 'pending'.
-              }
-            }
-            // Remember the date locally so a follow-up plan iteration in this
-            // same persist pass doesn't try to recreate it.
-            existing.putIfAbsent(p.id, () => <String>{}).add(key);
-            created++;
-          } on DioException catch (e) {
-            // Capture the FIRST error with full detail so the diagnostic
-            // banner / dialog can show the backend's actual rejection
-            // (status code + response body) — silent debugPrint is invisible
-            // unless you happen to be running flutter run.
-            if (persistLastError.value.isEmpty) {
-              persistLastError.value =
-                  'POST /room-bookings ${e.response?.statusCode ?? '?'} '
-                  '(plan ${p.id} $key): '
-                  '${e.response?.data ?? e.message ?? e}';
-            }
-            debugPrint(
-              'Persist fixed booking Dio error (plan ${p.id} $key) '
-              'status=${e.response?.statusCode} body=${e.response?.data}',
-            );
-          } catch (e) {
-            if (persistLastError.value.isEmpty) {
-              persistLastError.value =
-                  'POST /room-bookings (plan ${p.id} $key): $e';
-            }
-            debugPrint('Persist fixed booking error (plan ${p.id} $key): $e');
-          }
-        }
-      }
-      persistPlansForMe.value = plansForMe;
-      persistPlansComplete.value = plansComplete;
-      persistSlotsSkippedExisting.value = skippedExisting;
-      persistSlotsSkippedTaken.value = skippedTaken;
-      persistRowsCreated.value = created;
-      if (created > 0) {
-        await _reloadBookings();
-        // Refresh marker count from the post-create state.
-        var refreshedMarkers = 0;
-        for (final b in _allBookings) {
-          if (parseFixedActivePurpose(b.purpose) != null ||
-              parseFixedCancelPurpose(b.purpose) != null) {
-            refreshedMarkers++;
-          }
-        }
-        persistMarkerRowsInDb.value = refreshedMarkers;
-      }
-    } finally {
-      _persisting = false;
+      final sem = activeSemester.value;
+      classCancellations.assignAll(await _academic.fetchClassCancellations(
+        from: sem?.startDate,
+        to: sem?.endDate,
+      ));
+    } catch (e) {
+      debugPrint('Class cancellations load error: $e');
     }
   }
 
-  /// Builds [fixedBookings] from `room_booking` rows that carry a study-plan
-  /// marker. Both active (`__sp_fixed:<plan_id>`) and cancelled
-  /// (`__sp_cancel:<plan_id>`) markers are surfaced — the latter are flagged
-  /// `cancelled: true` so the teacher can review (and restore) what they
-  /// previously cancelled. Rows older than yesterday are dropped.
+  /// The cancellation row covering plan [planId] on [date], or null when the
+  /// occurrence runs as scheduled.
+  ClassCancellationModel? _cancellationFor(int planId, DateTime date) {
+    for (final cc in classCancellations) {
+      if (cc.studyPlanId == planId && sameDate(cc.cancelDate, date)) {
+        return cc;
+      }
+    }
+    return null;
+  }
+
+  /// Builds [fixedBookings] by expanding the teacher's own study plans into
+  /// weekly occurrences across the active semester — entirely client-side,
+  /// no `room_booking` rows involved. Occurrences with a matching
+  /// [classCancellations] row are flagged `cancelled` (struck out in the UI,
+  /// restorable via its row id). Dates older than yesterday are dropped.
   void _rebuildFixedBookings() {
-    final plansById = <int, StudyPlanModel>{
-      for (final p in studyPlans) p.id: p,
-    };
+    final sem = activeSemester.value;
+    final teacherId = currentUser.value?.teacherId;
+    if (sem == null ||
+        sem.startDate == null ||
+        sem.endDate == null ||
+        teacherId == null) {
+      fixedBookings.clear();
+      return;
+    }
+
     final today = dateOnly(DateTime.now());
     final out = <FixedBooking>[];
-    final seen = <String>{}; // de-dup on plan|date
-    for (final b in _allBookings) {
-      final activePid = parseFixedActivePurpose(b.purpose);
-      final cancelPid = parseFixedCancelPurpose(b.purpose);
-      final pid = activePid ?? cancelPid;
-      if (pid == null) continue;
-      final plan = plansById[pid];
-      if (plan == null) continue;
-      if (plan.roomId == null ||
-          plan.startTime == null ||
-          plan.endTime == null) {
+    for (final p in studyPlans) {
+      if (p.teacherId != teacherId) continue;
+      if (p.roomId == null || p.startTime == null || p.endTime == null) {
         continue;
       }
-      final d = dateOnly(b.bookingDate.toLocal());
-      if (d.isBefore(today.subtract(const Duration(days: 1)))) continue;
-
-      final dupKey = '$pid|${_dateKey(d)}';
-      if (!seen.add(dupKey)) continue;
-
-      final status = b.status.toLowerCase();
-      final cancelled = cancelPid != null ||
-          status == 'cancelled' ||
-          status == 'rejected';
-
-      out.add(FixedBooking(
-        plan: plan,
-        date: d,
-        cancelled: cancelled,
-        bookingId: b.bookingId,
-        cancelReason: cancelled ? parseFixedCancelReason(b.purpose) : null,
-      ));
+      for (final d in expandPlanDates(p, sem.startDate!, sem.endDate!)) {
+        if (d.isBefore(today.subtract(const Duration(days: 1)))) continue;
+        final cc = _cancellationFor(p.id, d);
+        out.add(FixedBooking(
+          plan: p,
+          date: d,
+          cancelled: cc != null,
+          cancellationId: cc?.id,
+          cancelReason: cc?.reason,
+        ));
+      }
     }
     out.sort((a, b) {
       final c = a.date.compareTo(b.date);
@@ -504,31 +318,17 @@ class BookingController extends GetxController {
           startTime, endTime, p.startTime ?? '', p.endTime ?? '')) {
         continue;
       }
-      // A plan occurrence is treated as "freed" when its backing
-      // room_booking row exists with status=cancelled (or rejected).
-      // We used to look for an explicit `__sp_cancel:<pid>` purpose
-      // marker, but the backend has no partial-update endpoint for
-      // purpose, so cancellation now flips status alone — the marker
-      // stays `__sp_fixed:<pid>`.
-      final cancelled = _allBookings.any((b) {
-        final pid = parseFixedActivePurpose(b.purpose) ??
-            parseFixedCancelPurpose(b.purpose);
-        if (pid != p.id) return false;
-        if (!sameDate(b.bookingDate.toLocal(), date)) return false;
-        final s = b.status.toLowerCase();
-        return s == 'cancelled' || s == 'rejected';
-      });
-      if (!cancelled) {
-        final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
-        final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
-        return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
-      }
+      // A class occurrence cancelled for this date (class_cancellations row)
+      // does not occupy the room — same rule as the backend's check.
+      if (_cancellationFor(p.id, date) != null) continue;
+      final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
+      final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
+      return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
     }
 
     for (final b in _allBookings) {
       if (b.roomId != roomId) continue;
       if (!sameDate(b.bookingDate.toLocal(), date)) continue;
-      if (parseFixedCancelPurpose(b.purpose) != null) continue;
       final s = b.status.toLowerCase();
       if (s != 'pending' && s != 'approved') continue;
       if (!timeRangesOverlap(startTime, endTime, b.startTime, b.endTime)) {
@@ -602,24 +402,22 @@ class BookingController extends GetxController {
         return;
       }
 
-      final clash = conflictReason(
+      // Spec §6.1: the backend is the authority on slot conflicts — probe
+      // check-availability first; a 409 lands in the catch below. The create
+      // itself re-checks under a room lock, covering the probe→create race.
+      // (The local conflictReason stays for the sheet's live room filter.)
+      final datePayload = bookingDatePayload(bookingDate);
+      await _booking.checkAvailability(
         roomId: roomId,
-        bookingDate: bookingDate,
+        bookingDate: datePayload,
         startTime: startTime,
         endTime: endTime,
       );
-      if (clash != null) {
-        AppDialogs.showWarning(
-          title: 'ຫ້ອງບໍ່ວ່າງ',
-          message: clash,
-        );
-        return;
-      }
 
       // user_id intentionally omitted — backend derives from JWT.
       await _booking.createBooking(
         roomId: roomId,
-        bookingDate: _bookingDatePayload(bookingDate),
+        bookingDate: datePayload,
         startTime: startTime,
         endTime: endTime,
         purpose: purpose,
@@ -630,6 +428,21 @@ class BookingController extends GetxController {
       );
       await fetchData();
     } on DioException catch (e) {
+      // 409 = the backend's conflict check rejected the slot. The body's
+      // `conflict` field says what it clashed with: "class" = the room's
+      // fixed class schedule, anything else = another booking.
+      if (e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        final clashesClass = data is Map && data['conflict'] == 'class';
+        AppDialogs.showWarning(
+          title: 'ຫ້ອງບໍ່ວ່າງ',
+          message: clashesClass
+              ? 'ຊ່ວງເວລານີ້ກົງກັບຕາຕະລາງຮຽນປະຈຳຂອງຫ້ອງ ກະລຸນາເລືອກເວລາອື່ນ'
+              : 'ຫ້ອງຖືກຈອງໄປແລ້ວໃນຊ່ວງເວລານີ້ ກະລຸນາເລືອກເວລາອື່ນ',
+        );
+        await fetchData();
+        return;
+      }
       final detail = AppDialogs.buildDioErrorDetail(e);
       AppDialogs.showError(
         title: 'ສົ່ງຄຳຂໍບໍ່ສຳເລັດ',
@@ -687,61 +500,11 @@ class BookingController extends GetxController {
     }
   }
 
-  /// Locates an already-persisted `room_booking` row that backs the given
-  /// study-plan occurrence. Resolution order, strongest match first:
-  ///   1. Marker rows that already point at `fb.planId` (active or cancel).
-  ///   2. Exact room + date + start + end time match (non-cancelled).
-  ///   3. Room + date + time-overlap with the plan slot (non-cancelled).
-  ///
-  /// Rows that share only room + date but no time relation are deliberately
-  /// **not** matched — that would risk cancelling an unrelated booking when
-  /// two different reservations exist on the same room/day.
-  int? _findExistingFixedBookingId(FixedBooking fb) {
-    final fbStart = timeToMinutes(fb.startTime);
-    final fbEnd = timeToMinutes(fb.endTime);
-    int? markerId;
-    int? exactId;
-    int? overlapId;
-    for (final b in _allBookings) {
-      if (b.roomId != fb.roomId) continue;
-      if (!sameDate(b.bookingDate.toLocal(), fb.date)) continue;
-
-      final markerPid = parseFixedActivePurpose(b.purpose) ??
-          parseFixedCancelPurpose(b.purpose);
-      if (markerPid == fb.planId) {
-        markerId ??= b.bookingId;
-        continue;
-      }
-      if (markerPid != null) continue; // marker for a different plan — skip
-
-      final s = b.status.toLowerCase();
-      if (s == 'cancelled' || s == 'rejected') continue;
-
-      final bStart = timeToMinutes(b.startTime);
-      final bEnd = timeToMinutes(b.endTime);
-      if (exactId == null && bStart == fbStart && bEnd == fbEnd) {
-        exactId = b.bookingId;
-      } else if (overlapId == null &&
-          timeRangesOverlap(fb.startTime, fb.endTime, b.startTime, b.endTime)) {
-        overlapId = b.bookingId;
-      }
-    }
-    final found = markerId ?? exactId ?? overlapId;
-    if (found == null) {
-      debugPrint(
-        'fixed booking lookup: no backing row for plan=${fb.planId} '
-        'room=${fb.roomId} date=${fb.date.toIso8601String()} '
-        'time=${fb.startTime}-${fb.endTime}. '
-        '_allBookings.length=${_allBookings.length}',
-      );
-    }
-    return found;
-  }
-
-  /// Cancel a single occurrence of a study-plan-based fixed booking on
-  /// [fb.date]. Updates the existing `room_booking` row's `purpose` with the
-  /// cancellation reason and flips its status from `approved` to `cancelled`.
-  /// Notifies every student in the affected student_group with [reason].
+  /// Cancel a single occurrence of the teacher's fixed class schedule on
+  /// [fb.date] via POST /class-cancellations. The backend enforces that only
+  /// the plan's own teacher (or an admin) may do this; the guard here just
+  /// gives instant feedback. Notifies every student in the affected
+  /// student_group with [reason].
   Future<void> cancelFixedBooking(FixedBooking fb, {String? reason}) async {
     final user = currentUser.value;
     if (user == null) return;
@@ -771,23 +534,11 @@ class BookingController extends GetxController {
     try {
       isLoading.value = true;
 
-      await _reloadBookings();
-      var bookingId = fb.bookingId ?? _findExistingFixedBookingId(fb);
-      if (bookingId == null) {
-        AppDialogs.showWarning(
-          title: 'ບໍ່ພົບການຈອງ',
-          message: 'ບໍ່ພົບຂໍ້ມູນການຈອງສຳລັບຄາບນີ້',
-        );
-        return;
-      }
-
-      // Backend only exposes PATCH /room-bookings/:id/status — there is no
-      // partial-update endpoint for `purpose`. We rely on status alone to
-      // signal cancellation; `_rebuildFixedBookings` already treats a row
-      // with status='cancelled' as cancelled regardless of its purpose
-      // marker. The teacher-supplied reason rides along in the student
-      // notification body below, which is where students actually see it.
-      await _booking.updateStatus(bookingId, 'cancelled');
+      await _academic.cancelClassOccurrence(
+        studyPlanId: fb.planId,
+        date: fb.date,
+        reason: trimmed,
+      );
 
       await _notifyGroupOfCancellation(fb, trimmed);
 
@@ -807,9 +558,8 @@ class BookingController extends GetxController {
     }
   }
 
-  /// Reverse a previously-cancelled fixed booking back to active. Flips the
-  /// row's purpose to the active marker and its status back to `approved`.
-  /// Owner-only.
+  /// Restore a previously-cancelled class occurrence by deleting its
+  /// class_cancellations row. Owner-only (backend-enforced).
   Future<void> restoreFixedBooking(FixedBooking fb) async {
     final user = currentUser.value;
     if (user == null) return;
@@ -841,20 +591,15 @@ class BookingController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _reloadBookings();
-      final bookingId = fb.bookingId ?? _findExistingFixedBookingId(fb);
-      if (bookingId == null) {
+      final ccId = fb.cancellationId;
+      if (ccId == null) {
         AppDialogs.showWarning(
-          title: 'ບໍ່ພົບການຈອງ',
-          message: 'ບໍ່ພົບຂໍ້ມູນການຈອງສຳລັບຄາບນີ້',
+          title: 'ບໍ່ພົບຂໍ້ມູນ',
+          message: 'ບໍ່ພົບລາຍການຍົກເລີກສຳລັບຄາບນີ້',
         );
         return;
       }
-      // Backend has no PATCH /room-bookings/:id for partial purpose update.
-      // The original row keeps its `__sp_fixed:<plan_id>` marker through the
-      // cancel→restore cycle (we never overwrite it), so flipping status
-      // back to `approved` is sufficient to restore the occurrence.
-      await _booking.updateStatus(bookingId, 'approved');
+      await _academic.restoreClassOccurrence(ccId);
       AppDialogs.showSuccess(
         title: 'ກູ້ຄືນສຳເລັດ',
         message: 'ຄາບການຮຽນຖືກກູ້ຄືນແລ້ວ',
@@ -871,34 +616,17 @@ class BookingController extends GetxController {
     }
   }
 
-  /// Re-runs the fixed-booking sync pipeline: semester → study plans →
-  /// persist → reload → rebuild. Bound to the diagnostic banner's "retry"
-  /// button so the teacher can re-try without a full app refresh.
+  /// Re-fetches the fixed-schedule inputs (semester → study plans →
+  /// cancellations) and rebuilds the list. Bound to the empty-state banner's
+  /// "retry" button so the teacher can re-try without a full app refresh.
   Future<void> resyncFixedBookings() async {
     try {
       isLoading.value = true;
       await _loadActiveSemester();
       await _loadStudyPlans();
-      await _reloadBookings();
-      await _ensureFixedBookingsPersisted();
+      await _loadClassCancellations();
       _rebuildFixedBookings();
-      if (persistRowsCreated.value > 0) {
-        AppDialogs.showSuccess(
-          title: 'ດຶງຂໍ້ມູນສຳເລັດ',
-          message: 'ສ້າງຄາບໃໝ່ ${persistRowsCreated.value} ລາຍການ',
-        );
-      } else if (persistBailReason.value.isNotEmpty) {
-        AppDialogs.showWarning(
-          title: 'ບໍ່ສາມາດສ້າງຄາບໄດ້',
-          message: persistBailReason.value,
-        );
-      } else if (persistLastError.value.isNotEmpty) {
-        AppDialogs.showError(
-          title: 'ບໍ່ສາມາດສ້າງຄາບໄດ້',
-          message: 'ມີຂໍ້ຜິດພາດຈາກ server',
-          detail: persistLastError.value,
-        );
-      } else if (fixedBookings.isEmpty) {
+      if (fixedBookings.isEmpty) {
         AppDialogs.showWarning(
           title: 'ບໍ່ມີຄາບການຮຽນ',
           message: 'ບໍ່ມີ study_plan ສຳລັບອາຈານໃນພາກຮຽນນີ້',
@@ -962,23 +690,4 @@ class BookingController extends GetxController {
 
     return toMin(start.trim()) < toMin(end.trim());
   }
-
-  /// Date-only string `YYYY-MM-DD` for *internal* de-dup keys — do NOT send
-  /// this to the backend. Use [_bookingDatePayload] for API payloads.
-  static String _dateKey(DateTime d) {
-    final dd = dateOnly(d);
-    return '${dd.year}-${dd.month.toString().padLeft(2, '0')}-${dd.day.toString().padLeft(2, '0')}';
-  }
-
-  /// RFC3339 representation of the chosen calendar date at midnight UTC:
-  /// e.g. `2026-05-18T00:00:00.000Z`. The Go backend parses booking_date
-  /// with layout `2006-01-02T15:04:05Z07:00`, which rejects a bare
-  /// `YYYY-MM-DD` (`cannot parse "" as "T"`). Anchoring to UTC midnight
-  /// keeps the date stable across timezones — converting back via
-  /// `.toLocal()` lands on the same calendar day everywhere east of GMT.
-  static String _bookingDatePayload(DateTime d) {
-    final dd = dateOnly(d);
-    return DateTime.utc(dd.year, dd.month, dd.day).toIso8601String();
-  }
-
 }

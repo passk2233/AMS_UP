@@ -166,8 +166,8 @@ class EvaluationProvider {
     String? comment,
   }) async {
     await _dio.put('/evaluation-results/$id', data: {
-      if (score != null) 'score': score,
-      if (comment != null) 'comment': comment,
+      'score': ?score,
+      'comment': ?comment,
     });
   }
 

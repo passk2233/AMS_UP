@@ -1,3 +1,4 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get/get.dart';
 import 'package:frontend/app/modules/data/data_exporter.dart';
@@ -54,6 +55,12 @@ EnrollmentModel _enroll({
 }
 
 void main() {
+  // ScoreController's constructor builds providers on ApiClient.dio, which
+  // reads API_URL from dotenv — seed it so construction works off-device.
+  setUpAll(() {
+    dotenv.loadFromString(envString: 'API_URL=http://localhost');
+  });
+
   // Data taken verbatim from the official transcript of 225Q007022
   // (ທ້າວ ເພັດສະໝອນ ສີສົມຫວັງ):
   //   ເທີມ 1 ສົກສຶກສາ 2022 - 2023 → 18 ໜ່ວຍກິດ, GPA 3.00

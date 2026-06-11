@@ -26,6 +26,8 @@ class BookingStudentController extends GetxController {
   final RxList<RoomBookingModel> myBookings = <RoomBookingModel>[].obs;
   final RxList<RoomBookingModel> _allBookings = <RoomBookingModel>[].obs;
   final RxList<StudyPlanModel> studyPlans = <StudyPlanModel>[].obs;
+  final RxList<ClassCancellationModel> _classCancellations =
+      <ClassCancellationModel>[].obs;
 
   /// UI filter for `myBookings`. One of: all | upcoming | pending | approved
   /// | cancelled | past.
@@ -58,14 +60,12 @@ class BookingStudentController extends GetxController {
       final all = await _booking.fetchBookings(limit: 500);
       _allBookings.assignAll(all);
 
-      final mine = all
-          .where((b) =>
-              b.userId == user.id && parseFixedCancelPurpose(b.purpose) == null)
-          .toList()
+      final mine = all.where((b) => b.userId == user.id).toList()
         ..sort((a, b) => b.bookingDate.compareTo(a.bookingDate));
       myBookings.assignAll(mine);
 
       await _loadStudyPlans();
+      await _loadClassCancellations();
     } on DioException catch (e) {
       debugPrint('Booking Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
@@ -139,6 +139,18 @@ class BookingStudentController extends GetxController {
     } catch (_) {}
   }
 
+  /// Single-date study-plan exceptions: a cancelled class occurrence frees
+  /// its room for that day in [conflictReason], mirroring the backend rule.
+  Future<void> _loadClassCancellations() async {
+    try {
+      final sem = activeSemester.value;
+      _classCancellations.assignAll(await _academic.fetchClassCancellations(
+        from: sem?.startDate,
+        to: sem?.endDate,
+      ));
+    } catch (_) {}
+  }
+
   /// Returns a human-readable reason if [bookingDate] + [startTime] is in the
   /// past; null when the slot is in the future.
   String? pastSlotReason(DateTime bookingDate, String startTime) {
@@ -166,17 +178,10 @@ class BookingStudentController extends GetxController {
           startTime, endTime, p.startTime ?? '', p.endTime ?? '')) {
         continue;
       }
-      // Cancellation is signaled by status=cancelled on the marker row;
-      // backend has no partial-update endpoint for purpose, so the
-      // `__sp_fixed:<pid>` marker stays in place through cancel.
-      final cancelled = _allBookings.any((b) {
-        final pid = parseFixedActivePurpose(b.purpose) ??
-            parseFixedCancelPurpose(b.purpose);
-        if (pid != p.id) return false;
-        if (!sameDate(b.bookingDate, date)) return false;
-        final s = b.status.toLowerCase();
-        return s == 'cancelled' || s == 'rejected';
-      });
+      // A class occurrence cancelled for this date (class_cancellations row)
+      // does not occupy the room — same rule as the backend's check.
+      final cancelled = _classCancellations.any(
+          (cc) => cc.studyPlanId == p.id && sameDate(cc.cancelDate, date));
       if (!cancelled) {
         final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
         final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
@@ -186,7 +191,6 @@ class BookingStudentController extends GetxController {
     for (final b in _allBookings) {
       if (b.roomId != roomId) continue;
       if (!sameDate(b.bookingDate, date)) continue;
-      if (parseFixedCancelPurpose(b.purpose) != null) continue;
       final s = b.status.toLowerCase();
       if (s != 'pending' && s != 'approved') continue;
       if (!timeRangesOverlap(startTime, endTime, b.startTime, b.endTime)) {
@@ -260,26 +264,24 @@ class BookingStudentController extends GetxController {
         return;
       }
 
-      final clash = conflictReason(
+      // Spec §6.1: the backend is the authority on slot conflicts — probe
+      // check-availability first; a 409 lands in the catch below. The create
+      // itself re-checks under a room lock, covering the probe→create race.
+      // (The local conflictReason stays for the sheet's live room filter.)
+      final datePayload = bookingDatePayload(bookingDate);
+      await _booking.checkAvailability(
         roomId: roomId,
-        bookingDate: bookingDate,
+        bookingDate: datePayload,
         startTime: startTime,
         endTime: endTime,
       );
-      if (clash != null) {
-        AppDialogs.showWarning(
-          title: 'ຫ້ອງບໍ່ວ່າງ',
-          message: clash,
-        );
-        return;
-      }
 
       // Note: user_id is NOT sent — the backend derives the booker from the
       // JWT subject. Trusting a client-provided user_id would let any
       // logged-in user book on behalf of someone else.
       await _booking.createBooking(
         roomId: roomId,
-        bookingDate: bookingDate.toUtc().toIso8601String(),
+        bookingDate: datePayload,
         startTime: startTime,
         endTime: endTime,
         purpose: purpose,
@@ -290,6 +292,21 @@ class BookingStudentController extends GetxController {
       );
       await fetchData();
     } on DioException catch (e) {
+      // 409 = the backend's conflict check rejected the slot. The body's
+      // `conflict` field says what it clashed with: "class" = the room's
+      // fixed class schedule, anything else = another booking.
+      if (e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        final clashesClass = data is Map && data['conflict'] == 'class';
+        AppDialogs.showWarning(
+          title: 'ຫ້ອງບໍ່ວ່າງ',
+          message: clashesClass
+              ? 'ຊ່ວງເວລານີ້ກົງກັບຕາຕະລາງຮຽນປະຈຳຂອງຫ້ອງ ກະລຸນາເລືອກເວລາອື່ນ'
+              : 'ຫ້ອງຖືກຈອງໄປແລ້ວໃນຊ່ວງເວລານີ້ ກະລຸນາເລືອກເວລາອື່ນ',
+        );
+        await fetchData();
+        return;
+      }
       final detail = AppDialogs.buildDioErrorDetail(e);
       AppDialogs.showError(
         title: 'ສົ່ງຄຳຂໍບໍ່ສຳເລັດ',
