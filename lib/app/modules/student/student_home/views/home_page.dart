@@ -39,10 +39,7 @@ class HomePage extends GetView<HomePageController> {
               AppGreetingHeader(
                 greeting: "ສະບາຍດີ, ${controller.displayName} 👋",
                 subtitle: controller.currentDate,
-                trailing: AppIconBubble(
-                  icon: Icons.notifications_none_rounded,
-                  onTap: () => Get.toNamed('/student-noti'),
-                ),
+                trailing: const NotiBellButton(route: '/student-noti'),
               ),
               const SizedBox(height: 25),
               AppStatsBanner(

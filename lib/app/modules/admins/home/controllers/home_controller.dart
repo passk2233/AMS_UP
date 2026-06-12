@@ -2,19 +2,28 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
-import '../../../data/models/room_booking_model.dart';
-import '../../../data/models/semaster_model.dart';
-import '../../../data/models/user_model.dart';
+import '../../../data/data_exporter.dart';
 
 /// Reactive state owner for [AdminHomeView].
 ///
 /// On init, fans out four parallel requests (current user, bookings, active
-/// semester, room-usage %) and aggregates them into observables. Exposes
+/// semester, booking stats) and aggregates them into observables. Exposes
 /// approve / reject mutations that update local state optimistically and
 /// reconcile via the backend response.
 class AdminHomeController extends GetxController {
+  AdminHomeController({
+    AuthProvider? auth,
+    BookingProvider? booking,
+    AcademicProvider? academic,
+  })  : _auth = auth ?? AuthProvider(),
+        _booking = booking ?? BookingProvider(),
+        _academic = academic ?? AcademicProvider();
+
+  final AuthProvider _auth;
+  final BookingProvider _booking;
+  final AcademicProvider _academic;
+
   /// Currently signed-in admin user.
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
 
@@ -27,10 +36,10 @@ class AdminHomeController extends GetxController {
   /// Last user-facing error message, empty when there is no error.
   final RxString errorMessage = ''.obs;
 
-  /// Count of `pending` bookings in [bookings].
+  /// Whole-table count of `pending` bookings (server-side aggregate).
   final RxInt pendingCount = 0.obs;
 
-  /// Count of `approved` bookings in [bookings].
+  /// Whole-table count of `approved` bookings (server-side aggregate).
   final RxInt approvedCount = 0.obs;
 
   /// Percentage of rooms with at least one approved booking today.
@@ -41,8 +50,6 @@ class AdminHomeController extends GetxController {
 
   /// Lao-formatted today's date (e.g. `ວັນຈັນ, ມັງກອນ 5`).
   final RxString todayDate = ''.obs;
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -65,7 +72,7 @@ class AdminHomeController extends GetxController {
         _fetchCurrentUser(),
         _fetchBookings(),
         _fetchActiveSemester(),
-        _fetchRoomUsage(),
+        _fetchStats(),
       ]);
     } catch (e) {
       errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນແດດໂບດໄດ້';
@@ -87,18 +94,16 @@ class AdminHomeController extends GetxController {
 
   Future<void> _changeBookingStatus(int bookingId, String status) async {
     try {
-      final response = await _dio.patch(
-        '/room-bookings/$bookingId/status',
-        data: {'status': status},
-      );
-      if (response.statusCode != 200) return;
+      await _booking.updateStatus(bookingId, status);
 
       final index = bookings.indexWhere((b) => b.bookingId == bookingId);
       if (index != -1) {
         bookings[index].status = status;
         bookings.refresh();
-        _updateStats();
       }
+      // The stat cards are whole-table server aggregates — re-fetch rather
+      // than nudging local counters that only cover the fetched page.
+      await _fetchStats();
 
       if (status == 'approved') {
         AppDialogs.showSuccess(
@@ -123,10 +128,7 @@ class AdminHomeController extends GetxController {
 
   Future<void> _fetchCurrentUser() async {
     try {
-      final response = await _dio.get('/auth/me');
-      if (response.statusCode == 200) {
-        currentUser.value = UserModel.fromJson(response.data);
-      }
+      currentUser.value = await _auth.me();
     } on DioException catch (e) {
       debugPrint('Failed to fetch user: ${e.message}');
     }
@@ -134,18 +136,7 @@ class AdminHomeController extends GetxController {
 
   Future<void> _fetchBookings() async {
     try {
-      final response = await _dio.get(
-        '/room-bookings',
-        queryParameters: {'limit': 50},
-      );
-      if (response.statusCode != 200) return;
-
-      bookings.assignAll(
-        _extractList(response.data)
-            .map((json) => RoomBookingModel.fromJson(json))
-            .toList(),
-      );
-      _updateStats();
+      bookings.assignAll(await _booking.fetchBookings(limit: 50));
     } on DioException catch (e) {
       debugPrint('Failed to fetch bookings: ${e.message}');
     }
@@ -153,67 +144,27 @@ class AdminHomeController extends GetxController {
 
   Future<void> _fetchActiveSemester() async {
     try {
-      final response = await _dio.get(
-        '/semasters',
-        queryParameters: {'limit': 10},
+      semester.value = _pickSemesterLabel(
+        await _academic.fetchSemesters(limit: 10),
       );
-      if (response.statusCode != 200) return;
-
-      final items = _extractList(response.data)
-          .map((json) => SemasterModel.fromJson(json))
-          .toList();
-      semester.value = _pickSemesterLabel(items);
     } on DioException catch (e) {
       debugPrint('Failed to fetch semester: ${e.message}');
       semester.value = 'Semester';
     }
   }
 
-  Future<void> _fetchRoomUsage() async {
+  /// Pull the whole-table aggregates (status counts + today's room usage)
+  /// from GET /room-bookings/stats. One call replaces the old client-side
+  /// counting over a fetched page, which undercounted past the page cap.
+  Future<void> _fetchStats() async {
     try {
-      final totalRooms = await _fetchTotalRooms();
-      if (totalRooms <= 0) return;
-
-      final response = await _dio.get(
-        '/room-bookings',
-        queryParameters: {'status': 'approved', 'limit': 100},
-      );
-      if (response.statusCode != 200) return;
-
-      final today = _isoDate(DateTime.now());
-      final roomsInUse = _extractList(response.data)
-          .map((b) => RoomBookingModel.fromJson(b))
-          .where((b) => _isoDate(b.bookingDate) == today)
-          .map((b) => b.roomId)
-          .toSet()
-          .length;
-
-      roomInUsePercent.value = ((roomsInUse / totalRooms) * 100).round();
+      final stats = await _booking.fetchBookingStats(date: DateTime.now());
+      pendingCount.value = stats.pending;
+      approvedCount.value = stats.approved;
+      roomInUsePercent.value = stats.roomInUsePercent;
     } on DioException catch (e) {
-      debugPrint('Failed to compute room usage: ${e.message}');
+      debugPrint('Failed to fetch booking stats: ${e.message}');
     }
-  }
-
-  Future<int> _fetchTotalRooms() async {
-    final response = await _dio.get(
-      '/rooms',
-      queryParameters: {'limit': 100},
-    );
-    if (response.statusCode != 200) return 0;
-
-    final raw = response.data;
-    if (raw is Map) {
-      final metaTotal = raw['meta']?['total'] as int?;
-      if (metaTotal != null && metaTotal > 0) return metaTotal;
-      if (raw['data'] is List) return (raw['data'] as List).length;
-    }
-    if (raw is List) return raw.length;
-    return 0;
-  }
-
-  void _updateStats() {
-    pendingCount.value = bookings.where((b) => b.status == 'pending').length;
-    approvedCount.value = bookings.where((b) => b.status == 'approved').length;
   }
 
   void _showErrorDialog(String title, DioException e) {
@@ -237,16 +188,6 @@ class AdminHomeController extends GetxController {
     final picked = active.isNotEmpty ? active.first : items.first;
     return '${picked.semasterCode} (${picked.year})';
   }
-
-  /// Normalize the two server response shapes into a `List<dynamic>`.
-  List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
-  }
-
-  /// `2026-05-18`-style date used for same-day comparisons.
-  String _isoDate(DateTime d) => d.toIso8601String().split('T').first;
 
   String _formatToday(DateTime now) {
     const weekdays = <String>[

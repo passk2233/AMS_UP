@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../services/auth_storage.dart';
 import '../../../../services/fcm_service.dart';
 import '../../../../widgets/app_colors.dart';
@@ -15,6 +14,12 @@ import '../../../data/data_exporter.dart';
 /// view can bind directly to. Owns the multi-step logout flow (FCM unsub →
 /// local auth clear → redirect to `/auth`).
 class AdminProfileController extends GetxController {
+  AdminProfileController({AuthProvider? auth})
+      : _auth = auth ?? AuthProvider();
+
+  /// Data-access seam for `/auth/*`.
+  final AuthProvider _auth;
+
   /// Currently signed-in admin (loaded from `GET /auth/me`).
   final Rx<UserModel?> user = Rx<UserModel?>(null);
 
@@ -26,8 +31,6 @@ class AdminProfileController extends GetxController {
 
   /// User-facing error message from the last fetch; empty when there is none.
   final RxString errorMessage = ''.obs;
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -44,10 +47,8 @@ class AdminProfileController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response = await _dio.get('/auth/me');
-      if (response.statusCode == 200 && response.data is Map<String, dynamic>) {
-        user.value = UserModel.fromJson(response.data);
-      }
+      final result = await _auth.me();
+      if (result != null) user.value = result;
     } on DioException catch (e) {
       debugPrint(
         'fetchProfile Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
@@ -60,11 +61,12 @@ class AdminProfileController extends GetxController {
     }
   }
 
-  /// Confirm with the user, then unregister the device's FCM token, clear
-  /// the stored JWT, and redirect to `/auth`.
+  /// Confirm with the user, then unregister the device's FCM token, revoke
+  /// the refresh token server-side, clear the stored JWT, and redirect to
+  /// `/auth`.
   ///
-  /// The FCM unsubscribe MUST run before [AuthStorage.clear] because the
-  /// DELETE request still needs the auth token.
+  /// The FCM unsubscribe and the server-side revoke MUST run before
+  /// [AuthStorage.clear] because both requests still need the auth token.
   Future<void> logout() async {
     final confirmed = await AppDialogs.showConfirmation(
       title: 'ອອກຈາກລະບົບ',
@@ -78,6 +80,7 @@ class AdminProfileController extends GetxController {
     isLoggingOut.value = true;
     try {
       await FCMService.clearTokenOnLogout();
+      await _auth.logout(); // best-effort server-side session revoke
       await AuthStorage.clear();
       Get.offAllNamed('/auth');
     } finally {

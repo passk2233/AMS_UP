@@ -35,6 +35,8 @@ class AppSnackbar {
       message: message,
       color: AppColors.borderPending,
       icon: Icons.warning_amber_rounded,
+      // White on amber is only 2.15:1; dark ink clears AA at 7.94:1.
+      foreground: AppColors.textPrimary,
     );
   }
 
@@ -42,7 +44,7 @@ class AppSnackbar {
     _show(
       title: title,
       message: message,
-      color: AppColors.primary,
+      color: AppColors.primaryFill,
       icon: Icons.info_outline_rounded,
     );
   }
@@ -52,30 +54,31 @@ class AppSnackbar {
     required String message,
     required Color color,
     required IconData icon,
+    Color foreground = Colors.white,
   }) {
     Get.snackbar(
       title,
       message,
       titleText: Text(
         title,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: foreground,
           fontSize: 14,
           fontWeight: FontWeight.w700,
         ),
       ),
       messageText: Text(
         message,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: foreground,
           fontSize: 13,
           height: 1.3,
         ),
       ),
       snackPosition: SnackPosition.TOP,
       backgroundColor: color,
-      colorText: Colors.white,
-      icon: Icon(icon, color: Colors.white),
+      colorText: foreground,
+      icon: Icon(icon, color: foreground),
       shouldIconPulse: false,
       borderRadius: AppColors.cardRadius,
       margin: const EdgeInsets.all(AppSpacing.m),

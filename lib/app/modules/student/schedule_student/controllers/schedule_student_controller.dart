@@ -4,10 +4,17 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
+import 'package:frontend/app/widgets/app_colors.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class ScheduleStudentController extends GetxController {
+  ScheduleStudentController({AuthProvider? auth, AcademicProvider? academic})
+      : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+
   var selectedDate = DateTime.now().obs;
   var currentWeek = <DateTime>[].obs;
 
@@ -16,7 +23,6 @@ class ScheduleStudentController extends GetxController {
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
-  Dio get _dio => ApiClient.dio;
   int? _stdGroupId;
 
   @override
@@ -38,12 +44,12 @@ class ScheduleStudentController extends GetxController {
       debugPrint(
           'ScheduleStudent bootstrap Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       if (errorMessage.value.isEmpty) {
-        errorMessage.value = 'Failed to load schedule.';
+        errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້.';
       }
     } catch (e) {
       debugPrint('ScheduleStudent bootstrap error: $e');
       if (errorMessage.value.isEmpty) {
-        errorMessage.value = 'Failed to load schedule.';
+        errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້.';
       }
     } finally {
       isLoading.value = false;
@@ -52,24 +58,7 @@ class ScheduleStudentController extends GetxController {
 
   Future<void> _loadActiveSemester() async {
     try {
-      final resp = await _dio.get('/semasters', queryParameters: {'limit': 20});
-      final items = _extractList(resp.data);
-      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
-      if (all.isEmpty) return;
-
-      final now = DateTime.now();
-      final containing = all.where((s) =>
-          s.startDate != null &&
-          s.endDate != null &&
-          !now.isBefore(_dateOnly(s.startDate!)) &&
-          !now.isAfter(_dateOnly(s.endDate!).add(const Duration(days: 1))));
-      if (containing.isNotEmpty) {
-        activeSemester.value = containing.first;
-        return;
-      }
-
-      final active = all.where((s) => s.status == 1);
-      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+      activeSemester.value = await _academic.fetchActiveSemester();
     } on DioException catch (e) {
       debugPrint(
           'ScheduleStudent semester Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
@@ -79,32 +68,26 @@ class ScheduleStudentController extends GetxController {
   }
 
   Future<void> _loadStudentGroup() async {
-    final me = await _dio.get('/auth/me');
-    if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-      final u = UserModel.fromJson(me.data);
-      _stdGroupId = u.student?.stdGroupId;
-    }
+    final user = await _auth.me();
+    _stdGroupId = user?.student?.stdGroupId;
   }
 
   Future<void> fetchStudyPlans() async {
     final gid = _stdGroupId;
     if (gid == null) {
       studyPlans.clear();
-      errorMessage.value = 'Student group not found.';
+      errorMessage.value = 'ບໍ່ພົບກຸ່ມນັກສຶກສາ.';
       return;
     }
     try {
       isLoading.value = true;
       errorMessage.value = '';
-      final query = <String, dynamic>{
-        'std_group_id': gid,
-        'limit': 200,
-      };
       final semId = activeSemester.value?.id;
-      if (semId != null) query['semaster_id'] = semId;
-      final resp = await _dio.get('/study-plans', queryParameters: query);
-      final items = _extractList(resp.data);
-      var list = items.map((j) => StudyPlanModel.fromJson(j)).toList();
+      var list = await _academic.fetchStudyPlans(
+        studentGroupId: gid,
+        semesterId: semId,
+        limit: 200,
+      );
       if (semId != null) {
         list = list.where((sp) => sp.semasterId == semId).toList();
       }
@@ -112,7 +95,7 @@ class ScheduleStudentController extends GetxController {
     } on DioException catch (e) {
       debugPrint(
           'ScheduleStudent fetchStudyPlans Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
-      errorMessage.value = 'Failed to load schedule.';
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຕາຕະລາງໄດ້.';
     } finally {
       isLoading.value = false;
     }
@@ -216,14 +199,10 @@ class ScheduleStudentController extends GetxController {
   List<Map<String, dynamic>> get filteredSchedules {
     if (!isInSemester(selectedDate.value)) return const [];
 
-    final palette = <Color>[
-      Colors.purple,
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.redAccent,
-      Colors.teal,
-    ];
+    // Class cards use one neutral brand accent. The prior rainbow tinted
+    // cards in the reserved status colors (amber/emerald/red) and off-brand
+    // purple, which collided with the closed status vocabulary. See DESIGN.md.
+    final palette = <Color>[AppColors.info];
 
     final selectedWeekday = selectedDate.value.weekday;
     final selected = studyPlans.where((p) {
@@ -249,6 +228,8 @@ class ScheduleStudentController extends GetxController {
         'instructor': teacher,
         'location': room,
         'color': palette[i % palette.length],
+        // Full record so the detail sheet can surface subject / teacher / room.
+        'plan': p,
       };
     });
   }
@@ -328,9 +309,4 @@ class ScheduleStudentController extends GetxController {
     return DateFormat('HH:mm').format(dt);
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
-  }
 }

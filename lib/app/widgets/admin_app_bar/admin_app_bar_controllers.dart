@@ -7,10 +7,13 @@ import '../../services/api_client.dart';
 
 /// Reactive state owner for [AdminAppBar].
 ///
-/// Loads three independent pieces of state on init:
+/// Loads two independent pieces of state on init:
 /// 1. The active [semester] (priority: date-range → status flag → newest).
 /// 2. The count of pending room bookings ([pendingRequestCount]).
-/// 3. The count of unread notifications ([unreadNotiCount]).
+///
+/// The notification-bell badge is sourced separately from the shared
+/// notification-badge controller (the per-user `/user-noti` inbox), not from
+/// here — that keeps the unread count in lockstep with mark-as-read.
 ///
 /// Each fetch is best-effort — a failure logs and leaves the corresponding
 /// observable at its last value, so the UI never blocks on networking.
@@ -24,9 +27,6 @@ class AdminAppBarControllers extends GetxController {
   /// Count of `status = pending` room bookings.
   final RxInt pendingRequestCount = 0.obs;
 
-  /// Count of `is_read = 0` notifications addressed to this user.
-  final RxInt unreadNotiCount = 0.obs;
-
   Dio get _dio => ApiClient.dio;
 
   @override
@@ -34,18 +34,16 @@ class AdminAppBarControllers extends GetxController {
     super.onInit();
     _fetchActiveSemester();
     _fetchPendingRequests();
-    _fetchUnreadNotifications();
   }
 
-  /// Refresh all three observables in parallel.
+  /// Refresh both observables in parallel.
   ///
   /// Call from screens that need an up-to-date bar after a write — e.g.
-  /// after the admin approves a booking or marks a notification read.
+  /// after the admin approves a booking (which changes the pending count).
   Future<void> refreshData() {
     return Future.wait([
       _fetchActiveSemester(),
       _fetchPendingRequests(),
-      _fetchUnreadNotifications(),
     ]);
   }
 
@@ -84,23 +82,6 @@ class AdminAppBarControllers extends GetxController {
           .length;
     } on DioException catch (e) {
       debugPrint('Failed to fetch pending requests: ${e.message}');
-    }
-  }
-
-  Future<void> _fetchUnreadNotifications() async {
-    try {
-      final response = await _dio.get(
-        '/notifications',
-        queryParameters: {'limit': 200},
-      );
-      if (response.statusCode != 200) return;
-
-      unreadNotiCount.value = _extractList(response.data)
-          .map((json) => NotificationModel.fromJson(json))
-          .where((n) => n.isRead == 0)
-          .length;
-    } on DioException catch (e) {
-      debugPrint('Failed to fetch unread notifications: ${e.message}');
     }
   }
 

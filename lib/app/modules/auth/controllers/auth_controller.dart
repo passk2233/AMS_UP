@@ -7,11 +7,10 @@ import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../routes/app_pages.dart';
-import '../../../services/api_client.dart';
 import '../../../services/auth_storage.dart';
 import '../../../services/fcm_service.dart';
 import '../../../widgets/app_snackbar.dart';
-import '../../data/models/user_model.dart';
+import '../../data/data_exporter.dart';
 
 /// Reactive state owner for [AuthView].
 ///
@@ -23,6 +22,11 @@ import '../../data/models/user_model.dart';
 /// 3. Sync the FCM device with the backend and subscribe role topics.
 /// 4. Route to the correct role landing page.
 class AuthController extends GetxController {
+  AuthController({AuthProvider? auth}) : _auth = auth ?? AuthProvider();
+
+  /// Data-access seam for `/auth/*`.
+  final AuthProvider _auth;
+
   /// Username input controller.
   final TextEditingController usernameController = TextEditingController();
 
@@ -93,26 +97,24 @@ class AuthController extends GetxController {
       // The shared ApiClient skips the auth header on /auth/login, so this
       // call goes out unauthenticated even if a stale token is sitting in
       // secure storage.
-      final response = await ApiClient.dio.post(
-        '/auth/login',
-        data: {
-          'username': username,
-          'password': password,
-          'device_token': deviceToken,
-          'platform': _platformId(),
-        },
+      final session = await _auth.login(
+        username: username,
+        password: password,
+        platform: _platformId(),
+        deviceToken: deviceToken,
       );
-      if (response.statusCode != 200) return;
-
-      final data = response.data as Map<String, dynamic>;
-      final token = data['token'] as String;
-      final user = UserModel.fromJson(data['user']);
-      final roles = user.roles ?? const <String>[];
+      final roles = session.user.roles ?? const <String>[];
 
       // Token + roles live in Keychain/Keystore-backed secure storage —
       // SharedPreferences is plain XML in the app sandbox and is readable
       // on rooted devices.
-      await AuthStorage.writeToken(token);
+      await AuthStorage.writeToken(session.token);
+      final refreshToken = session.refreshToken;
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        // Lets ApiClient silently renew the 24 h JWT on 401 instead of
+        // bouncing the user back to this screen every day.
+        await AuthStorage.writeRefreshToken(refreshToken);
+      }
       await AuthStorage.writeRoles(roles);
       await _persistRememberMe(username);
 
@@ -193,14 +195,12 @@ class AuthController extends GetxController {
         return body['error'].toString();
       }
       if (body is String) {
-        return body.length > 100
-            ? 'Server Error: Please check Backend'
-            : body;
+        return body.length > 100 ? 'Server Error: Please check Backend' : body;
       }
     }
     switch (e.type) {
       case DioExceptionType.connectionError:
-        return 'Cannot connect to server. Please check your internet or Ngrok URL.';
+        return 'Cannot connect to server. Please check your internet.';
       case DioExceptionType.connectionTimeout:
         return 'Cannot connect to server. Please check your internet connection.';
       default:

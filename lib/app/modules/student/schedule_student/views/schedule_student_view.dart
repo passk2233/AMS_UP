@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/schedule_student_controller.dart';
+import 'subject_detail_sheet.dart';
 
 class ScheduleStudentView extends GetView<ScheduleStudentController> {
   const ScheduleStudentView({super.key});
@@ -18,10 +19,7 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
           return AppPageScaffold(
             withBackground: true,
             title: 'ຕາຕະລາງຮຽນ',
-            trailing: AppIconBubble(
-              icon: Icons.notifications_none_rounded,
-              onTap: () => Get.toNamed('/student-noti'),
-            ),
+            trailing: const NotiBellButton(route: '/student-noti'),
             body: Column(
               children: [
                 _buildSemesterBanner(),
@@ -73,7 +71,7 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
                       Text(
                         range,
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 12,
                           color: AppColors.textSecondary,
                         ),
                       ),
@@ -259,6 +257,7 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
             instructor: item['instructor'] as String?,
             location: item['location'] as String?,
             color: item['color'] as Color? ?? AppColors.statsBlue,
+            onTap: () => showSubjectDetailSheet(context, item),
           );
         },
       );

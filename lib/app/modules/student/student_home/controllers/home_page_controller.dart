@@ -4,12 +4,23 @@ import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 /// Controller for the student dashboard / home page.
 /// Fetches user profile, enrollments, and today's schedule.
 class HomePageController extends GetxController {
+  HomePageController({
+    AuthProvider? auth,
+    AcademicProvider? academic,
+    EvaluationProvider? evaluation,
+  })  : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _eval = evaluation ?? EvaluationProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+  final EvaluationProvider _eval;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -22,8 +33,6 @@ class HomePageController extends GetxController {
   /// `now` falls within it. Drives the home page's "ປະເມີນອາຈານ" button.
   final RxBool isEvaluationWindowOpen = false.obs;
 
-  Dio get _dio => ApiClient.dio;
-
   @override
   void onInit() {
     super.onInit();
@@ -35,10 +44,7 @@ class HomePageController extends GetxController {
     errorMessage.value = '';
     try {
       // ── ດຶງຂໍ້ມູນຜູ້ໃຊ້ ──
-      final me = await _dio.get('/auth/me');
-      if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-        currentUser.value = UserModel.fromJson(me.data);
-      }
+      currentUser.value = await _auth.me();
 
       final stdId = currentUser.value?.stdId ?? currentUser.value?.student?.id;
       if (stdId == null) {
@@ -50,25 +56,13 @@ class HomePageController extends GetxController {
       await _loadEvaluationWindow();
 
       // ── ດຶງ enrollments (ສຳລັບ GPA + ຈຳນວນວິຊາ) ──
-      final enrollResp = await _dio.get('/enrollments', queryParameters: {
-        'std_id': stdId,
-        'limit': 200,
-      });
-      final enrollItems = _extractList(enrollResp.data);
-      enrollments.assignAll(
-        enrollItems.map((j) => EnrollmentModel.fromJson(j)).toList(),
-      );
+      enrollments.assignAll(await _academic.fetchEnrollments(studentId: stdId));
 
       // ── ດຶງ study plans (ສຳລັບຫ້ອງຮຽນມື້ນີ້) ──
       final groupId = currentUser.value?.student?.stdGroupId;
       if (groupId != null) {
-        final planResp = await _dio.get('/study-plans', queryParameters: {
-          'std_group_id': groupId,
-          'limit': 200,
-        });
-        final planItems = _extractList(planResp.data);
         studyPlans.assignAll(
-          planItems.map((j) => StudyPlanModel.fromJson(j)).toList(),
+          await _academic.fetchStudyPlans(studentGroupId: groupId, limit: 200),
         );
       }
     } on DioException catch (e) {
@@ -88,23 +82,7 @@ class HomePageController extends GetxController {
 
   Future<void> _loadActiveSemester() async {
     try {
-      final resp =
-          await _dio.get('/semasters', queryParameters: {'limit': 20});
-      final items = _extractList(resp.data);
-      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
-      if (all.isEmpty) return;
-      final now = DateTime.now();
-      final containing = all.where((s) {
-        if (s.startDate == null || s.endDate == null) return false;
-        return !now.isBefore(s.startDate!) &&
-            !now.isAfter(s.endDate!.add(const Duration(days: 1)));
-      });
-      if (containing.isNotEmpty) {
-        activeSemester.value = containing.first;
-        return;
-      }
-      final active = all.where((s) => s.status == 1);
-      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+      activeSemester.value = await _academic.fetchActiveSemester();
     } catch (_) {}
   }
 
@@ -118,17 +96,8 @@ class HomePageController extends GetxController {
   /// faculty-feedback page so the home CTA and that page stay in sync.
   Future<void> _loadEvaluationWindow() async {
     try {
-      final resp = await _dio.get('/open-evalu', queryParameters: {
-        'inactive': 0,
-        'limit': 1,
-      });
-      final items = _extractList(resp.data);
-      if (items.isEmpty) {
-        isEvaluationWindowOpen.value = false;
-        return;
-      }
-      final window = OpenEvaluationModel.fromJson(items.first);
-      isEvaluationWindowOpen.value = window.inactive == 0;
+      final window = await _eval.fetchActiveWindow();
+      isEvaluationWindowOpen.value = window != null && window.inactive == 0;
     } on DioException catch (e) {
       isEvaluationWindowOpen.value = false;
       debugPrint('loadEvaluationWindow error: ${e.message}');
@@ -281,9 +250,4 @@ class HomePageController extends GetxController {
     return DateFormat('HH:mm').format(DateTime(2000, 1, 1, h, m));
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
-  }
 }

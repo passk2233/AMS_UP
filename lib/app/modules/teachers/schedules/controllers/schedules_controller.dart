@@ -3,12 +3,17 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/widget.dart';
 import '../../../data/data_exporter.dart';
 
-
 class SchedulesController extends GetxController {
+  SchedulesController({AuthProvider? auth, AcademicProvider? academic})
+      : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+
   var selectedDate = DateTime.now().obs;
   var currentWeek = <DateTime>[].obs;
 
@@ -20,7 +25,6 @@ class SchedulesController extends GetxController {
   final RxList<StudyPlanModel> schedules = <StudyPlanModel>[].obs;
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
-  Dio get _dio => ApiClient.dio;
   int? _teacherId;
 
   @override
@@ -64,24 +68,7 @@ class SchedulesController extends GetxController {
 
   Future<void> _loadActiveSemester() async {
     try {
-      final resp = await _dio.get('/semasters', queryParameters: {'limit': 20});
-      final items = _extractList(resp.data);
-      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
-      if (all.isEmpty) return;
-
-      final now = DateTime.now();
-      final containing = all.where((s) =>
-          s.startDate != null &&
-          s.endDate != null &&
-          !now.isBefore(_dateOnly(s.startDate!)) &&
-          !now.isAfter(_dateOnly(s.endDate!).add(const Duration(days: 1))));
-      if (containing.isNotEmpty) {
-        activeSemester.value = containing.first;
-        return;
-      }
-
-      final active = all.where((s) => s.status == 1);
-      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+      activeSemester.value = await _academic.fetchActiveSemester();
     } on DioException catch (e) {
       debugPrint(
           'Schedules semester Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
@@ -91,10 +78,7 @@ class SchedulesController extends GetxController {
   }
 
   Future<void> _loadTeacher() async {
-    final me = await _dio.get('/auth/me');
-    final user = (me.statusCode == 200 && me.data is Map<String, dynamic>)
-        ? UserModel.fromJson(me.data)
-        : null;
+    final user = await _auth.me();
     _teacherId = user?.teacherId;
   }
 
@@ -107,28 +91,16 @@ class SchedulesController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final query = <String, dynamic>{
-        'teacher_id': teacherId,
-        'limit': 500,
-      };
       final semId = activeSemester.value?.id;
-      if (semId != null) query['semaster_id'] = semId;
-
-      final resp = await _dio.get('/study-plans', queryParameters: query);
-      final items = _extractList(resp.data);
-      var list = items.map((j) => StudyPlanModel.fromJson(j)).toList();
+      var list = await _academic.fetchStudyPlans(
+        teacherId: teacherId,
+        semesterId: semId,
+      );
 
       // Fallback: if backend ignores teacher_id filter, fetch all then filter.
       if (list.isEmpty) {
-        final fallbackQuery = <String, dynamic>{'limit': 500};
-        if (semId != null) fallbackQuery['semaster_id'] = semId;
-        final respAll =
-            await _dio.get('/study-plans', queryParameters: fallbackQuery);
-        final allItems = _extractList(respAll.data);
-        list = allItems
-            .map((j) => StudyPlanModel.fromJson(j))
-            .where((sp) => sp.teacherId == teacherId)
-            .toList();
+        final all = await _academic.fetchStudyPlans(semesterId: semId);
+        list = all.where((sp) => sp.teacherId == teacherId).toList();
       }
 
       if (semId != null) {
@@ -172,12 +144,6 @@ class SchedulesController extends GetxController {
     }
     selectedDate.value = initial;
     _generateWeek(initial);
-  }
-
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
   }
 
   void _generateWeek(DateTime date) {
@@ -311,14 +277,10 @@ class SchedulesController extends GetxController {
     return out;
   }
 
-  static const _palette = <Color>[
-    Colors.purple,
-    AppColors.statsBlue,
-    AppColors.borderApproved,
-    AppColors.borderPending,
-    AppColors.rejectRed,
-    Colors.teal,
-  ];
+  // One neutral brand accent for every class card. The prior rainbow reused
+  // the closed status colors (amber/emerald/red) decoratively and shipped
+  // off-brand purple/teal. See the status-color rule in DESIGN.md.
+  static const _palette = <Color>[AppColors.info];
 
   Map<String, dynamic> _planToMap(StudyPlanModel sp, int index, DateTime day) {
     final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';

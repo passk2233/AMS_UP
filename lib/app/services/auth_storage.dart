@@ -15,13 +15,14 @@ class AuthStorage {
   AuthStorage._();
 
   static const _kToken = 'token';
+  static const _kRefreshToken = 'refresh_token';
   static const _kRoles = 'roles';
   static const _kRememberUntil = 'remember_until';
   static const _kRolesSeparator = '|';
 
-  static final FlutterSecureStorage _secure = const FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
-  );
+  // No AndroidOptions: `encryptedSharedPreferences` is deprecated (ignored,
+  // removed in v11) — the plugin migrates existing data to its own ciphers.
+  static final FlutterSecureStorage _secure = const FlutterSecureStorage();
 
   /// Read the JWT, migrating from legacy [SharedPreferences] if necessary.
   /// Returns `null` when no token is stored.
@@ -37,6 +38,18 @@ class AuthStorage {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
   }
+
+  /// Read the stored refresh token. Returns `null` when none is stored —
+  /// e.g. a session started against a backend that predates `/auth/refresh`.
+  /// No legacy migration: the key never existed in [SharedPreferences].
+  static Future<String?> readRefreshToken() =>
+      _secure.read(key: _kRefreshToken);
+
+  /// Persist the (rotated) refresh token. The backend invalidates the
+  /// previous one on every `/auth/refresh`, so the stored value is always
+  /// the only live token for this device.
+  static Future<void> writeRefreshToken(String token) =>
+      _secure.write(key: _kRefreshToken, value: token);
 
   /// Read the persisted roles list, migrating from legacy
   /// [SharedPreferences] if necessary. Returns `const []` when not set.
@@ -61,6 +74,7 @@ class AuthStorage {
   /// JWT (e.g. `FCMService.clearTokenOnLogout`) must run **before** this.
   static Future<void> clear() async {
     await _secure.delete(key: _kToken);
+    await _secure.delete(key: _kRefreshToken);
     await _secure.delete(key: _kRoles);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);

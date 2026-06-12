@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
 
@@ -48,6 +47,18 @@ class TeacherFeedbackItem {
 /// the subject / group / semester labels can be rendered. Per the CLAUDE.md
 /// privacy rule, no student identifier is fetched or displayed.
 class FeedbacksController extends GetxController {
+  FeedbacksController({
+    AuthProvider? auth,
+    AcademicProvider? academic,
+    EvaluationProvider? evaluation,
+  })  : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _eval = evaluation ?? EvaluationProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+  final EvaluationProvider _eval;
+
   /// `true` while [fetchFeedbacks] is in flight.
   final RxBool isLoading = false.obs;
 
@@ -56,8 +67,6 @@ class FeedbacksController extends GetxController {
 
   /// Flattened, comment-only feedback entries for this teacher.
   final RxList<TeacherFeedbackItem> items = <TeacherFeedbackItem>[].obs;
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -86,12 +95,9 @@ class FeedbacksController extends GetxController {
 
       // Fetch all questions up-front so we can look up question text by ID
       // without relying on the backend's nested preload, which may be absent.
-      final qResp = await _dio.get('/evaluation-questions');
-      final Map<int, EvaluationQuestionModel> questionsMap = {};
-      for (final j in _extractList(qResp.data)) {
-        final q = EvaluationQuestionModel.fromJson(j);
-        questionsMap[q.evaQuestionId] = q;
-      }
+      final Map<int, EvaluationQuestionModel> questionsMap = {
+        for (final q in await _eval.fetchQuestions()) q.evaQuestionId: q,
+      };
 
       items.assignAll(await _loadFeedbackItems(teacherId, spMap, questionsMap));
     } on DioException catch (e) {
@@ -110,33 +116,18 @@ class FeedbacksController extends GetxController {
   }
 
   Future<int?> _resolveTeacherId() async {
-    final meResp = await _dio.get('/auth/me');
-    if (meResp.statusCode != 200 || meResp.data is! Map<String, dynamic>) {
-      return null;
-    }
-    return UserModel.fromJson(meResp.data).teacherId;
+    final user = await _auth.me();
+    return user?.teacherId;
   }
 
   /// Server-side filter by `teacher_id`, falling back to client-side filter
   /// when the backend returns nothing.
   Future<List<StudyPlanModel>> _loadTeacherStudyPlans(int teacherId) async {
-    final scoped = await _dio.get(
-      '/study-plans',
-      queryParameters: {'teacher_id': teacherId, 'limit': 500},
-    );
-    final scopedList = _extractList(scoped.data)
-        .map((j) => StudyPlanModel.fromJson(j))
-        .toList();
-    if (scopedList.isNotEmpty) return scopedList;
+    final scoped = await _academic.fetchStudyPlans(teacherId: teacherId);
+    if (scoped.isNotEmpty) return scoped;
 
-    final all = await _dio.get(
-      '/study-plans',
-      queryParameters: {'limit': 500},
-    );
-    return _extractList(all.data)
-        .map((j) => StudyPlanModel.fromJson(j))
-        .where((sp) => sp.teacherId == teacherId)
-        .toList();
+    final all = await _academic.fetchStudyPlans();
+    return all.where((sp) => sp.teacherId == teacherId).toList();
   }
 
   Future<List<TeacherFeedbackItem>> _loadFeedbackItems(
@@ -144,13 +135,9 @@ class FeedbacksController extends GetxController {
     Map<int, StudyPlanModel> spMap,
     Map<int, EvaluationQuestionModel> questionsMap,
   ) async {
-    final response = await _dio.get(
-      '/evaluation-results',
-      queryParameters: {'teacher_id': teacherId, 'limit': 500},
-    );
+    final results = await _eval.fetchResults(teacherId: teacherId);
     final out = <TeacherFeedbackItem>[];
-    for (final j in _extractList(response.data)) {
-      final r = EvaluationResultModel.fromJson(j);
+    for (final r in results) {
       final comment = (r.comment ?? '').trim();
       if (comment.isEmpty) continue;
       final sp = spMap[r.studyPlanId];
@@ -176,11 +163,5 @@ class FeedbacksController extends GetxController {
       );
     }
     return out.reversed.toList();
-  }
-
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
   }
 }

@@ -16,10 +16,7 @@ class FeedbacksView extends GetView<FeedbacksController> {
   Widget build(BuildContext context) {
     return AppPageScaffold(
       title: 'ຄຳຄິດເຫັນ',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/teacher-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/teacher-noti'),
       body: _FeedbacksBody(controller: controller),
     );
   }
@@ -78,8 +75,7 @@ class _FeedbacksList extends StatelessWidget {
               ),
             )
           else
-            for (final item in controller.items)
-              _FeedbackCard(item: item),
+            for (final item in controller.items) _FeedbackCard(item: item),
           const SizedBox(height: 20),
         ],
       ),
@@ -109,7 +105,6 @@ class _FeedbackCard extends StatelessWidget {
     return AppSurfaceCard(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
-      borderLeftColor: AppColors.statsBlue,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -167,14 +162,19 @@ class _FeedbackCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.format_quote_rounded,
-                  size: 16, color: Colors.grey.shade400),
+              Icon(
+                Icons.format_quote_rounded,
+                size: 16,
+                color: Colors.grey.shade400,
+              ),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   item.comment,
                   style: const TextStyle(
-                      fontSize: 13, color: AppColors.textPrimary),
+                    fontSize: 13,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],

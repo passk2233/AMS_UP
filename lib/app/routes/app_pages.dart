@@ -14,6 +14,8 @@ import '../modules/teachers/teacher_profile/bindings/teacher_profile_binding.dar
 import '../modules/teachers/teacher_profile/views/teacher_profile_view.dart';
 import '../modules/auth/bindings/auth_binding.dart';
 import '../modules/auth/views/auth_view.dart';
+import '../modules/splash/bindings/splash_binding.dart';
+import '../modules/splash/views/splash_view.dart';
 import '../modules/student/Booking_student/bindings/booking_student_binding.dart';
 import '../modules/student/Booking_student/views/booking_student_view.dart';
 import '../modules/student/faculty_feedback/bindings/faculty_feedback_binding.dart';
@@ -48,9 +50,14 @@ part 'app_routes.dart';
 class AppPages {
   AppPages._();
 
-  static const INITIAL = Routes.AUTH;
+  static const INITIAL = Routes.SPLASH;
 
   static final routes = [
+    GetPage(
+      name: _Paths.SPLASH,
+      page: () => const SplashView(),
+      binding: SplashBinding(),
+    ),
     GetPage(
       name: _Paths.AUTH,
       page: () => const AuthView(),

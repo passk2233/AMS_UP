@@ -3,11 +3,22 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 import 'package:frontend/app/modules/teachers/booking/controllers/fixed_booking.dart';
 
 class BookingStudentController extends GetxController {
+  BookingStudentController({
+    AuthProvider? auth,
+    BookingProvider? booking,
+    AcademicProvider? academic,
+  })  : _auth = auth ?? AuthProvider(),
+        _booking = booking ?? BookingProvider(),
+        _academic = academic ?? AcademicProvider();
+
+  final AuthProvider _auth;
+  final BookingProvider _booking;
+  final AcademicProvider _academic;
+
   final RxBool isLoading = false.obs;
   final RxString errorMessage = ''.obs;
 
@@ -15,6 +26,8 @@ class BookingStudentController extends GetxController {
   final RxList<RoomBookingModel> myBookings = <RoomBookingModel>[].obs;
   final RxList<RoomBookingModel> _allBookings = <RoomBookingModel>[].obs;
   final RxList<StudyPlanModel> studyPlans = <StudyPlanModel>[].obs;
+  final RxList<ClassCancellationModel> _classCancellations =
+      <ClassCancellationModel>[].obs;
 
   /// UI filter for `myBookings`. One of: all | upcoming | pending | approved
   /// | cancelled | past.
@@ -22,8 +35,6 @@ class BookingStudentController extends GetxController {
 
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
-
-  Dio get _dio => ApiClient.dio;
 
   @override
   void onInit() {
@@ -35,11 +46,8 @@ class BookingStudentController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final me = await _dio.get('/auth/me');
-      if (me.statusCode == 200 && me.data is Map<String, dynamic>) {
-        currentUser.value = UserModel.fromJson(me.data);
-      }
-      final user = currentUser.value;
+      final user = await _auth.me();
+      currentUser.value = user;
       if (user == null) {
         errorMessage.value = 'ບໍ່ພົບຂໍ້ມູນຜູ້ໃຊ້';
         return;
@@ -47,24 +55,17 @@ class BookingStudentController extends GetxController {
 
       await _loadActiveSemester();
 
-      final roomResp = await _dio.get('/rooms', queryParameters: {'limit': 200});
-      final roomItems = _extractList(roomResp.data);
-      rooms.assignAll(roomItems.map((j) => RoomModel.fromJson(j)).toList());
+      rooms.assignAll(await _booking.fetchRooms(limit: 200));
 
-      final bResp =
-          await _dio.get('/room-bookings', queryParameters: {'limit': 500});
-      final bItems = _extractList(bResp.data);
-      final all = bItems.map((j) => RoomBookingModel.fromJson(j)).toList();
+      final all = await _booking.fetchBookings(limit: 500);
       _allBookings.assignAll(all);
 
-      final mine = all
-          .where((b) =>
-              b.userId == user.id && parseFixedCancelPurpose(b.purpose) == null)
-          .toList()
+      final mine = all.where((b) => b.userId == user.id).toList()
         ..sort((a, b) => b.bookingDate.compareTo(a.bookingDate));
       myBookings.assignAll(mine);
 
       await _loadStudyPlans();
+      await _loadClassCancellations();
     } on DioException catch (e) {
       debugPrint('Booking Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
       // 401 is handled centrally by ApiClient (it clears auth + redirects).
@@ -123,37 +124,30 @@ class BookingStudentController extends GetxController {
 
   Future<void> _loadActiveSemester() async {
     try {
-      final resp = await _dio.get('/semasters', queryParameters: {'limit': 20});
-      final items = _extractList(resp.data);
-      final all = items.map((j) => SemasterModel.fromJson(j)).toList();
-      if (all.isEmpty) return;
-      final now = DateTime.now();
-      final containing = all.where((s) =>
-          s.startDate != null &&
-          s.endDate != null &&
-          !now.isBefore(dateOnly(s.startDate!)) &&
-          !now.isAfter(dateOnly(s.endDate!).add(const Duration(days: 1))));
-      if (containing.isNotEmpty) {
-        activeSemester.value = containing.first;
-        return;
-      }
-      final active = all.where((s) => s.status == 1);
-      activeSemester.value = active.isNotEmpty ? active.first : all.first;
+      activeSemester.value = await _academic.fetchActiveSemester();
     } catch (_) {}
   }
 
   Future<void> _loadStudyPlans() async {
     try {
-      final query = <String, dynamic>{'limit': 500};
       final semId = activeSemester.value?.id;
-      if (semId != null) query['semaster_id'] = semId;
-      final resp = await _dio.get('/study-plans', queryParameters: query);
-      final items = _extractList(resp.data);
-      var list = items.map((j) => StudyPlanModel.fromJson(j)).toList();
+      var list = await _academic.fetchStudyPlans(semesterId: semId);
       if (semId != null) {
         list = list.where((sp) => sp.semasterId == semId).toList();
       }
       studyPlans.assignAll(list);
+    } catch (_) {}
+  }
+
+  /// Single-date study-plan exceptions: a cancelled class occurrence frees
+  /// its room for that day in [conflictReason], mirroring the backend rule.
+  Future<void> _loadClassCancellations() async {
+    try {
+      final sem = activeSemester.value;
+      _classCancellations.assignAll(await _academic.fetchClassCancellations(
+        from: sem?.startDate,
+        to: sem?.endDate,
+      ));
     } catch (_) {}
   }
 
@@ -184,19 +178,12 @@ class BookingStudentController extends GetxController {
           startTime, endTime, p.startTime ?? '', p.endTime ?? '')) {
         continue;
       }
-      // Cancellation is signaled by status=cancelled on the marker row;
-      // backend has no partial-update endpoint for purpose, so the
-      // `__sp_fixed:<pid>` marker stays in place through cancel.
-      final cancelled = _allBookings.any((b) {
-        final pid = parseFixedActivePurpose(b.purpose) ??
-            parseFixedCancelPurpose(b.purpose);
-        if (pid != p.id) return false;
-        if (!sameDate(b.bookingDate, date)) return false;
-        final s = b.status.toLowerCase();
-        return s == 'cancelled' || s == 'rejected';
-      });
+      // A class occurrence cancelled for this date (class_cancellations row)
+      // does not occupy the room — same rule as the backend's check.
+      final cancelled = _classCancellations.any(
+          (cc) => cc.studyPlanId == p.id && sameDate(cc.cancelDate, date));
       if (!cancelled) {
-        final code = p.room?.roomCode ?? 'Room $roomId';
+        final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
         final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
         return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
       }
@@ -204,7 +191,6 @@ class BookingStudentController extends GetxController {
     for (final b in _allBookings) {
       if (b.roomId != roomId) continue;
       if (!sameDate(b.bookingDate, date)) continue;
-      if (parseFixedCancelPurpose(b.purpose) != null) continue;
       final s = b.status.toLowerCase();
       if (s != 'pending' && s != 'approved') continue;
       if (!timeRangesOverlap(startTime, endTime, b.startTime, b.endTime)) {
@@ -278,44 +264,49 @@ class BookingStudentController extends GetxController {
         return;
       }
 
-      final clash = conflictReason(
+      // Spec §6.1: the backend is the authority on slot conflicts — probe
+      // check-availability first; a 409 lands in the catch below. The create
+      // itself re-checks under a room lock, covering the probe→create race.
+      // (The local conflictReason stays for the sheet's live room filter.)
+      final datePayload = bookingDatePayload(bookingDate);
+      await _booking.checkAvailability(
         roomId: roomId,
-        bookingDate: bookingDate,
+        bookingDate: datePayload,
         startTime: startTime,
         endTime: endTime,
       );
-      if (clash != null) {
-        AppDialogs.showWarning(
-          title: 'ຫ້ອງບໍ່ວ່າງ',
-          message: clash,
-        );
-        return;
-      }
 
       // Note: user_id is NOT sent — the backend derives the booker from the
       // JWT subject. Trusting a client-provided user_id would let any
       // logged-in user book on behalf of someone else.
-      final resp = await _dio.post('/room-bookings', data: {
-        'room_id': roomId,
-        'booking_date': bookingDate.toUtc().toIso8601String(),
-        'start_time': startTime,
-        'end_time': endTime,
-        'purpose': purpose,
-      });
-
-      if (resp.statusCode == 200 || resp.statusCode == 201) {
-        AppDialogs.showSuccess(
-          title: 'ສົ່ງຄຳຂໍຈອງສຳເລັດ',
-          message: 'ກະລຸນາລໍຖ້າການອະນຸມັດ',
+      await _booking.createBooking(
+        roomId: roomId,
+        bookingDate: datePayload,
+        startTime: startTime,
+        endTime: endTime,
+        purpose: purpose,
+      );
+      AppDialogs.showSuccess(
+        title: 'ສົ່ງຄຳຂໍຈອງສຳເລັດ',
+        message: 'ກະລຸນາລໍຖ້າການອະນຸມັດ',
+      );
+      await fetchData();
+    } on DioException catch (e) {
+      // 409 = the backend's conflict check rejected the slot. The body's
+      // `conflict` field says what it clashed with: "class" = the room's
+      // fixed class schedule, anything else = another booking.
+      if (e.response?.statusCode == 409) {
+        final data = e.response?.data;
+        final clashesClass = data is Map && data['conflict'] == 'class';
+        AppDialogs.showWarning(
+          title: 'ຫ້ອງບໍ່ວ່າງ',
+          message: clashesClass
+              ? 'ຊ່ວງເວລານີ້ກົງກັບຕາຕະລາງຮຽນປະຈຳຂອງຫ້ອງ ກະລຸນາເລືອກເວລາອື່ນ'
+              : 'ຫ້ອງຖືກຈອງໄປແລ້ວໃນຊ່ວງເວລານີ້ ກະລຸນາເລືອກເວລາອື່ນ',
         );
         await fetchData();
-      } else {
-        AppDialogs.showError(
-          title: 'ສົ່ງຄຳຂໍບໍ່ສຳເລັດ',
-          message: 'ກະລຸນາລອງໃໝ່',
-        );
+        return;
       }
-    } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
       AppDialogs.showError(
         title: 'ສົ່ງຄຳຂໍບໍ່ສຳເລັດ',
@@ -356,8 +347,7 @@ class BookingStudentController extends GetxController {
 
     try {
       isLoading.value = true;
-      await _dio.patch('/room-bookings/${b.bookingId}/status',
-          data: {'status': 'cancelled'});
+      await _booking.updateStatus(b.bookingId, 'cancelled');
       AppDialogs.showSuccess(
         title: 'ຍົກເລີກສຳເລັດ',
         message: 'ການຈອງຖືກຍົກເລີກແລ້ວ',
@@ -386,11 +376,5 @@ class BookingStudentController extends GetxController {
     }
 
     return toMin(start.trim()) < toMin(end.trim());
-  }
-
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
   }
 }

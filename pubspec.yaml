@@ -2,7 +2,7 @@ name: frontend
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: "none" # Remove this line if you wish to publish to pub.dev
 
 # The following defines the version and build number for your application.
 # A version number is three numbers separated by dots, like 1.2.43
@@ -30,23 +30,31 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  intl: ^0.19.0
+  intl: ^0.20.2
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  
+
   get: ^4.7.3
   shared_preferences: ^2.5.4
-  flutter_secure_storage: ^9.2.2
+  flutter_secure_storage: ^10.3.1
   get_cli: ^1.8.1
   flutter_launcher_icons: ^0.14.4
   dio: ^5.9.2
   flutter_dotenv: ^6.0.0
   firebase_core: ^4.6.0
   firebase_messaging: ^16.1.3
+  # Foreground bridge: FCM does not auto-display notifications while the app is
+  # open on Android, so we post a local notification on the same high-importance
+  # channel to satisfy the "always show in the system panel" requirement.
+  flutter_local_notifications: ^21.0.0
   badges: ^3.2.0
-
+  file_picker: ^11.0.2
+  url_launcher: ^6.3.2
+  # Persistent (disk + memory) cache for remote avatars / attachments so they
+  # aren't re-downloaded on every cold start — important on slow campus / 3G.
+  cached_network_image: ^3.4.1
 
 dev_dependencies:
   flutter_test:
@@ -65,13 +73,11 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
   assets:
-    - assets/images/
     - images/
     - .env
 
@@ -108,13 +114,8 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "images/Logo1.png"
-  adaptive_icon_background: "#14385d"
-  adaptive_icon_foreground: "images/Logo1.png"
-  min_sdk_android: 21 
+  image_path: "images/loading.png"
+  adaptive_icon_background: "#17375f"
+  adaptive_icon_foreground: "images/loading.png"
+  min_sdk_android: 21
 
-flutter_native_splash:
-  color: "#14385d"
-
-  android_12:
-    color: "#14385d"

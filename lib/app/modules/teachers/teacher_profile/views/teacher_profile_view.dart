@@ -20,10 +20,7 @@ class TeacherProfileView extends GetView<TeacherProfileController> {
     }
     return AppPageScaffold(
       title: 'ໂປຣໄຟລ໌',
-      trailing: AppIconBubble(
-        icon: Icons.notifications_none_rounded,
-        onTap: () => Get.toNamed('/teacher-noti'),
-      ),
+      trailing: const NotiBellButton(route: '/teacher-noti'),
       body: _TeacherProfileBody(controller: controller),
     );
   }
@@ -78,7 +75,7 @@ class _TeacherProfileContent extends StatelessWidget {
             name: displayName,
             subtitle: email,
             caption: roles.join(', '),
-            avatarFallback: displayName.isNotEmpty ? displayName : '?',
+            photo: user?.teacher?.photo,
           ),
           const SizedBox(height: 25),
           const AppSectionTitle('ຂໍ້ມູນບັນຊີ'),
@@ -220,7 +217,7 @@ class _RoleTile extends StatelessWidget {
       ),
       subtitle: Text(
         info.desc,
-        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
       trailing: Icon(Icons.check_circle_rounded, color: info.color, size: 18),
     );
@@ -278,7 +275,7 @@ class _RoleInfo {
       case 'admin':
         return const _RoleInfo(
           Icons.shield_rounded,
-          Colors.indigo,
+          AppColors.info,
           'ເຂົ້າເຖິງລະບົບທັງໝົດ',
         );
       case 'teacher':

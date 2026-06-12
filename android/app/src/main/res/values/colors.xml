@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#17375f</color>
+    <!-- Tint applied behind the white status-bar icon on the expanded panel.
+         Matches AppColors.primary (the app's teal brand colour). -->
+    <color name="ams_notification_accent">#40b4cd</color>
 </resources>

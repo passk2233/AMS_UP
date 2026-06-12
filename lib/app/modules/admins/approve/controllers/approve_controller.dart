@@ -2,7 +2,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/admin_app_bar/admin_app_bar_controllers.dart';
 import '../../../../widgets/app_colors.dart';
 import '../../../../widgets/app_dialogs.dart';
@@ -29,6 +28,14 @@ abstract class ApproveTab {
 /// reflects the active [selectedTab] + [searchQuery], maintains live status
 /// counters, and supports both per-row and bulk approve/reject.
 class ApproveController extends GetxController {
+  /// Injected so tests can supply a mock; defaults to the shared provider in
+  /// production via the binding.
+  ApproveController({BookingProvider? provider})
+      : _provider = provider ?? BookingProvider();
+
+  /// Data-access seam for the `room_bookings` resource.
+  final BookingProvider _provider;
+
   /// Raw bookings returned by the last fetch.
   final RxList<RoomBookingModel> bookings = <RoomBookingModel>[].obs;
 
@@ -72,8 +79,6 @@ class ApproveController extends GetxController {
   /// IDs of bookings currently included in the bulk selection.
   final RxSet<int> selectedBookingIds = <int>{}.obs;
 
-  Dio get _dio => ApiClient.dio;
-
   @override
   void onInit() {
     super.onInit();
@@ -95,19 +100,9 @@ class ApproveController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response = await _dio.get(
-        '/room-bookings',
-        queryParameters: {'limit': 200},
-      );
-      if (response.statusCode == 200) {
-        bookings.assignAll(
-          _extractList(response.data)
-              .map((json) => RoomBookingModel.fromJson(json))
-              .toList(),
-        );
-        _updateStats();
-        _applyFilters();
-      }
+      bookings.assignAll(await _provider.fetchBookings());
+      _updateStats();
+      _applyFilters();
     } on DioException catch (e) {
       errorMessage.value = 'ບໍ່ສາມາດໂຫຼດຂໍ້ມູນການຈອງໄດ້';
       debugPrint('Failed to fetch bookings: ${e.message}');
@@ -209,11 +204,7 @@ class ApproveController extends GetxController {
     if (confirmed != true) return;
 
     try {
-      final response = await _dio.patch(
-        '/room-bookings/$bookingId/status',
-        data: {'status': status},
-      );
-      if (response.statusCode != 200) return;
+      await _provider.updateStatus(bookingId, status);
 
       final index = bookings.indexWhere((b) => b.bookingId == bookingId);
       if (index != -1) {
@@ -280,10 +271,7 @@ class ApproveController extends GetxController {
     try {
       for (final id in ids) {
         try {
-          await _dio.patch(
-            '/room-bookings/$id/status',
-            data: {'status': status},
-          );
+          await _provider.updateStatus(id, status);
           final index = bookings.indexWhere((b) => b.bookingId == id);
           if (index != -1) bookings[index].status = status;
           success++;
@@ -398,11 +386,5 @@ class ApproveController extends GetxController {
       message: message,
       detail: AppDialogs.buildDioErrorDetail(e),
     );
-  }
-
-  List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
   }
 }

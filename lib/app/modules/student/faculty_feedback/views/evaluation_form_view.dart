@@ -3,7 +3,7 @@ import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 
 import '../controllers/faculty_feedback_controller.dart';
-import 'faculty_model.dart';
+import 'package:frontend/app/modules/data/models/faculty_model.dart';
 
 class EvaluationFormView extends GetView<FacultyFeedbackController> {
   const EvaluationFormView({super.key});
@@ -125,18 +125,7 @@ class _FacultyHeader extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.m),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 32,
-            backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-            child: Text(
-              faculty.initials,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-              ),
-            ),
-          ),
+          AppAvatar(photo: faculty.photo, radius: 32),
           const SizedBox(width: AppSpacing.m),
           Expanded(
             child: Column(

@@ -3,16 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../services/api_client.dart';
 import '../../../../widgets/app_dialogs.dart';
+import '../../../../widgets/noti_bell.dart';
 import '../../../data/data_exporter.dart';
 
-/// Reactive state owner for [TeacherNotiView].
+/// Reactive state for [TeacherNotiView].
 ///
-/// Loads the most recent notifications on init, exposes a filtered view
-/// driven by [selectedFilterIndex] (0 = All, 1 = Academic, 2 = Room Booking),
-/// and optimistically marks notifications as read.
+/// Reads the signed-in teacher's **personal inbox** from `GET /user-noti`
+/// (rows scoped to the current user, each with its parent notification
+/// preloaded) and marks rows read via `PATCH /user-noti/:id/read`. The view
+/// item's `id` is the `user_noti` row id, which is what mark-as-read needs.
 class TeacherNotiController extends GetxController {
+  TeacherNotiController({NotificationProvider? provider})
+      : _noti = provider ?? NotificationProvider();
+
+  /// Data-access seam for notifications.
+  final NotificationProvider _noti;
+
   /// Currently selected filter chip index — 0 = All, 1 = Academic,
   /// 2 = Room Booking.
   final RxInt selectedFilterIndex = 0.obs;
@@ -23,10 +30,8 @@ class TeacherNotiController extends GetxController {
   /// User-facing error message from the last load; empty when none.
   final RxString errorMessage = ''.obs;
 
-  /// Raw notifications returned by the API.
-  final RxList<NotificationModel> notifications = <NotificationModel>[].obs;
-
-  Dio get _dio => ApiClient.dio;
+  /// The current user's inbox rows, newest first.
+  final RxList<UserNotiModel> notifications = <UserNotiModel>[].obs;
 
   @override
   void onInit() {
@@ -34,32 +39,28 @@ class TeacherNotiController extends GetxController {
     fetchNotifications();
   }
 
-  /// GET `/notifications` and populate [notifications]. Errors map to a
+  /// GET `/user-noti` and populate [notifications]. Errors map to a
   /// localized message in [errorMessage].
   Future<void> fetchNotifications() async {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final response = await _dio.get(
-        '/notifications',
-        queryParameters: {'limit': 100},
-      );
-      notifications.assignAll(
-        _extractList(response.data)
-            .map((j) => NotificationModel.fromJson(j))
-            .toList(),
-      );
+      notifications.assignAll(await _noti.fetchInbox());
+      notiBadge.setCount(unreadCount);
     } on DioException catch (e) {
       debugPrint(
         'TeacherNoti Dio error:\n${AppDialogs.buildDioErrorDetail(e)}',
       );
       errorMessage.value = e.response?.statusCode == 401
-          ? 'Session expired. Please login again.'
-          : 'Failed to load notifications.';
+          ? 'ການເຂົ້າລະບົບຫມົດອາຍຸ. ກະລຸນາເຂົ້າສູ່ລະບົບໃໝ່.'
+          : 'ບໍ່ສາມາດໂຫຼດການແຈ້ງເຕືອນໄດ້.';
     } finally {
       isLoading.value = false;
     }
   }
+
+  /// Pull-to-refresh / tab-activation hook.
+  Future<void> refreshData() => fetchNotifications();
 
   /// Notifications projected to view-model maps, filtered by
   /// [selectedFilterIndex].
@@ -74,59 +75,94 @@ class TeacherNotiController extends GetxController {
   /// Number of unread notifications.
   int get unreadCount => notifications.where((n) => n.isRead == 0).length;
 
-  /// Mark a notification read locally first, then sync to the backend.
-  /// No-op if the notification is unknown or already read.
-  Future<void> markAsRead(int notiId) async {
-    final idx = notifications.indexWhere((n) => n.notiId == notiId);
+  /// Optimistically marks an inbox row read locally and tells the backend.
+  /// [userNotiId] is the `user_noti` row id (not the notification id).
+  Future<void> markAsRead(int userNotiId) async {
+    final idx = notifications.indexWhere((n) => n.id == userNotiId);
     if (idx == -1 || notifications[idx].isRead == 1) return;
 
     notifications[idx].isRead = 1;
     notifications.refresh();
+    notiBadge.setCount(unreadCount);
 
     try {
-      await _dio.put('/notifications/$notiId/read');
+      await _noti.markRead(userNotiId);
     } on DioException catch (e) {
-      debugPrint('markAsRead failed for $notiId: ${e.message}');
+      debugPrint('markAsRead failed for $userNotiId: ${e.message}');
     }
   }
 
-  /// Convert a model into the loose view-model map consumed by the list
+  /// Marks the whole inbox read: optimistic local flip + badge clear, then
+  /// one bulk `PATCH /user-noti/read-all`. On failure the list is re-fetched
+  /// so the optimistic flip cannot drift from the server.
+  Future<void> markAllAsRead() async {
+    if (unreadCount == 0) return;
+    for (final n in notifications) {
+      n.isRead = 1;
+    }
+    notifications.refresh();
+    notiBadge.setCount(0);
+
+    try {
+      await _noti.markAllRead();
+    } on DioException catch (e) {
+      debugPrint('markAllAsRead failed: ${e.message}');
+      await fetchNotifications();
+    }
+  }
+
+  /// Convert an inbox row into the loose view-model map consumed by the list
   /// items. Urgent rows carry a status pill; normal rows don't.
-  Map<String, dynamic> _toViewItem(NotificationModel n) {
-    final typeRaw = (n.type ?? '').toLowerCase();
+  Map<String, dynamic> _toViewItem(UserNotiModel n) {
+    final noti = n.notification;
+    final typeRaw = (noti?.type ?? '').toLowerCase();
     final isUrgent = typeRaw == 'urgent';
     final category = typeRaw.contains('booking') ? 'Room Booking' : 'Academic';
-    final ts = n.createdAt;
-    final time = ts == null
-        ? '-'
-        : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+
+    final ts = n.createAt ?? noti?.createdAt;
+    final time =
+        ts == null ? '-' : DateFormat('yyyy-MM-dd HH:mm').format(ts.toLocal());
+    final title = noti?.title ?? '';
+    final message = noti?.message ?? '';
+
+    // The full notification handed to NotificationDetailView on tap. Synthesize
+    // a minimal stand-in if the row arrived without its parent preloaded, so a
+    // tap still opens a readable (if sparse) detail instead of doing nothing.
+    final model = noti ??
+        NotificationModel(
+          notiId: n.notiId,
+          title: title,
+          message: message,
+          isRead: n.isRead,
+          createdAt: ts,
+        );
 
     if (isUrgent) {
       return {
-        'id': n.notiId,
+        'id': n.id,
         'unread': n.isRead == 0,
         'type': 'Urgent',
         'category': category,
-        'title': n.title,
-        'sub': n.message,
-        'status': 'Urgent',
+        'title': title,
+        'sub': message,
+        'status': 'ດ່ວນ',
         'time': time,
+        'model': model,
+        'timestamp': ts,
       };
     }
     return {
-      'id': n.notiId,
+      'id': n.id,
       'unread': n.isRead == 0,
       'type': 'Normal',
       'category': category,
-      'title': n.title,
-      'desc': n.message,
+      'title': title,
+      'desc': message,
       'time': time,
+      'files': noti?.files,
+      'model': model,
+      'timestamp': ts,
     };
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const <dynamic>[];
-  }
 }

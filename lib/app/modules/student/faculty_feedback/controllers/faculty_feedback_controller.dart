@@ -2,11 +2,21 @@ import 'package:dio/dio.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
-import 'package:frontend/app/modules/student/faculty_feedback/views/faculty_model.dart';
-import 'package:frontend/app/services/api_client.dart';
 import 'package:frontend/app/widgets/app_dialogs.dart';
 
 class FacultyFeedbackController extends GetxController {
+  FacultyFeedbackController({
+    AuthProvider? auth,
+    AcademicProvider? academic,
+    EvaluationProvider? evaluation,
+  })  : _auth = auth ?? AuthProvider(),
+        _academic = academic ?? AcademicProvider(),
+        _eval = evaluation ?? EvaluationProvider();
+
+  final AuthProvider _auth;
+  final AcademicProvider _academic;
+  final EvaluationProvider _eval;
+
   final RxList<Faculty> facultyList = <Faculty>[].obs;
   final RxList<EvaluationQuestionModel> questions = <EvaluationQuestionModel>[].obs;
   final RxBool isLoading = false.obs;
@@ -23,7 +33,6 @@ class FacultyFeedbackController extends GetxController {
   final Rx<OpenEvaluationModel?> activeWindow =
       Rx<OpenEvaluationModel?>(null);
 
-  Dio get _dio => ApiClient.dio;
   int? _studentId;
   int? _stdGroupId;
 
@@ -40,13 +49,12 @@ class FacultyFeedbackController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      final me = await _dio.get('/auth/me');
-      final user = UserModel.fromJson(me.data);
-      _studentId = user.stdId ?? user.student?.id;
-      _stdGroupId = user.student?.stdGroupId;
+      final user = await _auth.me();
+      _studentId = user?.stdId ?? user?.student?.id;
+      _stdGroupId = user?.student?.stdGroupId;
 
       if (_studentId == null || _stdGroupId == null) {
-        errorMessage.value = 'Student account is not linked.';
+        errorMessage.value = 'ບັນຊີນັກສຶກສາຍັງບໍ່ໄດ້ເຊື່ອມຕໍ່.';
         return;
       }
 
@@ -57,17 +65,13 @@ class FacultyFeedbackController extends GetxController {
         return;
       }
 
-      final qResp = await _dio.get('/evaluation-questions', queryParameters: {'is_active': 1});
-      final qItems = _extractList(qResp.data);
-      questions.assignAll(qItems.map((e) => EvaluationQuestionModel.fromJson(e)).toList());
+      questions.assignAll(await _eval.fetchQuestions(activeOnly: true));
       ratings.assignAll(List.filled(questions.length, 0));
 
-      final planResp = await _dio.get('/study-plans', queryParameters: {
-        'std_group_id': _stdGroupId,
-        'limit': 200,
-      });
-      final planItems = _extractList(planResp.data);
-      final plans = planItems.map((e) => StudyPlanModel.fromJson(e)).toList();
+      final plans = await _academic.fetchStudyPlans(
+        studentGroupId: _stdGroupId,
+        limit: 200,
+      );
 
       final list = <Faculty>[];
       for (final p in plans) {
@@ -85,12 +89,13 @@ class FacultyFeedbackController extends GetxController {
           initials: initials,
           name: teacherName,
           course: subjectName,
+          photo: teacher.photo,
           isSubmitted: submitted,
         ));
       }
       facultyList.assignAll(list);
     } on DioException catch (e) {
-      errorMessage.value = 'Failed to load faculty list.';
+      errorMessage.value = 'ບໍ່ສາມາດໂຫຼດລາຍການອາຈານໄດ້.';
       Get.log(AppDialogs.buildDioErrorDetail(e));
     } finally {
       isLoading.value = false;
@@ -104,19 +109,11 @@ class FacultyFeedbackController extends GetxController {
 
   Future<void> _fetchEvaluationWindow() async {
     try {
-      final resp = await _dio.get(
-        '/open-evalu',
-        queryParameters: {'limit': 1, 'inactive': 0},
-      );
-      final items = _extractList(resp.data);
-      if (items.isEmpty) {
-        activeWindow.value = null;
-        isEvaluationOpen.value = false;
-        return;
-      }
-      final window = OpenEvaluationModel.fromJson(items.first);
+      final window = await _eval.fetchActiveWindow();
       activeWindow.value = window;
-      isEvaluationOpen.value = window.inactive == 0;
+      // isOpenNow (not just inactive == 0) so a window scheduled for the
+      // future doesn't open the form early and an expired one closes itself.
+      isEvaluationOpen.value = window?.isOpenNow ?? false;
     } on DioException catch (e) {
       activeWindow.value = null;
       isEvaluationOpen.value = false;
@@ -125,12 +122,11 @@ class FacultyFeedbackController extends GetxController {
   }
 
   Future<bool> _hasSubmitted(int studyPlanId, int studentId) async {
-    final r = await _dio.get('/evaluation-results', queryParameters: {
-      'study_plan_id': studyPlanId,
-      'student_id': studentId,
-      'limit': 200,
-    });
-    final items = _extractList(r.data);
+    final items = await _eval.fetchResults(
+      studyPlanId: studyPlanId,
+      studentId: studentId,
+      limit: 200,
+    );
     // Only consider fully submitted when every active question has a result.
     // A partial submission (some POSTs failed mid-loop) must not lock the
     // student out — they should be able to re-open the form and re-submit.
@@ -152,16 +148,16 @@ class FacultyFeedbackController extends GetxController {
   Future<void> submitFeedback(Faculty faculty) async {
     if (_studentId == null) return;
     if (!isEvaluationOpen.value) {
-      Get.snackbar('Warning', 'ໄລຍະການປະເມີນຍັງບໍ່ໄດ້ເປີດ.');
+      Get.snackbar('ເຕືອນ', 'ໄລຍະການປະເມີນຍັງບໍ່ໄດ້ເປີດ.');
       return;
     }
     if (questions.isEmpty) {
-      Get.snackbar('Warning', 'No evaluation questions found.');
+      Get.snackbar('ເຕືອນ', 'ບໍ່ພົບຄໍາຖາມປະເມີນ.');
       return;
     }
     for (int i = 0; i < ratings.length; i++) {
       if (ratings[i] <= 0) {
-        Get.snackbar('Warning', 'Please rate all questions.');
+        Get.snackbar('ເຕືອນ', 'ກະລຸນາໃຫ້ຄະແນນຄົບທຸກຄໍາຖາມ.');
         return;
       }
     }
@@ -169,13 +165,13 @@ class FacultyFeedbackController extends GetxController {
     try {
       isLoading.value = true;
       for (int i = 0; i < questions.length; i++) {
-        await _dio.post('/evaluation-results', data: {
-          'study_plan_id': faculty.studyPlanId,
-          'student_id': _studentId,
-          'eva_question_id': questions[i].evaQuestionId,
-          'score': ratings[i],
-          'comment': i == 0 ? comment.value.trim() : null,
-        });
+        await _eval.submitResult(
+          studyPlanId: faculty.studyPlanId,
+          studentId: _studentId!,
+          evaQuestionId: questions[i].evaQuestionId,
+          score: ratings[i],
+          comment: i == 0 ? comment.value.trim() : null,
+        );
       }
 
       final index = facultyList.indexWhere((f) => f.studyPlanId == faculty.studyPlanId);
@@ -186,6 +182,7 @@ class FacultyFeedbackController extends GetxController {
           initials: faculty.initials,
           name: faculty.name,
           course: faculty.course,
+          photo: faculty.photo,
           isSubmitted: true,
         );
       }
@@ -196,7 +193,7 @@ class FacultyFeedbackController extends GetxController {
         Get.snackbar('ສຳເລັດ', 'ສົ່ງການປະເມີນສຳເລັດ.');
       });
     } on DioException catch (e) {
-      Get.snackbar('Error', 'Failed to submit feedback.');
+      Get.snackbar('ຜິດພາດ', 'ສົ່ງການປະເມີນບໍ່ສຳເລັດ.');
       Get.log(AppDialogs.buildDioErrorDetail(e));
     } finally {
       isLoading.value = false;
@@ -210,9 +207,4 @@ class FacultyFeedbackController extends GetxController {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  static List<dynamic> _extractList(dynamic data) {
-    if (data is List) return data;
-    if (data is Map && data['data'] is List) return data['data'] as List;
-    return const [];
-  }
 }

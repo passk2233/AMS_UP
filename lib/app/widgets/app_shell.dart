@@ -42,11 +42,7 @@ class AppPageScaffold extends StatelessWidget {
                 children: [
                   const SizedBox(width: 40),
                   Expanded(child: AppPageTitle(text: title!)),
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: trailing,
-                  ),
+                  SizedBox(width: 40, height: 40, child: trailing),
                 ],
               ),
             ),
@@ -144,8 +140,6 @@ class AppSurfaceCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final EdgeInsetsGeometry margin;
-  final Color? borderLeftColor;
-  final double borderLeftWidth;
   final VoidCallback? onTap;
 
   const AppSurfaceCard({
@@ -153,8 +147,6 @@ class AppSurfaceCard extends StatelessWidget {
     required this.child,
     this.padding = EdgeInsets.zero,
     this.margin = EdgeInsets.zero,
-    this.borderLeftColor,
-    this.borderLeftWidth = 4,
     this.onTap,
   });
 
@@ -166,14 +158,6 @@ class AppSurfaceCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(AppColors.cardRadius),
-        border: borderLeftColor != null
-            ? Border(
-                left: BorderSide(
-                  color: borderLeftColor!,
-                  width: borderLeftWidth,
-                ),
-              )
-            : null,
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.06),
@@ -198,21 +182,51 @@ class AppSurfaceCard extends StatelessWidget {
 }
 
 /// Circular icon button used inside headers (notifications, refresh).
+///
+/// When [badgeCount] is greater than zero, a red corner [Badge] is overlaid on
+/// the glyph — used by the notification bell to surface the unread count.
 class AppIconBubble extends StatelessWidget {
   final IconData icon;
   final VoidCallback? onTap;
   final Color? color;
+
+  /// Optional unread count rendered as a red corner badge; `0` hides it.
+  final int badgeCount;
+
+  /// Accessible name for this icon-only control (e.g. "ການແຈ້ງເຕືອນ"). When
+  /// set, the button is announced with this label plus the unread count, and
+  /// the decorative glyph/badge are excluded from the semantics tree.
+  final String? semanticLabel;
 
   const AppIconBubble({
     super.key,
     required this.icon,
     this.onTap,
     this.color,
+    this.badgeCount = 0,
+    this.semanticLabel,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
+    Widget glyph = Icon(icon, color: color ?? AppColors.textPrimary, size: 22);
+    if (badgeCount > 0) {
+      glyph = Badge(
+        label: Text(
+          badgeCount > 99 ? '99+' : '$badgeCount',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 9,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: AppColors.rejectRed,
+        offset: const Offset(6, -4),
+        child: glyph,
+      );
+    }
+
+    final Widget bubble = Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(AppColors.cardRadius),
@@ -220,6 +234,12 @@ class AppIconBubble extends StatelessWidget {
         child: Container(
           width: AppColors.minTouchTarget,
           height: AppColors.minTouchTarget,
+          // Center the glyph explicitly. Without this the fixed-size box sends
+          // tight constraints to the child: a bare Icon self-centers, but once
+          // wrapped in a Badge (badgeCount > 0) the Badge's Stack defaults to
+          // topStart and pins the icon to the top-left — the visible "jump to
+          // the left" when the unread dot appears.
+          alignment: Alignment.center,
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(AppColors.cardRadius),
@@ -231,9 +251,17 @@ class AppIconBubble extends StatelessWidget {
               ),
             ],
           ),
-          child: Icon(icon, color: color ?? AppColors.textPrimary, size: 22),
+          child: glyph,
         ),
       ),
+    );
+
+    if (semanticLabel == null) return Semantics(button: true, child: bubble);
+    return Semantics(
+      button: true,
+      label: badgeCount > 0 ? '$semanticLabel, $badgeCount' : semanticLabel,
+      excludeSemantics: true,
+      child: bubble,
     );
   }
 }

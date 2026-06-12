@@ -68,5 +68,14 @@
 		</array>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<!-- Allow FCM to wake the app for background/data pushes. Visible alert
+		     pushes are shown by the OS regardless; this also enables handling of
+		     content-available messages. Pair with the "Push Notifications"
+		     capability (aps-environment entitlement) added in Xcode. -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+			<string>fetch</string>
+		</array>
 	</dict>
 </plist>

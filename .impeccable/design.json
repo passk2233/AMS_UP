@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-01T00:00:00Z",
+  "title": "Design System: AMS UP",
+  "extensions": {
+    "colorMeta": {
+      "faculty-teal": {
+        "role": "primary",
+        "displayName": "Faculty Teal",
+        "canonical": "oklch(0.71 0.10 216)",
+        "tonalRamp": ["oklch(0.20 0.06 216)", "oklch(0.32 0.08 216)", "oklch(0.45 0.10 216)", "oklch(0.58 0.10 216)", "oklch(0.71 0.10 216)", "oklch(0.80 0.08 216)", "oklch(0.88 0.05 216)", "oklch(0.95 0.02 216)"]
+      },
+      "info-blue": {
+        "role": "secondary",
+        "displayName": "Info Blue",
+        "canonical": "oklch(0.49 0.18 264)",
+        "tonalRamp": ["oklch(0.20 0.09 264)", "oklch(0.30 0.13 264)", "oklch(0.40 0.16 264)", "oklch(0.49 0.18 264)", "oklch(0.60 0.16 264)", "oklch(0.72 0.12 264)", "oklch(0.84 0.07 264)", "oklch(0.94 0.03 264)"]
+      },
+      "identity-navy": {
+        "role": "tertiary",
+        "displayName": "Identity Navy",
+        "canonical": "oklch(0.33 0.07 250)",
+        "tonalRamp": ["oklch(0.18 0.05 250)", "oklch(0.25 0.06 250)", "oklch(0.33 0.07 250)", "oklch(0.45 0.08 250)", "oklch(0.58 0.08 250)", "oklch(0.70 0.06 250)", "oklch(0.82 0.04 250)", "oklch(0.93 0.02 250)"]
+      },
+      "highlight-gold": {
+        "role": "tertiary",
+        "displayName": "Highlight Gold",
+        "canonical": "oklch(0.84 0.14 90)",
+        "tonalRamp": ["oklch(0.40 0.06 90)", "oklch(0.52 0.09 90)", "oklch(0.64 0.11 90)", "oklch(0.74 0.13 90)", "oklch(0.84 0.14 90)", "oklch(0.90 0.10 90)", "oklch(0.95 0.06 90)", "oklch(0.98 0.02 90)"]
+      },
+      "approved-emerald": {
+        "role": "status",
+        "displayName": "Approved Emerald",
+        "canonical": "oklch(0.52 0.10 164)",
+        "tonalRamp": ["oklch(0.22 0.05 164)", "oklch(0.32 0.07 164)", "oklch(0.42 0.09 164)", "oklch(0.52 0.10 164)", "oklch(0.64 0.10 164)", "oklch(0.76 0.08 164)", "oklch(0.86 0.05 164)", "oklch(0.95 0.02 164)"]
+      },
+      "pending-amber": {
+        "role": "status",
+        "displayName": "Pending Amber",
+        "canonical": "oklch(0.78 0.16 70)",
+        "tonalRamp": ["oklch(0.35 0.07 70)", "oklch(0.48 0.10 70)", "oklch(0.60 0.13 70)", "oklch(0.70 0.15 70)", "oklch(0.78 0.16 70)", "oklch(0.86 0.12 70)", "oklch(0.92 0.07 70)", "oklch(0.97 0.03 70)"]
+      },
+      "reject-red": {
+        "role": "status",
+        "displayName": "Reject Red",
+        "canonical": "oklch(0.60 0.22 27)",
+        "tonalRamp": ["oklch(0.25 0.10 27)", "oklch(0.37 0.15 27)", "oklch(0.48 0.19 27)", "oklch(0.60 0.22 27)", "oklch(0.70 0.18 27)", "oklch(0.80 0.12 27)", "oklch(0.89 0.06 27)", "oklch(0.96 0.02 27)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(0.20 0.03 280)",
+        "tonalRamp": ["oklch(0.18 0.03 280)", "oklch(0.30 0.03 280)", "oklch(0.42 0.025 280)", "oklch(0.54 0.02 280)", "oklch(0.66 0.015 280)", "oklch(0.78 0.01 280)", "oklch(0.88 0.008 280)", "oklch(0.96 0.004 280)"]
+      },
+      "slate-gray": {
+        "role": "neutral",
+        "displayName": "Slate Gray",
+        "canonical": "oklch(0.56 0.02 265)",
+        "tonalRamp": ["oklch(0.25 0.02 265)", "oklch(0.37 0.02 265)", "oklch(0.46 0.02 265)", "oklch(0.56 0.02 265)", "oklch(0.67 0.015 265)", "oklch(0.78 0.012 265)", "oklch(0.88 0.008 265)", "oklch(0.96 0.004 265)"]
+      },
+      "mist-gray": {
+        "role": "neutral",
+        "displayName": "Mist Gray",
+        "canonical": "oklch(0.97 0.004 250)",
+        "tonalRamp": ["oklch(0.40 0.01 250)", "oklch(0.55 0.008 250)", "oklch(0.68 0.006 250)", "oklch(0.80 0.005 250)", "oklch(0.88 0.005 250)", "oklch(0.93 0.004 250)", "oklch(0.97 0.004 250)", "oklch(0.99 0.002 250)"]
+      },
+      "surface-white": {
+        "role": "neutral",
+        "displayName": "Surface White",
+        "canonical": "oklch(1 0 0)",
+        "tonalRamp": ["oklch(0.55 0 0)", "oklch(0.68 0 0)", "oklch(0.78 0 0)", "oklch(0.86 0 0)", "oklch(0.92 0 0)", "oklch(0.96 0 0)", "oklch(0.99 0 0)", "oklch(1 0 0)"]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Largest type: dashboard headline numbers, boldest statements. 24px/700." },
+      "heading": { "displayName": "Heading", "purpose": "Section headers, dialog titles, app-bar titles. 18px/600." },
+      "subheading": { "displayName": "Subheading", "purpose": "Card headers and grouped-content labels. 16px/600." },
+      "body": { "displayName": "Body", "purpose": "Default reading text and input text. 16px/400, 65-75ch." },
+      "label": { "displayName": "Label", "purpose": "Field labels above inputs, button captions, dense metadata. 14px/600." },
+      "caption": { "displayName": "Caption", "purpose": "Helper text, timestamps, field errors. Smallest type that ships. 12px/400." }
+    },
+    "shadows": [
+      { "name": "surface-rest", "value": "0 2px 8px rgba(0,0,0,0.06)", "purpose": "Default card lift. Surface cards, stat cards, class cards, icon bubbles." },
+      { "name": "nav-lift", "value": "0 -2px 12px rgba(0,0,0,0.08)", "purpose": "Upward shadow separating the bottom nav from scrolling content." },
+      { "name": "chip-rest", "value": "0 2px 6px rgba(0,0,0,0.06)", "purpose": "Idle filter chip." },
+      { "name": "accent-glow", "value": "0 2px 8px rgba(50,87,204,0.30)", "purpose": "Colored glow under an active element or branded banner, tinted in its own hue at ~30% (Info Blue on the default selected chip and stat banner). Neutral surfaces never use this." }
+    ],
+    "motion": [
+      { "name": "state-transition", "value": "200ms", "purpose": "Chip selection, bottom-nav tile state. AnimatedContainer default." },
+      { "name": "toast-in", "value": "250ms", "purpose": "Snackbar entrance from the top edge." },
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Ease-out for state transitions and reveals; no bounce, no elastic." }
+    ],
+    "breakpoints": [
+      { "name": "android-baseline", "value": "360px", "purpose": "Android mobile baseline (360x800 dp). Primary design target." },
+      { "name": "ios-baseline", "value": "375px", "purpose": "iOS mobile baseline (375x812 pt)." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid Faculty Teal action button, full-width, 48dp tall. One per screen. Disables and shows an inline spinner while loading.",
+      "html": "<button class=\"ds-btn-primary\">ບັນທຶກ / Save changes</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; background: #40b4cd; color: #ffffff; font: 600 16px/1.2 Roboto, 'SF Pro Text', system-ui, sans-serif; border: none; border-radius: 12px; cursor: pointer; transition: background 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-primary:hover { background: #379eb5; } .ds-btn-primary:focus-visible { outline: 2px solid #40b4cd; outline-offset: 2px; } .ds-btn-primary:disabled { background: rgba(64,180,205,0.5); color: rgba(255,255,255,0.85); cursor: default; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Outlined teal button for Cancel / Back / alternative actions beside a primary.",
+      "html": "<button class=\"ds-btn-secondary\">ຍົກເລີກ / Cancel</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 24px; background: transparent; color: #40b4cd; font: 600 16px/1.2 Roboto, 'SF Pro Text', system-ui, sans-serif; border: 1.2px solid #40b4cd; border-radius: 12px; cursor: pointer; transition: background 200ms cubic-bezier(0.16,1,0.3,1); } .ds-btn-secondary:hover { background: rgba(64,180,205,0.08); } .ds-btn-secondary:focus-visible { outline: 2px solid #40b4cd; outline-offset: 2px; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Single-select pill in a horizontal scrolling row. Selected fills with Info Blue and casts a glow in its own hue.",
+      "html": "<div class=\"ds-chip-row\"><button class=\"ds-chip ds-chip--selected\">ທັງໝົດ</button><button class=\"ds-chip\">ລໍຖ້າ</button><button class=\"ds-chip\">ອະນຸມັດ</button></div>",
+      "css": ".ds-chip-row { display: flex; gap: 8px; } .ds-chip { min-height: 48px; padding: 10px 18px; background: #ffffff; color: #1a1a2e; font: 400 13px/1 Roboto, 'SF Pro Text', system-ui, sans-serif; border: none; border-radius: 20px; box-shadow: 0 2px 6px rgba(0,0,0,0.06); cursor: pointer; transition: background 200ms cubic-bezier(0.16,1,0.3,1), box-shadow 200ms; } .ds-chip--selected { background: #3257cc; color: #ffffff; font-weight: 700; box-shadow: 0 2px 8px rgba(50,87,204,0.30); } .ds-chip:focus-visible { outline: 2px solid #3257cc; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Label-above field, Mist Gray fill, teal focus border. Required fields add a red asterisk; errors turn the border red with a caption below.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field__label\">ອີເມວ / Email <span class=\"ds-field__req\">*</span></span><input class=\"ds-input\" type=\"email\" placeholder=\"you@ceit.la\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; } .ds-field__label { padding-left: 4px; font: 600 14px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #1a1a2e; } .ds-field__req { color: #e53935; } .ds-input { min-height: 48px; padding: 14px 16px; background: #f5f7fa; color: #1a1a2e; font: 400 16px/1.4 Roboto, 'SF Pro Text', system-ui, sans-serif; border: 1px solid #e5e7eb; border-radius: 12px; outline: none; transition: border-color 150ms; } .ds-input::placeholder { color: rgba(107,114,128,0.7); } .ds-input:focus { border-color: #40b4cd; border-width: 1.5px; } .ds-input:disabled { border-color: #f3f4f6; }"
+    },
+    {
+      "name": "Surface Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "The base white card used everywhere for grouped info. 14px radius, single soft rest shadow, flat at rest.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card__title\">ຫ້ອງ A201</h3><p class=\"ds-card__body\">ຄວາມຈຸ 40 ບ່ອນ · ວ່າງ</p></div>",
+      "css": ".ds-card { padding: 16px; background: #ffffff; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); } .ds-card__title { margin: 0 0 4px; font: 600 16px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #1a1a2e; } .ds-card__body { margin: 0; font: 400 14px/1.4 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #6b7280; }"
+    },
+    {
+      "name": "Class Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Schedule / booking card: surface card with a 4px status-colored left edge, a tinted leading-icon badge, title in the status hue, and a meta row of time / instructor / room pills.",
+      "html": "<div class=\"ds-classcard\"><div class=\"ds-classcard__head\"><span class=\"ds-classcard__icon\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"#067a59\"><path d=\"M4 6h16v2H4zm0 5h16v2H4zm0 5h10v2H4z\"/></svg></span><div><div class=\"ds-classcard__title\">Data Structures</div><div class=\"ds-classcard__sub\">CS-204</div></div></div><div class=\"ds-classcard__meta\"><span>08:00 - 09:30</span><span>Rm A201</span></div></div>",
+      "css": ".ds-classcard { padding: 14px; background: #ffffff; border-radius: 14px; border-left: 4px solid #067a59; box-shadow: 0 2px 8px rgba(0,0,0,0.06); } .ds-classcard__head { display: flex; align-items: center; gap: 10px; } .ds-classcard__icon { display: inline-flex; padding: 8px; background: rgba(6,122,89,0.10); border-radius: 10px; } .ds-classcard__title { font: 700 14px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #067a59; } .ds-classcard__sub { font: 400 12px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #6b7280; } .ds-classcard__meta { display: flex; gap: 16px; margin-top: 10px; font: 400 12px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #9ca3af; }"
+    },
+    {
+      "name": "Stat Card",
+      "kind": "card",
+      "refersTo": "card-surface",
+      "description": "Vertical dashboard stat: tinted icon badge, large colored value, muted label.",
+      "html": "<div class=\"ds-statcard\"><span class=\"ds-statcard__icon\"><svg viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" fill=\"#f59e0b\"><path d=\"M12 8v5l4 2 .8-1.6L13.5 12V8zM12 2a10 10 0 100 20 10 10 0 000-20z\"/></svg></span><span class=\"ds-statcard__value\">7</span><span class=\"ds-statcard__label\">ລໍຖ້າອະນຸມັດ</span></div>",
+      "css": ".ds-statcard { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 12px; background: #ffffff; border-radius: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); } .ds-statcard__icon { display: inline-flex; padding: 8px; background: rgba(245,158,11,0.10); border-radius: 10px; } .ds-statcard__value { font: 700 18px/1 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #f59e0b; } .ds-statcard__label { font: 400 12px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #6b7280; }"
+    },
+    {
+      "name": "Bottom Navigation",
+      "kind": "nav",
+      "refersTo": "card-surface",
+      "description": "Shared role bottom bar, white with an upward lift shadow. Selected tile gets an 8% teal tint, teal icon and bold caption; idle tiles are gray.",
+      "html": "<nav class=\"ds-nav\"><button class=\"ds-nav__tile ds-nav__tile--active\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\" fill=\"#40b4cd\"><path d=\"M12 3 2 12h3v8h6v-6h2v6h6v-8h3z\"/></svg><span>ໜ້າຫຼັກ</span></button><button class=\"ds-nav__tile\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\" fill=\"#9ca3af\"><path d=\"M7 2v2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-2V2h-2v2H9V2zm12 8v10H5V10z\"/></svg><span>ຕາຕະລາງ</span></button></nav>",
+      "css": ".ds-nav { display: flex; justify-content: space-around; padding: 8px 0; background: #ffffff; box-shadow: 0 -2px 12px rgba(0,0,0,0.08); } .ds-nav__tile { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 48px; min-height: 48px; padding: 4px 12px; background: transparent; border: none; border-radius: 12px; color: #9ca3af; font: 400 10px/1 Roboto, 'SF Pro Text', system-ui, sans-serif; cursor: pointer; transition: background 200ms; } .ds-nav__tile--active { background: rgba(64,180,205,0.08); color: #40b4cd; font-weight: 600; }"
+    },
+    {
+      "name": "Dialog",
+      "kind": "custom",
+      "refersTo": "dialog",
+      "description": "Blocking feedback signature: rounded white card with a circular tinted icon badge, title, centered message, and a full-width action button. Four flavors (success / warning / error / confirm) share this shell.",
+      "html": "<div class=\"ds-dialog\"><span class=\"ds-dialog__badge\"><svg viewBox=\"0 0 24 24\" width=\"48\" height=\"48\" fill=\"#067a59\"><path d=\"M12 2a10 10 0 100 20 10 10 0 000-20zm-1.2 14.2-3.8-3.8 1.4-1.4 2.4 2.4 5-5L17.2 10z\"/></svg></span><h2 class=\"ds-dialog__title\">ສຳເລັດ</h2><p class=\"ds-dialog__msg\">ການຈອງຫ້ອງຂອງທ່ານຖືກສົ່ງແລ້ວ.</p><button class=\"ds-dialog__btn\">ຕົກລົງ</button></div>",
+      "css": ".ds-dialog { display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 320px; padding: 24px; background: #ffffff; border-radius: 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); } .ds-dialog__badge { display: inline-flex; padding: 16px; background: rgba(6,122,89,0.10); border-radius: 999px; } .ds-dialog__title { margin: 8px 0 0; font: 600 18px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #1a1a2e; } .ds-dialog__msg { margin: 0; text-align: center; font: 400 14px/1.4 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #6b7280; } .ds-dialog__btn { width: 100%; margin-top: 20px; padding: 12px; background: #067a59; color: #ffffff; font: 600 15px/1.2 Roboto, 'SF Pro Text', system-ui, sans-serif; border: none; border-radius: 10px; cursor: pointer; }"
+    },
+    {
+      "name": "Empty State",
+      "kind": "custom",
+      "refersTo": "card-surface",
+      "description": "Centered muted icon, slate title, optional subtitle, and a teal CTA. The copy teaches the next action rather than saying 'nothing here'.",
+      "html": "<div class=\"ds-empty\"><svg viewBox=\"0 0 24 24\" width=\"56\" height=\"56\" fill=\"#d1d5db\"><path d=\"M20 6H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm0 5h-4a4 4 0 0 1-8 0H4V8h16z\"/></svg><p class=\"ds-empty__title\">ຍັງບໍ່ມີການຈອງ</p><p class=\"ds-empty__sub\">ການຈອງຫ້ອງຂອງທ່ານຈະປາກົດຢູ່ນີ້.</p><button class=\"ds-empty__cta\">+ ຈອງຫ້ອງ</button></div>",
+      "css": ".ds-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 24px; text-align: center; } .ds-empty__title { margin: 14px 0 0; font: 500 15px/1.3 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #6b7280; } .ds-empty__sub { margin: 0; font: 400 13px/1.4 Roboto, 'SF Pro Text', system-ui, sans-serif; color: #9ca3af; } .ds-empty__cta { margin-top: 16px; padding: 10px 18px; background: #40b4cd; color: #ffffff; font: 600 13px/1.2 Roboto, 'SF Pro Text', system-ui, sans-serif; border: none; border-radius: 12px; cursor: pointer; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Campus Noticeboard",
+    "overview": "AMS UP is the trusted board where the real schedule, the real notice, and the real result get posted. Everything on it should read as posted by the faculty and current: this is tomorrow's class, this booking really was approved, this grade really stands. The system carries warm authority. It is official and credible, but it belongs to a campus, not a bank. Authority comes from clarity and calm, never from heavy chrome or cold formality. The build is calm and utilitarian: white cards floating a few millimetres off a cool mist-gray scaffold on a single soft shadow, gently rounded corners, and one bright Faculty Teal marking everything you can act on. Color is rationed: teal means act, one Info Blue carries informational and admin-context surfaces, and amber/emerald/red report state. The interface is built to be glanced at, so the answer sits at the top of every screen and depth waits until it is asked for.",
+    "keyCharacteristics": [
+      "One bright accent (Faculty Teal) carries every primary action, focus ring, active tab, and link.",
+      "One support blue (Info Blue) carries admin-context surfaces, info state, and data-viz; no second blue.",
+      "White cards on cool mist-gray, lifted by a single 6 percent shadow. Flat by default, never glassy.",
+      "Status is a fixed three-color language: amber pending, emerald approved, red rejected.",
+      "System fonts only, on a fixed 16px-floor scale tuned for Lao script and English fallback.",
+      "Every screen ships four real states: loading skeleton, teaching empty state, plain-language error with retry, and toast/dialog success."
+    ],
+    "rules": [
+      { "name": "The Teal-Leads Rule", "body": "Faculty Teal is the only color that means 'act' or 'you are here'. Primary buttons, focus, active nav, links. Nothing else borrows it, and primary actions use nothing else.", "section": "colors" },
+      { "name": "The Status-Color Rule", "body": "Amber, emerald, and red are a closed vocabulary for booking and action state. They report; they never decorate. A surface is never amber because amber looked nice.", "section": "colors" },
+      { "name": "The One-Blue Rule", "body": "The palette is Faculty Teal plus exactly one support blue (Info Blue #3257cc) and one status emerald. The former four-blue / three-green drift is consolidated. Never reintroduce a second support blue or revert to the retired #4c4ddc / #4a68ff / #4a80f0 / #3a3bbf values, and never add a second green beside Approved Emerald.", "section": "colors" },
+      { "name": "The 16px Floor Rule", "body": "Body and input text never drop below 16px. 14px is reserved for labels and dense metadata, 12px for captions only. Nothing smaller than 12px ships, ever.", "section": "typography" },
+      { "name": "The Lao Headroom Rule", "body": "Line-height stays at or above 1.3 on headings and 1.4 on body so Lao stacked diacritics never clip. Test every heading and label in Lao and in the longer English fallback at 360dp width.", "section": "typography" },
+      { "name": "The Soft-Shadow Rule", "body": "One shadow per surface, black at 6 to 8 percent, blur 6 to 12, y-offset 2. No second shadow layer, no shadow darker than 8 percent, no Material elevation.", "section": "elevation" },
+      { "name": "The Colored-Glow Rule", "body": "Only an active element (selected chip) or a branded banner (gradient stats) earns a shadow tinted in its own hue at ~30 percent. A resting neutral card never glows.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Faculty Teal (#40b4cd) for every primary action, focus ring, active tab, and link, and nothing else for those. One accent, one meaning.",
+      "Do keep status to the three-color set: Pending Amber (#f59e0b), Approved Emerald (#067a59), Reject Red (#e53935). Report state with them; never decorate.",
+      "Do float white cards on Mist Gray with the single Surface Rest shadow (0 2px 8px rgba(0,0,0,0.06)). Flat at rest.",
+      "Do hold body and input text at 16px and keep Slate Gray (#6b7280) as the lightest text that touches a background. Verify 4.5:1.",
+      "Do ship all four states on every data screen: skeleton, teaching empty state, plain-language error with retry, and toast/dialog success.",
+      "Do put labels above fields, set the right keyboard per input, and test copy in Lao and the English fallback at 360dp.",
+      "Do keep every tap target at 48dp with at least 8dp between controls."
+    ],
+    "donts": [
+      "Don't build dated enterprise / ERP screens: no cluttered gray forms, dense unscannable tables, or sub-12px text.",
+      "Don't go childish / gamified: no mascots, candy-bright colors, confetti, or badge-spam.",
+      "Don't ship generic AI SaaS: no purple gradients, no decorative glassmorphism, no endless identical icon-heading-text card grids.",
+      "Don't drift stiff corporate / banking: keep Identity Navy (#14385d) to launch and identity only; it is not a second body color.",
+      "Don't widen the 4px card left-stripe, apply it decoratively, or add it to new surfaces. Encode status with a pill, badge, or tinted leading icon instead.",
+      "Don't reintroduce a second support blue or a second green. The palette is Faculty Teal + one Info Blue (#3257cc) + one Approved Emerald (#067a59); the retired #4c4ddc / #4a68ff / #4a80f0 / #3a3bbf / #10b981 / #27ae60 / #4caf50 values must not come back.",
+      "Don't stack shadows, darken a shadow past 8 percent, or use Material elevation tiers. One soft shadow per surface.",
+      "Don't use gradient text, pure #000000 on pure #ffffff, or Highlight Gold for text on white.",
+      "Don't drop a bare spinner into the middle of content where a content-shaped AppLoading skeleton belongs."
+    ]
+  }
+}

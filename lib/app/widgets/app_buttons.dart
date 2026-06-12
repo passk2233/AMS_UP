@@ -25,7 +25,7 @@ class AppPrimaryButton extends StatelessWidget {
   /// When true (default), the button stretches to fill its parent's width.
   final bool fullWidth;
 
-  /// Override the default brand background.
+  /// Override the default on-fill teal background.
   final Color? backgroundColor;
 
   /// Color applied to the label and icon (default white).
@@ -44,7 +44,7 @@ class AppPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = backgroundColor ?? AppColors.primary;
+    final bg = backgroundColor ?? AppColors.primaryFill;
     return SizedBox(
       width: fullWidth ? double.infinity : null,
       height: AppColors.minTouchTarget,
@@ -382,34 +382,40 @@ class _AppFilterChipTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-        constraints: const BoxConstraints(
-          minHeight: AppColors.minTouchTarget,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? activeColor : AppColors.cardBg,
-          borderRadius: BorderRadius.circular(AppColors.chipRadius),
-          boxShadow: [
-            BoxShadow(
-              color: isSelected
-                  ? activeColor.withValues(alpha: 0.3)
-                  : Colors.black.withValues(alpha: 0.06),
-              blurRadius: isSelected ? 8 : 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : AppColors.textPrimary,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              fontSize: 13,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          constraints: const BoxConstraints(
+            minHeight: AppColors.minTouchTarget,
+          ),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor : AppColors.cardBg,
+            borderRadius: BorderRadius.circular(AppColors.chipRadius),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.3)
+                    : Colors.black.withValues(alpha: 0.06),
+                blurRadius: isSelected ? 8 : 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                fontSize: 13,
+              ),
             ),
           ),
         ),

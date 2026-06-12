@@ -230,6 +230,11 @@ The token is **never** refreshed automatically — a 401 will boot the user back
 
 ## Push Notifications (FCM)
 
+Full cross-stack design for OS-visible foreground/background/terminated
+delivery lives in [`../docs/fcm-notification-design.md`](../docs/fcm-notification-design.md).
+That document is the implementation target for the system-notification-panel
+requirement.
+
 `lib/app/services/fcm_service.dart` is initialised in `main()` after Firebase:
 
 ```dart

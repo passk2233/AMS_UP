@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../modules/data/models/user_model.dart';
+import 'app_avatar.dart';
 import 'app_colors.dart';
 import 'app_spacing.dart';
 
@@ -42,14 +43,18 @@ class ProfileCard extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          // White text/icons sit on this banner, so both stops must clear AA.
+          // The bright primary (#40b4cd) is only 2.43:1 under white; the
+          // darker on-fill teal (4.70:1) into Info Blue (6.2:1) stays legible
+          // across the whole sweep and mirrors the admin app bar. See DESIGN.md.
+          colors: [AppColors.primaryFill, AppColors.info],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.3),
+            color: AppColors.primaryFill.withValues(alpha: 0.3),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -108,9 +113,9 @@ class _ProfileDisplay {
     return 'ພາກວິຊາວິສະວະກຳຄອມພິວເຕີ ແລະ ເຕັກໂນໂລຊີຂໍ້ມູນຂ່າວສານ';
   }
 
-  /// First glyph used as the avatar fallback when no image is supplied.
-  String get initial =>
-      name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'A';
+  /// Stored profile photo (teacher → student). Null/broken paths fall back to
+  /// the bundled placeholder inside [AppAvatar].
+  String? get photo => user?.teacher?.photo ?? user?.student?.photo;
 }
 
 /// Avatar + name + role + department block (top of the card).
@@ -124,7 +129,7 @@ class _ProfileIdentity extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _ProfileAvatar(initial: display.initial),
+        _ProfileAvatar(photo: display.photo),
         const SizedBox(width: AppSpacing.s + 4),
         Expanded(
           child: Column(
@@ -152,12 +157,12 @@ class _ProfileIdentity extends StatelessWidget {
   }
 }
 
-/// Circular initial avatar rendered on the gradient surface.
+/// Circular photo avatar rendered on the gradient surface, ringed in white.
 class _ProfileAvatar extends StatelessWidget {
-  /// Single uppercase letter shown when there is no image.
-  final String initial;
+  /// Stored photo path/URL; null/broken shows the bundled placeholder.
+  final String? photo;
 
-  const _ProfileAvatar({required this.initial});
+  const _ProfileAvatar({required this.photo});
 
   @override
   Widget build(BuildContext context) {
@@ -166,21 +171,16 @@ class _ProfileAvatar extends StatelessWidget {
       height: 48,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.2),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.4),
           width: 2,
         ),
       ),
-      child: Center(
-        child: Text(
-          initial,
-          style: const TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+      // 44 = 48 − 2px ring on each side, so the photo sits flush inside it.
+      child: AppAvatar(
+        photo: photo,
+        radius: 22,
+        backgroundColor: Colors.white.withValues(alpha: 0.2),
       ),
     );
   }
@@ -280,7 +280,9 @@ class _ProfileStatTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.15),
+          // Dark wash (not white) so the white value + label keep contrast on
+          // the gradient; a translucent-white tile lightens it and fails AA.
+          color: Colors.black.withValues(alpha: 0.18),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Column(
