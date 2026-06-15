@@ -54,7 +54,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1074144160794',
     projectId: 'ams-up-fcm',
     storageBucket: 'ams-up-fcm.firebasestorage.app',
-    iosBundleId: 'com.example.frontend',
+    iosBundleId: 'xyz.phetsamone.amsup',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -63,7 +63,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '1074144160794',
     projectId: 'ams-up-fcm',
     storageBucket: 'ams-up-fcm.firebasestorage.app',
-    iosBundleId: 'com.example.frontend',
+    iosBundleId: 'xyz.phetsamone.amsup',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(

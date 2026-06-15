@@ -1,4 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Network access for all build types. Declared here (not only in the
+         debug manifest) so the release APK can reach the backend even if no
+         merged plugin manifest happens to provide it. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <!-- Android 13+ requires an explicit runtime permission before any
          notification (FCM or local) can be posted to the system panel. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

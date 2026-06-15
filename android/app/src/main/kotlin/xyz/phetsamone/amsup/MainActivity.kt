@@ -1,4 +1,4 @@
-package com.example.frontend
+package xyz.phetsamone.amsup
 
 import io.flutter.embedding.android.FlutterActivity
 
