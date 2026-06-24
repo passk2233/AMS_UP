@@ -185,29 +185,47 @@ class ScoreController extends GetxController {
     return match.isNotEmpty ? match.first : groups.last;
   }
 
-  /// Full transcript-style label, e.g. "ເທີມ 1 ສົກສຶກສາ 2022 - 2023".
-  String labelFor(ScoreSemester s) {
-    if (s.term > 0 && s.year > 0) {
-      return 'ເທີມ ${s.term} ສົກສຶກສາ ${s.year} - ${s.year + 1}';
+  /// Academic year *level* (1-based) of a semester, e.g. a first-year term → 1.
+  /// Prefers the curriculum year carried by the term's subjects; falls back to
+  /// the chronological position (2 terms per academic year). 0 = unknown.
+  int yearLevelFor(ScoreSemester s) {
+    var y = 0;
+    for (final e in s.enrollments) {
+      final sy = e.studyPlan?.subject?.year ?? 0;
+      if (sy > y) y = sy;
     }
-    if (s.code != null && s.code!.isNotEmpty) return s.code!;
-    final idx = semesters.indexWhere((g) => g.semasterId == s.semasterId) + 1;
-    return 'ເທີມ $idx';
+    if (y > 0) return y;
+    final idx = semesters.indexWhere((g) => g.semasterId == s.semasterId);
+    return idx < 0 ? 0 : (idx ~/ 2) + 1;
   }
 
-  /// Two-line chip label: top "ເທີມ 1", bottom "ສົກສຶກສາ 2022 - 2023".
+  /// Full transcript-style label, e.g. "ປີ 1 ເທີມ 2 ສົກສຶກສາ 2022 - 2023".
+  String labelFor(ScoreSemester s) {
+    final yl = yearLevelFor(s);
+    final yearPart = yl > 0 ? 'ປີ $yl ' : '';
+    if (s.term > 0 && s.year > 0) {
+      return '$yearPartເທີມ ${s.term} ສົກສຶກສາ ${s.year} - ${s.year + 1}';
+    }
+    if (s.code != null && s.code!.isNotEmpty) return '$yearPart${s.code!}';
+    final idx = semesters.indexWhere((g) => g.semasterId == s.semasterId) + 1;
+    return '$yearPartເທີມ $idx';
+  }
+
+  /// Two-line chip label: top "ປີ 1 ເທີມ 2", bottom "ສົກສຶກສາ 2022 - 2023".
   ({String line1, String line2}) chipLabelFor(ScoreSemester s) {
+    final yl = yearLevelFor(s);
+    final yearPart = yl > 0 ? 'ປີ $yl ' : '';
     if (s.term > 0 && s.year > 0) {
       return (
-        line1: 'ເທີມ ${s.term}',
+        line1: '$yearPartເທີມ ${s.term}',
         line2: 'ສົກສຶກສາ ${s.year} - ${s.year + 1}',
       );
     }
     if (s.code != null && s.code!.isNotEmpty) {
-      return (line1: s.code!, line2: '');
+      return (line1: '$yearPart${s.code!}', line2: '');
     }
     final idx = semesters.indexWhere((g) => g.semasterId == s.semasterId) + 1;
-    return (line1: 'ເທີມ $idx', line2: '');
+    return (line1: '$yearPartເທີມ $idx', line2: '');
   }
 
   // ── Aggregate / cumulative stats (transcript header) ──────────────────────

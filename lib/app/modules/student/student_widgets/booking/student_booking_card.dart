@@ -19,10 +19,24 @@ class StudentBookingCard extends StatelessWidget {
     required this.controller,
   });
 
+  /// Room label with fallbacks: the preloaded room, else a match from the
+  /// controller's rooms list (the booking only carries `room_id` when the
+  /// backend can't preload `room`), else "ຫ້ອງ #id" so the card never shows
+  /// a bare "-".
+  String _roomCode(RoomBookingModel b) {
+    final preloaded = b.room?.roomCode;
+    if (preloaded != null && preloaded.isNotEmpty) return preloaded;
+    final match = controller.rooms.where((r) => r.id == b.roomId);
+    if (match.isNotEmpty && match.first.roomCode.isNotEmpty) {
+      return match.first.roomCode;
+    }
+    return 'ຫ້ອງ #${b.roomId}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final b = booking;
-    final room = b.room?.roomCode ?? '-';
+    final room = _roomCode(b);
     final date =
         '${b.bookingDate.day}/${b.bookingDate.month}/${b.bookingDate.year}';
     final status = b.status;

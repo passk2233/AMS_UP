@@ -40,7 +40,7 @@ class _ScoreCard extends StatelessWidget {
     final code = sub?.subjectCode ?? '-';
     final credit = sub?.credit ?? 0;
     final title = sub?.nameLao ?? sub?.nameEng ?? '-';
-    final teacherName = teacher?.nameLao ?? teacher?.nameEng ?? '-';
+    final teacherName = _teacherFullName(teacher);
     final grade = e.grade ?? '-';
     final gc = _gradeColors(grade);
 
@@ -116,6 +116,16 @@ class _ScoreCard extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// Full teacher name "ຊື່ ນາມສະກຸນ" (Lao, English fallback). Mirrors the
+  /// schedule sheet so the score card shows surname too, not just first name.
+  static String _teacherFullName(TeacherModel? t) {
+    if (t == null) return '-';
+    final lao = '${t.nameLao} ${t.surnameLao}'.trim();
+    if (lao.isNotEmpty) return lao;
+    final eng = '${t.nameEng} ${t.surnameEng ?? ''}'.trim();
+    return eng.isNotEmpty ? eng : '-';
   }
 
   static String _gradeLabel(String grade) {
