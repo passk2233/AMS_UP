@@ -45,7 +45,9 @@ Future<void> showCreateStudentBookingSheet(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
     builder: (context) {
-      return Padding(
+      return SafeArea(
+        top: false,
+        child: Padding(
         padding: EdgeInsets.only(
           left: 16,
           right: 16,
@@ -214,6 +216,7 @@ Future<void> showCreateStudentBookingSheet(
             ],
           );
         }),
+        ),
       );
     },
   );
