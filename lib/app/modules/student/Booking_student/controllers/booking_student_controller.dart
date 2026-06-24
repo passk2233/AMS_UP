@@ -183,7 +183,7 @@ class BookingStudentController extends GetxController {
       final cancelled = _classCancellations.any(
           (cc) => cc.studyPlanId == p.id && sameDate(cc.cancelDate, date));
       if (!cancelled) {
-        final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
+        final code = p.room?.roomCode ?? '-';
         final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
         return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
       }

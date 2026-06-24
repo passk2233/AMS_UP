@@ -285,8 +285,7 @@ class SchedulesController extends GetxController {
   Map<String, dynamic> _planToMap(StudyPlanModel sp, int index, DateTime day) {
     final subject = sp.subject?.nameLao ?? sp.subject?.nameEng ?? 'ວິຊາ';
     final code = sp.subject?.subjectCode ?? '';
-    final room = sp.room?.roomCode ??
-        (sp.roomId != null ? 'ຫ້ອງ ${sp.roomId}' : '-');
+    final room = sp.room?.roomCode ?? '-';
     final time =
         '${_formatTime(sp.startTime)} - ${_formatTime(sp.endTime)}';
     final group = sp.studentGroup?.stdGroupName ?? '';

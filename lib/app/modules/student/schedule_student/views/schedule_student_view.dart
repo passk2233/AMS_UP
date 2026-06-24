@@ -19,7 +19,7 @@ class ScheduleStudentView extends GetView<ScheduleStudentController> {
           return AppPageScaffold(
             withBackground: true,
             title: 'ຕາຕະລາງຮຽນ',
-            trailing: const NotiBellButton(route: '/student-noti'),
+            topBar: const AppTopBar(notiRoute: '/student-noti'),
             body: Column(
               children: [
                 _buildSemesterBanner(),

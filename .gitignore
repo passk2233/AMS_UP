@@ -13,6 +13,11 @@
 migrate_working_dir/
 .env
 
+# Android release signing — keep the keystore and its passwords out of VCS.
+/android/key.properties
+**/*.jks
+**/*.keystore
+
 # IntelliJ related
 *.iml
 *.ipr

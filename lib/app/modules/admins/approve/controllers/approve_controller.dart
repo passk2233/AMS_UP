@@ -188,7 +188,7 @@ class ApproveController extends GetxController {
 
   Future<void> _confirmAndPatch(int bookingId, String status) async {
     final booking = bookings.firstWhereOrNull((b) => b.bookingId == bookingId);
-    final roomName = booking?.room?.roomCode ?? 'ID: $bookingId';
+    final roomName = booking?.room?.roomCode ?? '-';
     final approving = status == 'approved';
 
     final confirmed = await AppDialogs.showConfirmation(

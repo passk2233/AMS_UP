@@ -41,10 +41,11 @@ class TeacherGreeting extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The notifications bell + semester now live in the shared [AppTopBar] at
+    // the top of the screen, so the greeting no longer carries its own bell.
     return AppGreetingHeader(
       greeting: 'ສະບາຍດີ, $name 👋',
       subtitle: 'ພາກຮຽນ 2026',
-      trailing: const NotiBellButton(route: '/teacher-noti'),
     );
   }
 }

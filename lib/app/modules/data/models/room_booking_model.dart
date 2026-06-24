@@ -14,6 +14,19 @@ class RoomBookingModel {
   RoomModel? room;
   UserModel? user;
 
+  /// Human-readable purpose for the UI. Backend tags fixed study-plan
+  /// occurrences with internal markers like `__sp_fixed:1` in `purpose`;
+  /// map the known one to a friendly label and hide any other `__`-prefixed
+  /// marker so raw internals never reach the user.
+  /// ponytail: prefix match; extend the switch when new markers appear.
+  String? get displayPurpose {
+    final p = purpose?.trim();
+    if (p == null || p.isEmpty) return null;
+    if (p.startsWith('__sp_fixed')) return 'ຄາບຮຽນປະຈຳ';
+    if (p.startsWith('__')) return null;
+    return p;
+  }
+
   RoomBookingModel({
     required this.bookingId,
     required this.roomId,

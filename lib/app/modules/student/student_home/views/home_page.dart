@@ -18,6 +18,7 @@ class HomePage extends GetView<HomePageController> {
         builder: (context, constraints) {
           return AppPageScaffold(
       withBackground: true,
+      topBar: const AppTopBar(notiRoute: '/student-noti'),
       body: Obx(() {
         if (controller.isLoading.value) {
           return AppRefreshableLoader(
@@ -36,10 +37,11 @@ class HomePage extends GetView<HomePageController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // The notifications bell + semester now live in the shared
+              // [AppTopBar] at the top of the screen.
               AppGreetingHeader(
                 greeting: "ສະບາຍດີ, ${controller.displayName} 👋",
                 subtitle: controller.currentDate,
-                trailing: const NotiBellButton(route: '/student-noti'),
               ),
               const SizedBox(height: 25),
               AppStatsBanner(

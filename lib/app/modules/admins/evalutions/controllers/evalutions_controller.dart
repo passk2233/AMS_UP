@@ -655,8 +655,8 @@ class EvalutionController extends GetxController {
     if (fromRelation != null && fromRelation.trim().isNotEmpty) {
       return fromRelation.trim();
     }
-    // 3. Ordinal fallback.
-    return 'ຄຳຖາມທີ $qId';
+    // 3. No question text available — never show the raw id.
+    return '-';
   }
 
   // ───────────────────────────────────────────── search + nav ──

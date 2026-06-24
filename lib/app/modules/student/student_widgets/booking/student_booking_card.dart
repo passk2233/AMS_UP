@@ -22,7 +22,7 @@ class StudentBookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = booking;
-    final room = b.room?.roomCode ?? 'ຫ້ອງ ${b.roomId}';
+    final room = b.room?.roomCode ?? '-';
     final date =
         '${b.bookingDate.day}/${b.bookingDate.month}/${b.bookingDate.year}';
     final status = b.status;
@@ -57,8 +57,8 @@ class StudentBookingCard extends StatelessWidget {
               subtitle: Text(
                 [
                   'ວັນທີ $date',
-                  if (b.purpose != null && b.purpose!.isNotEmpty)
-                    'ເປົ້າໝາຍ: ${b.purpose}',
+                  if (b.displayPurpose != null)
+                    'ເປົ້າໝາຍ: ${b.displayPurpose}',
                 ].join('\n'),
               ),
               isThreeLine: true,

@@ -18,18 +18,9 @@ class BookingStudentView extends GetView<BookingStudentController> {
     return GetBuilder<BookingStudentController>(
       builder: (controller) => LayoutBuilder(
         builder: (context, constraints) {
-          return Scaffold(
-            appBar: AppBar(
-              title: const Text('ຈອງຫ້ອງ'),
-              centerTitle: true,
-              actions: [
-                IconButton(
-                  onPressed: () => Get.toNamed('/student-noti'),
-                  icon: const Icon(Icons.notifications_none_rounded),
-                  tooltip: 'ການແຈ້ງເຕືອນ',
-                )
-              ],
-            ),
+          return AppPageScaffold(
+            title: 'ຈອງຫ້ອງ',
+            topBar: const AppTopBar(notiRoute: '/student-noti'),
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => showCreateStudentBookingSheet(
                 context,

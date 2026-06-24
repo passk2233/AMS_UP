@@ -3,6 +3,20 @@ import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/profile_student_controller.dart';
 
+/// Builds an info row, or an empty box when the value is missing ("-" / blank).
+/// Fields the API does not provide (e.g. student type, an unset email) are
+/// hidden instead of showing a column of "-".
+Widget _infoTile(
+  IconData icon,
+  String label,
+  String value, {
+  Color? valueColor,
+}) {
+  final v = value.trim();
+  if (v.isEmpty || v == '-') return const SizedBox.shrink();
+  return AppInfoTile(icon: icon, label: label, value: v, valueColor: valueColor);
+}
+
 class ProfileStudentView extends GetView<ProfileStudentController> {
   const ProfileStudentView({super.key});
 
@@ -17,7 +31,7 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
         builder: (context, constraints) {
           return AppPageScaffold(
             title: 'ໂປຣໄຟລ໌',
-            trailing: const NotiBellButton(route: '/student-noti'),
+            topBar: const AppTopBar(notiRoute: '/student-noti'),
             body: Obx(() {
               if (controller.isLoading.value) {
                 return AppRefreshableLoader(
@@ -31,6 +45,10 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                   onRetry: () => controller.onInit(),
                 );
               }
+
+              final dob = controller.dob == null
+                  ? '-'
+                  : '${controller.dob!.day}/${controller.dob!.month}/${controller.dob!.year}';
 
               return SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(20, 4, 20, 100),
@@ -49,58 +67,24 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                     AppSurfaceCard(
                       child: Column(
                         children: [
-                          AppInfoTile(
-                            icon: Icons.person_outline,
-                            label: "ຊື່-ນາມສະກຸນ (ອັງກິດ)",
-                            value: controller.nameEng,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.transgender,
-                            label: "ເພດ",
-                            value: controller.gender,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.cake_outlined,
-                            label: "ວັນເດືອນປີເກີດ",
-                            value: controller.dob == null
-                                ? '-'
-                                : '${controller.dob!.day}/${controller.dob!.month}/${controller.dob!.year}',
-                          ),
-                          AppInfoTile(
-                            icon: Icons.flag_outlined,
-                            label: "ສັນຊາດ",
-                            value: controller.nationality,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.people_outline,
-                            label: "ຊົນເຜົ່າ",
-                            value: controller.ethnic,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.account_tree,
-                            label: "ເຊື້ອຊາດ",
-                            value: controller.race,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.group_outlined,
-                            label: "ຕະກູນ",
-                            value: controller.tribe,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.menu_book_outlined,
-                            label: "ສາສະໜາ",
-                            value: controller.religion,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.favorite_border,
-                            label: "ສະຖານະສົມລົດ",
-                            value: controller.maritalStatus,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.health_and_safety_outlined,
-                            label: "ສຸຂະພາບ",
-                            value: controller.healthStatus,
-                          ),
+                          _infoTile(Icons.person_outline,
+                              "ຊື່-ນາມສະກຸນ (ອັງກິດ)", controller.nameEng),
+                          _infoTile(Icons.transgender, "ເພດ", controller.gender),
+                          _infoTile(Icons.cake_outlined, "ວັນເດືອນປີເກີດ", dob),
+                          _infoTile(Icons.flag_outlined, "ສັນຊາດ",
+                              controller.nationality),
+                          _infoTile(Icons.people_outline, "ຊົນເຜົ່າ",
+                              controller.ethnic),
+                          _infoTile(Icons.account_tree, "ເຊື້ອຊາດ",
+                              controller.race),
+                          _infoTile(Icons.group_outlined, "ຕະກູນ",
+                              controller.tribe),
+                          _infoTile(Icons.menu_book_outlined, "ສາສະໜາ",
+                              controller.religion),
+                          _infoTile(Icons.favorite_border, "ສະຖານະສົມລົດ",
+                              controller.maritalStatus),
+                          _infoTile(Icons.health_and_safety_outlined, "ສຸຂະພາບ",
+                              controller.healthStatus),
                         ],
                       ),
                     ),
@@ -112,16 +96,10 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                     AppSurfaceCard(
                       child: Column(
                         children: [
-                          AppInfoTile(
-                            icon: Icons.email_outlined,
-                            label: "ອີເມວ",
-                            value: controller.email,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.phone_android_outlined,
-                            label: "ເບີໂທ",
-                            value: controller.phone,
-                          ),
+                          _infoTile(Icons.email_outlined, "ອີເມວ",
+                              controller.email),
+                          _infoTile(Icons.phone_android_outlined, "ເບີໂທ",
+                              controller.phone),
                         ],
                       ),
                     ),
@@ -133,37 +111,19 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                     AppSurfaceCard(
                       child: Column(
                         children: [
-                          AppInfoTile(
-                            icon: Icons.badge_outlined,
-                            label: "ລະຫັດນັກສຶກສາ",
-                            value: controller.studentCode,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.category_outlined,
-                            label: "ປະເພດນັກສຶກສາ",
-                            value: controller.studentTypeName,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.groups_outlined,
-                            label: "ກຸ່ມ",
-                            value: controller.studentGroupName,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.school_outlined,
-                            label: "ຫຼັກສູດ",
-                            value: controller.program,
-                            valueColor: AppColors.primary,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.account_balance_outlined,
-                            label: "ໂຮງຮຽນ / ສະຖາບັນ",
-                            value: controller.school,
-                          ),
-                          AppInfoTile(
-                            icon: Icons.work_outline,
-                            label: "ຕຳແໜ່ງ",
-                            value: controller.jobTitle,
-                          ),
+                          _infoTile(Icons.badge_outlined, "ລະຫັດນັກສຶກສາ",
+                              controller.studentCode),
+                          _infoTile(Icons.category_outlined, "ປະເພດນັກສຶກສາ",
+                              controller.studentTypeName),
+                          _infoTile(Icons.groups_outlined, "ກຸ່ມ",
+                              controller.studentGroupName),
+                          _infoTile(Icons.school_outlined, "ຫຼັກສູດ",
+                              controller.program,
+                              valueColor: AppColors.primary),
+                          _infoTile(Icons.account_balance_outlined,
+                              "ໂຮງຮຽນ / ສະຖາບັນ", controller.school),
+                          _infoTile(Icons.work_outline, "ຕຳແໜ່ງ",
+                              controller.jobTitle),
                         ],
                       ),
                     ),

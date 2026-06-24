@@ -20,7 +20,7 @@ class ScoreView extends GetView<ScoreController> {
     return AppPageScaffold(
       withBackground: true,
       title: 'ຄະແນນ',
-      trailing: const NotiBellButton(route: '/student-noti'),
+      topBar: const AppTopBar(notiRoute: '/student-noti'),
       body: Obx(() {
         if (controller.isLoading.value) {
           return AppRefreshableLoader(

@@ -28,7 +28,7 @@ class EvalutionView extends GetView<EvalutionController> {
         ),
         child: Column(
           children: [
-            const AdminAppBar(),
+            const AppTopBar(notiRoute: '/admin-noti'),
             Expanded(child: _EvalutionBody(controller: controller)),
           ],
         ),

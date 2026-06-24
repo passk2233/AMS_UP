@@ -34,6 +34,25 @@ class ApiClient {
   static Dio? _instance;
   static bool _redirecting = false;
 
+  /// Resolve the backend base URL, in priority order:
+  ///   1. `API_URL` from the bundled `.env` (dev convenience — hot-swappable
+  ///      without a rebuild).
+  ///   2. `--dart-define=API_URL=...` baked in at build time. `.env` is
+  ///      gitignored, so CI / release builds on a clean checkout rely on this.
+  ///   3. Empty string — the splash screen's reachability check surfaces an
+  ///      unconfigured backend to the user instead of crashing.
+  static String get _baseUrl {
+    var fromDotenv = '';
+    try {
+      fromDotenv = dotenv.env['API_URL'] ?? '';
+    } catch (_) {
+      // dotenv not loaded in this context (e.g. a unit test that skips
+      // bootstrap) — fall through to the compile-time define.
+    }
+    if (fromDotenv.isNotEmpty) return fromDotenv;
+    return const String.fromEnvironment('API_URL');
+  }
+
   /// In-flight refresh, shared so a burst of concurrent 401s (every
   /// controller reloads after an expiry) performs exactly one
   /// `/auth/refresh` round-trip. Dart's event loop makes the `??=`
@@ -56,7 +75,7 @@ class ApiClient {
   static Dio _build() {
     final d = Dio(
       BaseOptions(
-        baseUrl: dotenv.env['API_URL'] ?? '',
+        baseUrl: _baseUrl,
         connectTimeout: _timeout,
         receiveTimeout: _timeout,
         headers: const {
@@ -149,7 +168,7 @@ class ApiClient {
 
     final bare = Dio(
       BaseOptions(
-        baseUrl: dotenv.env['API_URL'] ?? '',
+        baseUrl: _baseUrl,
         connectTimeout: _timeout,
         receiveTimeout: _timeout,
         headers: const {

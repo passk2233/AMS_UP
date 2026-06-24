@@ -1,0 +1,22 @@
+# Release signing config — COPY this file to `key.properties` and fill in
+# your real values. `key.properties` and the keystore itself are gitignored;
+# never commit them.
+#
+# 1. Generate an upload keystore (run from the `android/` folder):
+#
+#      keytool -genkey -v -keystore upload-keystore.jks \
+#        -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+#    It will prompt for a store password, a key password, and your name/org.
+#    Keep these safe — losing the keystore means you can never ship an update
+#    to the same Play Store listing.
+#
+# 2. Copy this file to `key.properties` and set the four values below.
+# 3. Build:  flutter build appbundle --release
+#
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+# Path is relative to the `android/app/` folder. If you keep the keystore in
+# `android/`, use ../upload-keystore.jks
+storeFile=../upload-keystore.jks

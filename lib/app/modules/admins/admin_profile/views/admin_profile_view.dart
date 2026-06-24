@@ -29,7 +29,7 @@ class AdminProfileView extends GetView<AdminProfileController> {
         ),
         child: Column(
           children: [
-            const AdminAppBar(),
+            const AppTopBar(notiRoute: '/admin-noti'),
             Expanded(child: _AdminProfileBody(controller: controller)),
           ],
         ),

@@ -16,7 +16,7 @@ class FeedbacksView extends GetView<FeedbacksController> {
   Widget build(BuildContext context) {
     return AppPageScaffold(
       title: 'ຄຳຄິດເຫັນ',
-      trailing: const NotiBellButton(route: '/teacher-noti'),
+      topBar: const AppTopBar(notiRoute: '/teacher-noti'),
       body: _FeedbacksBody(controller: controller),
     );
   }
@@ -136,7 +136,7 @@ class _FeedbackCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ຄຳຖາມ ${item.questionId}: ',
+                  'ຄຳຖາມ: ',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -145,9 +145,7 @@ class _FeedbackCard extends StatelessWidget {
                 ),
                 Expanded(
                   child: Text(
-                    item.questionText.isNotEmpty
-                        ? item.questionText
-                        : 'ຄຳຖາມທີ ${item.questionId}',
+                    item.questionText.isNotEmpty ? item.questionText : '-',
                     style: const TextStyle(
                       fontSize: 12,
                       color: AppColors.textPrimary,
