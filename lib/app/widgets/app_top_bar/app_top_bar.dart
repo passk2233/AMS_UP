@@ -1,30 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
-import '../widget.dart';
-import 'admin_app_bar_controllers.dart';
+import '../app_colors.dart';
+import '../noti_bell.dart';
+import 'semester_controller.dart';
 
-/// Gradient app bar used across every admin screen.
+/// Gradient top bar shared across every role (admin / teacher / student).
 ///
 /// Renders a [_SemesterChip] on the left and a [_NotificationBubble] on the
-/// right. State is owned by [AdminAppBarControllers] via GetX — the bar
-/// itself is purely declarative.
+/// right. The semester is owned by the shared [SemesterController]; the unread
+/// badge is owned by the shared [notiBadge]. The bar itself is purely
+/// declarative — drop a `const AppTopBar(notiRoute: ...)` at the top of any
+/// role's Scaffold body.
 ///
-/// The controller is resolved lazily and inserted permanently if absent so
-/// the same instance survives tab switches between admin pages.
-class AdminAppBar extends StatelessWidget {
-  const AdminAppBar({super.key});
+/// [notiRoute] is the one role-specific input: each role passes its own
+/// notification center (e.g. `/admin-noti`, `/teacher-noti`, `/student-noti`)
+/// so the bell routes to the right inbox while the rest of the bar stays
+/// identical everywhere.
+class AppTopBar extends StatelessWidget {
+  /// Named route of this role's notification center, opened when the bell is
+  /// tapped (e.g. `/student-noti`).
+  final String notiRoute;
+
+  const AppTopBar({super.key, required this.notiRoute});
 
   @override
   Widget build(BuildContext context) {
-    // Side effect — ensure the controller is registered before any child
-    // descendant calls Get.find. The returned instance is unused here.
-    if (!Get.isRegistered<AdminAppBarControllers>()) {
-      Get.put(AdminAppBarControllers(), permanent: true);
-    }
+    // Side effect — ensure the shared semester controller is registered before
+    // the chip below reads it. The returned instance is unused here.
+    semesterController;
 
-    return const DecoratedBox(
-      decoration: BoxDecoration(
+    return DecoratedBox(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.primary, AppColors.laoBlue],
           begin: Alignment.topLeft,
@@ -43,54 +50,34 @@ class AdminAppBar extends StatelessWidget {
         top: true,
         bottom: false,
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          child: _AdminAppBarBody(),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              const Expanded(child: _SemesterChip()),
+              _NotificationBubble(notiRoute: notiRoute),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Body of [AdminAppBar] — split out so the outer gradient + safe area stay
-/// trivially `const`.
-class _AdminAppBarBody extends StatelessWidget {
-  const _AdminAppBarBody();
-
-  @override
-  Widget build(BuildContext context) {
-    final controller = Get.find<AdminAppBarControllers>();
-    return Row(
-      children: [
-        Expanded(child: _SemesterChip(controller: controller)),
-        const _NotificationBubble(),
-      ],
-    );
-  }
-}
-
-/// Pill on the left side of the app bar showing the active semester. While
-/// the controller is loading it falls back to a small spinner pill.
+/// Pill on the left side of the bar showing the active semester. While the
+/// shared controller is loading it falls back to a small spinner pill.
 class _SemesterChip extends StatelessWidget {
-  /// Source of the reactive semester string + loading flag.
-  final AdminAppBarControllers controller;
-
-  const _SemesterChip({required this.controller});
+  const _SemesterChip();
 
   @override
   Widget build(BuildContext context) {
-    return Obx(() {
-      if (controller.semesterLoading.value) return const _SemesterLoadingChip();
-      return _SemesterReadyChip(label: controller.semester.value);
-    });
+    final controller = semesterController;
+    return Obx(() => controller.semesterLoading.value
+        ? _loading()
+        : _ready(controller.semester.value));
   }
-}
 
-/// Spinner pill rendered while the active semester is being fetched.
-class _SemesterLoadingChip extends StatelessWidget {
-  const _SemesterLoadingChip();
-
-  @override
-  Widget build(BuildContext context) {
+  /// Spinner pill rendered while the active semester is being fetched.
+  Widget _loading() {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -120,17 +107,9 @@ class _SemesterLoadingChip extends StatelessWidget {
       ),
     );
   }
-}
 
-/// Resolved semester pill rendered once the controller has data.
-class _SemesterReadyChip extends StatelessWidget {
-  /// Display label (typically `<code> (<year>)`).
-  final String label;
-
-  const _SemesterReadyChip({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
+  /// Resolved semester pill rendered once the controller has data.
+  Widget _ready(String label) {
     return Align(
       alignment: Alignment.centerLeft,
       child: Container(
@@ -161,15 +140,18 @@ class _SemesterReadyChip extends StatelessWidget {
   }
 }
 
-/// Circular notification-bell button with a live unread badge. Taps route
-/// to `/admin-noti` via GetX, then refresh the count on return so rows read
-/// there clear the dot immediately.
+/// Circular notification-bell button with a live unread badge. Taps route to
+/// [notiRoute] (the role's notification center) via GetX, then refresh the
+/// count on return so rows read there clear the dot immediately.
 ///
 /// The count comes from the shared [notiBadge] (the per-user `/user-noti`
-/// inbox) — the same source the admin notification screen marks read — so the
+/// inbox) — the same source every notification screen marks read — so the
 /// badge stays in sync instead of lingering after a read.
 class _NotificationBubble extends StatelessWidget {
-  const _NotificationBubble();
+  /// Named route opened on tap.
+  final String notiRoute;
+
+  const _NotificationBubble({required this.notiRoute});
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +163,7 @@ class _NotificationBubble extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
           onTap: () async {
-            await Get.toNamed('/admin-noti');
+            await Get.toNamed(notiRoute);
             await badge.fetchUnread();
           },
           child: Container(

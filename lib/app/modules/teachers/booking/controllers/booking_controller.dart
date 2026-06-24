@@ -321,7 +321,7 @@ class BookingController extends GetxController {
       // A class occurrence cancelled for this date (class_cancellations row)
       // does not occupy the room — same rule as the backend's check.
       if (_cancellationFor(p.id, date) != null) continue;
-      final code = p.room?.roomCode ?? 'ຫ້ອງ $roomId';
+      final code = p.room?.roomCode ?? '-';
       final subj = p.subject?.nameLao ?? p.subject?.nameEng ?? 'ການຮຽນ';
       return 'ຫ້ອງ $code ມີຕາຕະລາງ "$subj" ${p.startTime}-${p.endTime} ໃນວັນດຽວກັນ';
     }
@@ -640,7 +640,7 @@ class BookingController extends GetxController {
   Future<void> _notifyGroupOfCancellation(
       FixedBooking fb, String reason) async {
     final subject = fb.plan.subject?.nameLao ?? fb.plan.subject?.nameEng ?? 'ວິຊາ';
-    final group = fb.plan.studentGroup?.stdGroupName ?? 'ກຸ່ມ ${fb.stdGroupId}';
+    final group = fb.plan.studentGroup?.stdGroupName ?? '-';
     final dateStr = '${fb.date.day}/${fb.date.month}/${fb.date.year}';
     final title = 'ຍົກເລີກການຮຽນ - $subject';
     final base =

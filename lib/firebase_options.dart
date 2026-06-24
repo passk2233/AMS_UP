@@ -42,24 +42,22 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBr5N4shHfEDHqiH_9xlTYPDkBKgGoN0FQ',
-    appId: '1:1074144160794:android:c2538bea1e6d8510bdf5a3',
+    appId: '1:1074144160794:android:ac763604d7949466bdf5a3',
     messagingSenderId: '1074144160794',
     projectId: 'ams-up-fcm',
     storageBucket: 'ams-up-fcm.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyB8Tu4VElub7NDH8gMiFpi0Of8MQoL8Rvw',
-    appId: '1:1074144160794:ios:73a2c8f8c164149fbdf5a3',
+    appId: '1:1074144160794:ios:76f57b60fb307060bdf5a3',
     messagingSenderId: '1074144160794',
     projectId: 'ams-up-fcm',
     storageBucket: 'ams-up-fcm.firebasestorage.app',
     iosBundleId: 'xyz.phetsamone.amsup',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyB8Tu4VElub7NDH8gMiFpi0Of8MQoL8Rvw',
-    appId: '1:1074144160794:ios:73a2c8f8c164149fbdf5a3',
+    appId: '1:1074144160794:ios:76f57b60fb307060bdf5a3',
     messagingSenderId: '1074144160794',
     projectId: 'ams-up-fcm',
     storageBucket: 'ams-up-fcm.firebasestorage.app',

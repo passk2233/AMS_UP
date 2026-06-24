@@ -58,8 +58,7 @@ class TeacherClassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final subject = plan.subject?.nameLao ?? plan.subject?.nameEng ?? 'ວິຊາ';
     final code = plan.subject?.subjectCode ?? '';
-    final room = plan.room?.roomCode ??
-        (plan.roomId != null ? 'ຫ້ອງ ${plan.roomId}' : '-');
+    final room = plan.room?.roomCode ?? '-';
     final time = '${plan.startTime ?? '-'} - ${plan.endTime ?? '-'}';
     final group = plan.studentGroup?.stdGroupName ?? '';
 

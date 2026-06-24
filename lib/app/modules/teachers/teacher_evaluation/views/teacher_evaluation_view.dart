@@ -17,7 +17,7 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
         builder: (context, constraints) {
           return AppPageScaffold(
             title: 'ການປະເມີນ',
-            trailing: const NotiBellButton(route: '/teacher-noti'),
+            topBar: const AppTopBar(notiRoute: '/teacher-noti'),
             body: Obx(() {
               if (controller.isLoading.value) {
                 return AppRefreshableLoader(

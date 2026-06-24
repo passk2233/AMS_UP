@@ -61,7 +61,13 @@ class AppLoading extends StatelessWidget {
       : variant = AppLoadingVariant.dashboard,
         itemCount = 0;
 
-  /// Profile screens: avatar header + 2 grouped info-card blocks + action.
+  /// Teacher home dashboard: greeting + profile card + 3-stat banner +
+  /// quick-action tiles + class list.
+  const AppLoading.teacherDashboard({super.key})
+      : variant = AppLoadingVariant.teacherDashboard,
+        itemCount = 0;
+
+  /// Profile screens: avatar header + 3 grouped info-card blocks + action.
   const AppLoading.profile({super.key})
       : variant = AppLoadingVariant.profile,
         itemCount = 0;
@@ -132,6 +138,8 @@ class AppLoading extends StatelessWidget {
     switch (variant) {
       case AppLoadingVariant.dashboard:
         return const AppDashboardSkeleton();
+      case AppLoadingVariant.teacherDashboard:
+        return const AppTeacherDashboardSkeleton();
       case AppLoadingVariant.profile:
         return const AppProfileSkeleton();
       case AppLoadingVariant.schedule:
@@ -167,6 +175,7 @@ class AppLoading extends StatelessWidget {
 enum AppLoadingVariant {
   list,
   dashboard,
+  teacherDashboard,
   profile,
   schedule,
   booking,

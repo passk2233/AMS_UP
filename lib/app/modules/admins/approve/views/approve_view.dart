@@ -13,7 +13,7 @@ import '../controllers/approve_controller.dart';
 /// Admin booking approval queue.
 ///
 /// Renders, top-to-bottom:
-/// - The shared [AdminAppBar].
+/// - The shared [AppTopBar].
 /// - A three-chip stats row (pending / approved / rejected).
 /// - A search bar + a selection-mode toggle.
 /// - Filter tabs (All / Pending / Approved / Rejected).
@@ -35,7 +35,7 @@ class ApproveView extends GetView<ApproveController> {
         ),
         child: Column(
           children: [
-            const AdminAppBar(),
+            const AppTopBar(notiRoute: '/admin-noti'),
             Expanded(child: _ApproveBody(controller: controller)),
           ],
         ),

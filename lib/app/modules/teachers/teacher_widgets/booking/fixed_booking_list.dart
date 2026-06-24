@@ -166,7 +166,7 @@ class FixedBookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fb = booking;
-    final room = fb.plan.room?.roomCode ?? 'ຫ້ອງ ${fb.roomId}';
+    final room = fb.plan.room?.roomCode ?? '-';
     final subject =
         fb.plan.subject?.nameLao ?? fb.plan.subject?.nameEng ?? 'ວິຊາ';
     final group = fb.plan.studentGroup?.stdGroupName ?? '-';

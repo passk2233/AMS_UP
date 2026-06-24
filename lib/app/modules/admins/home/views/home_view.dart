@@ -8,7 +8,7 @@ import '../controllers/home_controller.dart';
 /// Admin dashboard — first tab in the admin shell.
 ///
 /// Renders, in order:
-/// 1. The shared [AdminAppBar] (semester chip + notifications bell).
+/// 1. The shared [AppTopBar] (semester chip + notifications bell).
 /// 2. A [ProfileCard] gradient banner with name + 3 stats.
 /// 3. A list of `pending` [BookingCard]s the admin can approve / reject.
 ///
@@ -29,7 +29,7 @@ class AdminHomeView extends GetView<AdminHomeController> {
         ),
         child: Column(
           children: [
-            const AdminAppBar(),
+            const AppTopBar(notiRoute: '/admin-noti'),
             Expanded(child: _AdminHomeBody(controller: controller)),
           ],
         ),

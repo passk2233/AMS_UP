@@ -68,8 +68,13 @@ class FacultyFeedbackController extends GetxController {
       questions.assignAll(await _eval.fetchQuestions(activeOnly: true));
       ratings.assignAll(List.filled(questions.length, 0));
 
+      // Scope to the current semester so the student only evaluates the
+      // teachers in their active study plan — not every teacher the group
+      // has ever had across past semesters. Null semester falls back to all.
+      final activeSemester = await _academic.fetchActiveSemester();
       final plans = await _academic.fetchStudyPlans(
         studentGroupId: _stdGroupId,
+        semesterId: activeSemester?.id,
         limit: 200,
       );
 

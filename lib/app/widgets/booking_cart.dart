@@ -91,8 +91,8 @@ class _BookingDisplay {
   /// Whether the booker is a student — used to switch the role pill color.
   bool get isStudent => booking.user?.stdId != null;
 
-  /// Room code if the relation is populated, otherwise `Room <id>`.
-  String get roomName => booking.room?.roomCode ?? 'Room ${booking.roomId}';
+  /// Room code if the relation is populated, otherwise `-` (never a raw id).
+  String get roomName => booking.room?.roomCode ?? '-';
 
   /// Formatted `HH:mm - HH:mm` time range. Empty when both ends are missing.
   String get timeDisplay {

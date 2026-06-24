@@ -49,7 +49,7 @@ class _ComposePage extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const AdminAppBar(),
+          const AppTopBar(notiRoute: '/admin-noti'),
           ComposeHeader(onHistory: controller.openHistory),
           Expanded(
             child: SingleChildScrollView(

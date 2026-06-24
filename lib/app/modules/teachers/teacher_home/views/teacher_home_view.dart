@@ -22,6 +22,7 @@ class TeacherHomeView extends GetView<TeacherHomeController> {
     final nav = Get.find<TeacherBottomNavController>();
     return AppPageScaffold(
       withBackground: true,
+      topBar: const AppTopBar(notiRoute: '/teacher-noti'),
       body: _TeacherHomeBody(controller: controller, nav: nav),
     );
   }
@@ -43,7 +44,7 @@ class _TeacherHomeBody extends StatelessWidget {
       if (controller.isLoading.value) {
         return AppRefreshableLoader(
           onRefresh: controller.refreshData,
-          child: const AppLoading.dashboard(),
+          child: const AppLoading.teacherDashboard(),
         );
       }
       if (controller.errorMessage.value.isNotEmpty) {

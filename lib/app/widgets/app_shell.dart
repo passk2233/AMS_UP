@@ -12,10 +12,17 @@ import 'app_colors.dart';
 /// Pass [title] to render a centered [AppPageTitle] below the status bar.
 /// Pass [appBar] for screens that genuinely need a Material AppBar (e.g.,
 /// detail screens with a back button).
+///
+/// Pass [topBar] for a full-width bar (e.g. [AppTopBar]) pinned above the page
+/// content. It renders edge-to-edge behind the status bar — owning its own
+/// safe-area inset — so the page body below it skips the top inset to avoid a
+/// double gap.
 class AppPageScaffold extends StatelessWidget {
   final Widget body;
   final String? title;
   final Widget? trailing;
+  final Widget? topBar;
+  final Widget? floatingActionButton;
   final PreferredSizeWidget? appBar;
   final bool withBackground;
   final EdgeInsetsGeometry? padding;
@@ -25,6 +32,8 @@ class AppPageScaffold extends StatelessWidget {
     required this.body,
     this.title,
     this.trailing,
+    this.topBar,
+    this.floatingActionButton,
     this.appBar,
     this.withBackground = false,
     this.padding,
@@ -33,6 +42,9 @@ class AppPageScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final content = SafeArea(
+      // A topBar already clears the status bar, so the body must not re-apply
+      // the top inset (that would push it down by a second status-bar height).
+      top: topBar == null,
       child: Column(
         children: [
           if (title != null)
@@ -55,10 +67,16 @@ class AppPageScaffold extends StatelessWidget {
       ),
     );
 
+    // Stack the optional full-width top bar above the page content.
+    final Widget page = topBar == null
+        ? content
+        : Column(children: [topBar!, Expanded(child: content)]);
+
     if (withBackground) {
       return Scaffold(
         appBar: appBar,
         backgroundColor: Colors.transparent,
+        floatingActionButton: floatingActionButton,
         body: Stack(
           children: [
             Container(
@@ -69,7 +87,7 @@ class AppPageScaffold extends StatelessWidget {
                 ),
               ),
             ),
-            content,
+            page,
           ],
         ),
       );
@@ -78,7 +96,8 @@ class AppPageScaffold extends StatelessWidget {
     return Scaffold(
       appBar: appBar,
       backgroundColor: AppColors.scaffoldBg,
-      body: content,
+      floatingActionButton: floatingActionButton,
+      body: page,
     );
   }
 }

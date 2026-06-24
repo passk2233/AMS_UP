@@ -46,7 +46,7 @@ class AuthProvider {
   /// failure. The transport skips the auth header for this path, so a stale
   /// token in storage does not leak in.
   Future<AuthSession> login({
-    required String username,
+    required String email,
     required String password,
     required String platform,
     String? deviceToken,
@@ -54,7 +54,7 @@ class AuthProvider {
     final response = await _dio.post(
       '/auth/login',
       data: {
-        'username': username,
+        'email': email,
         'password': password,
         'device_token': deviceToken,
         'platform': platform,

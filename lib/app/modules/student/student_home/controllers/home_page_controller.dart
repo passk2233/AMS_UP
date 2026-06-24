@@ -97,7 +97,10 @@ class HomePageController extends GetxController {
   Future<void> _loadEvaluationWindow() async {
     try {
       final window = await _eval.fetchActiveWindow();
-      isEvaluationWindowOpen.value = window != null && window.inactive == 0;
+      // isOpenNow (not just inactive == 0) so the button only shows while the
+      // admin window is actually open — not for a future-scheduled window nor
+      // one whose close_time has already passed.
+      isEvaluationWindowOpen.value = window?.isOpenNow ?? false;
     } on DioException catch (e) {
       isEvaluationWindowOpen.value = false;
       debugPrint('loadEvaluationWindow error: ${e.message}');

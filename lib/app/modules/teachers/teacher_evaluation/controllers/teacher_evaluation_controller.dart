@@ -141,7 +141,7 @@ class TeacherEvaluationController extends GetxController {
       g.questionScores.putIfAbsent(
         qId,
         () => QScore(
-          questionText: questionTextMap[qId] ?? 'ຄຳຖາມ #$qId',
+          questionText: questionTextMap[qId] ?? '-',
           totalScore: 0,
           count: 0,
         ),

@@ -20,7 +20,7 @@ class TeacherProfileView extends GetView<TeacherProfileController> {
     }
     return AppPageScaffold(
       title: 'ໂປຣໄຟລ໌',
-      trailing: const NotiBellButton(route: '/teacher-noti'),
+      topBar: const AppTopBar(notiRoute: '/teacher-noti'),
       body: _TeacherProfileBody(controller: controller),
     );
   }
@@ -111,7 +111,7 @@ class _TeacherProfileContent extends StatelessWidget {
   }
 }
 
-/// "ຂໍ້ມູນບັນຊີ" — id, username, email, active status.
+/// "ຂໍ້ມູນບັນຊີ" — username, email, active status.
 class _AccountInfoCard extends StatelessWidget {
   /// Source of reactive state.
   final TeacherProfileController controller;
@@ -127,11 +127,6 @@ class _AccountInfoCard extends StatelessWidget {
     return AppSurfaceCard(
       child: Column(
         children: [
-          AppInfoTile(
-            icon: Icons.badge_outlined,
-            label: 'ລະຫັດ',
-            value: '${user?.id ?? '-'}',
-          ),
           AppInfoTile(
             icon: Icons.account_circle_outlined,
             label: 'ຊື່ຜູ້ໃຊ້',
