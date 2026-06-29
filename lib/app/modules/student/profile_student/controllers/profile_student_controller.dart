@@ -8,6 +8,28 @@ import 'package:frontend/app/services/fcm_service.dart';
 
 import '../../../../widgets/widget.dart';
 
+/// Lao academic year rolls over at the start of this month (~September). This is
+/// the one knob to tune if the institution's intake month differs — it shifts
+/// the computed study-year by one for dates near the boundary.
+const int kAcademicYearStartMonth = 9;
+
+/// Rewrites a legacy group name's cohort year into the student's current
+/// study-year level: "ນັກສຶກສາໄອທີ ປີ 2022 ຫ້ອງ 1" → "... ປີ 4 ...". The legacy
+/// `std_group_name` embeds the 4-digit intake year ("ປີ YYYY"); students want to
+/// see which year of study they're in, not the calendar cohort. Returns the
+/// name unchanged when it carries no 4-digit "ປີ" token, or when the computed
+/// level would be < 1 (a future/odd cohort we shouldn't fabricate a level for).
+String studyYearGroupName(String name, DateTime now,
+    {int startMonth = kAcademicYearStartMonth}) {
+  final match = RegExp(r'ປີ\s*(\d{4})').firstMatch(name);
+  if (match == null) return name;
+  final cohort = int.parse(match.group(1)!);
+  final academicYear = now.month >= startMonth ? now.year : now.year - 1;
+  final level = academicYear - cohort + 1;
+  if (level < 1) return name;
+  return name.replaceRange(match.start, match.end, 'ປີ $level');
+}
+
 class ProfileStudentController extends GetxController {
   ProfileStudentController({AuthProvider? auth})
       : _auth = auth ?? AuthProvider();
@@ -114,9 +136,8 @@ class ProfileStudentController extends GetxController {
 
   String get studentGroupName {
     final name = student?.studentGroup?.stdGroupName ?? '';
-    return name.isNotEmpty
-        ? name
-        : (student?.studentGroup?.stdGroupCode ?? '-');
+    if (name.isEmpty) return student?.studentGroup?.stdGroupCode ?? '-';
+    return studyYearGroupName(name, DateTime.now());
   }
 
   String get program {
