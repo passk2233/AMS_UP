@@ -81,11 +81,14 @@ class FacultyFeedbackController extends GetxController {
       final list = <Faculty>[];
       for (final p in plans) {
         final teacher = p.teacher;
-        final subjectName = p.subject?.nameEng ?? p.subject?.nameLao ?? '-';
+        final subjectName = p.subject?.nameLao ?? p.subject?.nameEng ?? '-';
         if (teacher == null) continue;
-        final teacherName = (teacher.surnameEng != null && teacher.surnameEng!.trim().isNotEmpty)
-            ? '${teacher.nameEng} ${teacher.surnameEng}'
-            : teacher.nameEng;
+        // The study plan denormalises the teacher's Lao name; prefer it and fall
+        // back to English so the evaluation card never shows a blank name.
+        final laoName = '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+        final engName = '${teacher.nameEng} ${teacher.surnameEng ?? ''}'.trim();
+        final teacherName =
+            laoName.isNotEmpty ? laoName : (engName.isNotEmpty ? engName : '-');
         final initials = _initials(teacherName);
         final submitted = await _hasSubmitted(p.id, _studentId!);
         list.add(Faculty(

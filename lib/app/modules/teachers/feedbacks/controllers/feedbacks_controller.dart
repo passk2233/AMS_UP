@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../services/reference_cache.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
 
@@ -49,14 +50,11 @@ class TeacherFeedbackItem {
 class FeedbacksController extends GetxController {
   FeedbacksController({
     AuthProvider? auth,
-    AcademicProvider? academic,
     EvaluationProvider? evaluation,
   })  : _auth = auth ?? AuthProvider(),
-        _academic = academic ?? AcademicProvider(),
         _eval = evaluation ?? EvaluationProvider();
 
   final AuthProvider _auth;
-  final AcademicProvider _academic;
   final EvaluationProvider _eval;
 
   /// `true` while [fetchFeedbacks] is in flight.
@@ -121,12 +119,13 @@ class FeedbacksController extends GetxController {
   }
 
   /// Server-side filter by `teacher_id`, falling back to client-side filter
-  /// when the backend returns nothing.
+  /// when the backend returns nothing. Reads through [ReferenceCache] so
+  /// re-entering this (lazyPut) screen within the TTL doesn't re-download.
   Future<List<StudyPlanModel>> _loadTeacherStudyPlans(int teacherId) async {
-    final scoped = await _academic.fetchStudyPlans(teacherId: teacherId);
+    final scoped = await ReferenceCache.to.studyPlans(teacherId: teacherId);
     if (scoped.isNotEmpty) return scoped;
 
-    final all = await _academic.fetchStudyPlans();
+    final all = await ReferenceCache.to.studyPlans();
     return all.where((sp) => sp.teacherId == teacherId).toList();
   }
 

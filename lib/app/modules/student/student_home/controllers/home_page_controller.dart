@@ -59,11 +59,21 @@ class HomePageController extends GetxController {
       enrollments.assignAll(await _academic.fetchEnrollments(studentId: stdId));
 
       // ── ດຶງ study plans (ສຳລັບຫ້ອງຮຽນມື້ນີ້) ──
+      // Scope to the active semester, mirroring ScheduleStudentController.
+      // Without semaster_id the timetable comes back empty, so today's
+      // classes never render on the dashboard.
       final groupId = currentUser.value?.student?.stdGroupId;
       if (groupId != null) {
-        studyPlans.assignAll(
-          await _academic.fetchStudyPlans(studentGroupId: groupId, limit: 200),
+        final semId = activeSemester.value?.id;
+        var plans = await _academic.fetchStudyPlans(
+          studentGroupId: groupId,
+          semesterId: semId,
+          limit: 200,
         );
+        if (semId != null) {
+          plans = plans.where((p) => p.semasterId == semId).toList();
+        }
+        studyPlans.assignAll(plans);
       }
     } on DioException catch (e) {
       debugPrint(

@@ -2,9 +2,11 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../../../../services/reference_cache.dart';
 import '../../../../widgets/app_colors.dart';
 import '../../../../widgets/app_dialogs.dart';
 import '../../../data/data_exporter.dart';
+import '../../admin_widgets/evalutions/eval_report_pdf.dart';
 import '../views/question_dialog.dart';
 
 /// Page modes for the evaluations admin screen.
@@ -133,6 +135,10 @@ class EvalutionController extends GetxController {
 
   /// Cache of `study_plan.id → StudyPlanModel` with preloaded relations.
   final Map<int, StudyPlanModel> _studyPlanMap = {};
+
+  /// Cache of `std_group.id → roster size`, the "expected" denominator for the
+  /// completion meter (evaluated / expected). Filled once per [fetchResults].
+  final Map<int, int> _groupSizes = {};
 
   @override
   void onInit() {
@@ -490,6 +496,7 @@ class EvalutionController extends GetxController {
     resultsError.value = '';
     try {
       await _fetchStudyPlans();
+      await _fetchGroupSizes();
 
       final parsed = await _eval.fetchResults(limit: 500);
       for (final r in parsed) {
@@ -509,12 +516,34 @@ class EvalutionController extends GetxController {
   Future<void> _fetchStudyPlans() async {
     try {
       _studyPlanMap.clear();
-      for (final sp in await _academic.fetchStudyPlans(limit: 500)) {
+      for (final sp in await ReferenceCache.to.studyPlans(limit: 500)) {
         _studyPlanMap[sp.id] = sp;
       }
     } on DioException catch (e) {
       debugPrint('fetchStudyPlans error: ${e.message}');
     }
+  }
+
+  /// Roster size of every student group referenced by the loaded study plans —
+  /// the "expected" denominator of the completion meter. One `/students` call
+  /// per distinct group, fetched in parallel.
+  /// ponytail: no cross-session cache; a tab refresh refetches. Rosters are
+  /// stable within a semester, so add a short-TTL cache only if this shows up
+  /// as slow on the admin results screen.
+  Future<void> _fetchGroupSizes() async {
+    final groupIds = <int>{
+      for (final sp in _studyPlanMap.values)
+        if (sp.stdGroupId > 0) sp.stdGroupId,
+    }..removeWhere(_groupSizes.containsKey);
+    if (groupIds.isEmpty) return;
+    await Future.wait(groupIds.map((gid) async {
+      try {
+        _groupSizes[gid] = await ReferenceCache.to.groupSize(gid);
+      } on DioException catch (e) {
+        debugPrint('fetchGroupSizes($gid) error: ${e.message}');
+        _groupSizes[gid] = 0;
+      }
+    }));
   }
 
   // ──────────────────────────────────────── summary aggregations ──
@@ -551,9 +580,37 @@ class EvalutionController extends GetxController {
       _bumpQuestionScore(summary.questionScores, r);
     }
 
+    for (final s in summaries.values) {
+      _computeTeacherCompletion(s);
+    }
     final list = summaries.values.toList()
       ..sort((a, b) => b.averageScore.compareTo(a.averageScore));
     teacherSummaries.assignAll(list);
+  }
+
+  /// Fill [TeacherEvalSummary.respondents] / [expectedStudents] from the
+  /// teacher's raw rows. Per study plan, respondents ≈ the max answers on any
+  /// one question — each student answers every active question exactly once, so
+  /// the busiest question's count equals the number of students who submitted
+  /// (computed without ever touching student_id, per the privacy rule).
+  /// Expected = that plan's group roster size from [_groupSizes].
+  void _computeTeacherCompletion(TeacherEvalSummary s) {
+    final perPlanQ = <int, Map<int, int>>{};
+    final planGroup = <int, int>{};
+    for (final r in s.results) {
+      (perPlanQ[r.studyPlanId] ??= {})
+          .update(r.evaQuestionId, (c) => c + 1, ifAbsent: () => 1);
+      final sp = r.studyPlan ?? _studyPlanMap[r.studyPlanId];
+      if (sp != null) planGroup[r.studyPlanId] = sp.stdGroupId;
+    }
+    var respondents = 0;
+    var expected = 0;
+    perPlanQ.forEach((planId, counts) {
+      respondents += counts.values.fold(0, (m, c) => c > m ? c : m);
+      expected += _groupSizes[planGroup[planId]] ?? 0;
+    });
+    s.respondents = respondents;
+    s.expectedStudents = expected;
   }
 
   TeacherModel? _resolveTeacher(
@@ -593,6 +650,7 @@ class EvalutionController extends GetxController {
               : 'ບໍ່ລະບຸ',
           semesterId: sp.semasterId,
           studentGroupName: sp.studentGroup?.stdGroupName ?? '',
+          expectedStudents: _groupSizes[sp.stdGroupId] ?? 0,
           totalResponses: 0,
           totalScore: 0,
           questionScores: {},
@@ -696,6 +754,42 @@ class EvalutionController extends GetxController {
     pageMode.value = EvalutionPageMode.results;
   }
 
+  // ─────────────────────────────────────────────── pdf reports ──
+
+  /// Build + share the printable PDF for a single subject (one study plan) —
+  /// the per-class report. Opens the system print / share sheet (Save as PDF).
+  Future<void> downloadSubjectReport(SubjectEvalSummary subject) =>
+      _downloadReport([subject]);
+
+  /// Build + share one PDF covering every subject of the open teacher — the
+  /// bulk report (one page per class).
+  Future<void> downloadTeacherReport() =>
+      _downloadReport(selectedTeacherSubjects.toList());
+
+  Future<void> _downloadReport(List<SubjectEvalSummary> subjects) async {
+    final teacher = selectedTeacherSummary.value?.teacher;
+    if (teacher == null || subjects.isEmpty) {
+      AppDialogs.showWarning(
+        title: 'ບໍ່ມີຂໍ້ມູນ',
+        message: 'ຍັງບໍ່ມີຜົນການປະເມີນໃຫ້ສ້າງບົດລາຍງານ.',
+      );
+      return;
+    }
+    try {
+      await EvalReportPdf.share(
+        teacherName: '${teacher.nameLao} ${teacher.surnameLao}'.trim(),
+        subjects: subjects,
+        questions: questions,
+      );
+    } catch (e) {
+      AppDialogs.showError(
+        title: 'ສ້າງ PDF ບໍ່ສຳເລັດ',
+        message: 'ມີບັນຫາໃນການສ້າງບົດລາຍງານ, ກະລຸນາລອງໃໝ່.',
+        detail: e.toString(),
+      );
+    }
+  }
+
   // ─────────────────────────────────────────────── ui + helpers ──
 
   Future<bool?> _showQuestionDialog({required bool isEdit}) {
@@ -750,6 +844,14 @@ class TeacherEvalSummary {
   /// Raw rows used to build this summary — needed for the detail page.
   final List<EvaluationResultModel> results;
 
+  /// Students who submitted across all this teacher's plans (set by
+  /// [EvalutionController._computeTeacherCompletion]). 0 until computed.
+  int respondents = 0;
+
+  /// Sum of the roster sizes of every plan this teacher taught — the
+  /// "expected" completion denominator. 0 until computed.
+  int expectedStudents = 0;
+
   TeacherEvalSummary({
     required this.teacher,
     required this.totalResponses,
@@ -763,6 +865,12 @@ class TeacherEvalSummary {
   /// no responses.
   double get averageScore =>
       totalResponses > 0 ? totalScore / totalResponses : 0;
+
+  /// Completion across all plans as a 0..100 percentage. 0 when no roster
+  /// sizes are known.
+  int get completionPercent => expectedStudents > 0
+      ? (respondents / expectedStudents * 100).round().clamp(0, 100)
+      : 0;
 }
 
 /// Per-question score aggregate used inside [TeacherEvalSummary] /
@@ -808,6 +916,9 @@ class SubjectEvalSummary {
   /// Student group display name.
   final String studentGroupName;
 
+  /// Roster size of the student group — the "expected" completion denominator.
+  final int expectedStudents;
+
   /// Number of evaluation rows aggregated.
   int totalResponses;
 
@@ -827,29 +938,29 @@ class SubjectEvalSummary {
     required this.semesterLabel,
     required this.semesterId,
     required this.studentGroupName,
+    required this.expectedStudents,
     required this.totalResponses,
     required this.totalScore,
     required this.questionScores,
     required this.evaluationDetails,
   });
 
+  /// Students who submitted this evaluation. Each student answers every active
+  /// question once, so the busiest question's response count is the headcount
+  /// — derived without student identity, per the privacy rule.
+  int get respondents =>
+      questionScores.values.fold(0, (m, q) => q.count > m ? q.count : m);
+
+  /// Completion as a 0..100 percentage (`respondents / expectedStudents`).
+  /// Returns 0 when the roster size is unknown.
+  int get completionPercent => expectedStudents > 0
+      ? (respondents / expectedStudents * 100).round().clamp(0, 100)
+      : 0;
+
   /// Average score across [evaluationDetails]. Returns `0` when there are
   /// no responses.
   double get averageScore =>
       totalResponses > 0 ? totalScore / totalResponses : 0;
-
-  /// Approximation of how many distinct students rated this subject.
-  ///
-  /// Per the CLAUDE.md privacy rule we never join evaluator identity to the
-  /// client; we instead group by submission date as a heuristic. Falls back
-  /// to [totalResponses] when no rows carry a date.
-  int get uniqueEvaluatorCount {
-    final dates = evaluationDetails
-        .where((d) => d.date != null)
-        .map((d) => '${d.date!.year}-${d.date!.month}-${d.date!.day}')
-        .toSet();
-    return dates.isNotEmpty ? dates.length : totalResponses;
-  }
 }
 
 /// One anonymized evaluation row (no student identity carried).
@@ -863,7 +974,7 @@ class AnonymousEvalDetail {
   /// Optional free-form comment.
   final String? comment;
 
-  /// Submission timestamp (used by [SubjectEvalSummary.uniqueEvaluatorCount]).
+  /// Submission timestamp (anonymous — no student identity attached).
   final DateTime? date;
 
   AnonymousEvalDetail({

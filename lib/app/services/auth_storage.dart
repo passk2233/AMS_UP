@@ -17,6 +17,7 @@ class AuthStorage {
   static const _kToken = 'token';
   static const _kRefreshToken = 'refresh_token';
   static const _kRoles = 'roles';
+  static const _kActiveRole = 'active_role';
   static const _kRememberUntil = 'remember_until';
   static const _kRolesSeparator = '|';
 
@@ -68,6 +69,16 @@ class AuthStorage {
     await prefs.remove(_kRoles);
   }
 
+  /// The role shell the user is currently operating as (a multi-role user can
+  /// switch between them in-app). Returns `null` when unset — callers fall
+  /// back to the highest-priority role.
+  static Future<String?> readActiveRole() => _secure.read(key: _kActiveRole);
+
+  /// Persist the chosen active role so the next launch lands on the same
+  /// shell instead of resetting to the highest-priority one.
+  static Future<void> writeActiveRole(String role) =>
+      _secure.write(key: _kActiveRole, value: role);
+
   /// Wipe everything auth-related (token + roles + remember-me prefs).
   ///
   /// Safe to call from a logout flow, but any cleanup that depends on the
@@ -76,6 +87,7 @@ class AuthStorage {
     await _secure.delete(key: _kToken);
     await _secure.delete(key: _kRefreshToken);
     await _secure.delete(key: _kRoles);
+    await _secure.delete(key: _kActiveRole);
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
     await prefs.remove(_kRoles);

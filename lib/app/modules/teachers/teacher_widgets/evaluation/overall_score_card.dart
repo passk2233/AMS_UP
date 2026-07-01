@@ -6,7 +6,7 @@ import 'eval_score_colors.dart';
 /// Headline card showing the teacher's overall average score on a heat-scale
 /// colored fill with a white score pill.
 class OverallScoreCard extends StatelessWidget {
-  /// Overall average score (0..5).
+  /// Overall average score (0..10).
   final double average;
 
   const OverallScoreCard({super.key, required this.average});
@@ -19,13 +19,13 @@ class OverallScoreCard extends StatelessWidget {
     String label = 'ດີ';
     IconData emoji = Icons.thumb_up_alt_rounded;
 
-    if (average < 3.0) {
+    if (average < 5.0) {
       label = 'ຕ້ອງປັບປຸງ';
       emoji = Icons.trending_down_rounded;
-    } else if (average < 4.0) {
+    } else if (average < 7.0) {
       label = 'ປານກາງ';
       emoji = Icons.trending_flat_rounded;
-    } else if (average >= 4.5) {
+    } else if (average >= 9.0) {
       label = 'ດີເລີດ';
       emoji = Icons.emoji_events_rounded;
     }

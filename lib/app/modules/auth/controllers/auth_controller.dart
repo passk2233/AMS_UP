@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../routes/app_pages.dart';
 import '../../../services/auth_storage.dart';
 import '../../../services/fcm_service.dart';
+import '../../../services/role_routing.dart';
 import '../../../widgets/app_snackbar.dart';
 import '../../data/data_exporter.dart';
 
@@ -130,12 +130,16 @@ class AuthController extends GetxController {
       unawaited(FCMService.syncTokenIfNeeded());
       unawaited(FCMService.subscribeRoleTopics(roles));
 
-      final destination = _routeForRoles(roles);
-      if (destination == null) {
+      final known = RoleRouting.known(roles);
+      if (known.isEmpty) {
         AppSnackbar.error('ບໍ່ສາມາດກວດສອບສິດເຂົ້າໃຊ້ໄດ້');
         return;
       }
-      Get.offAllNamed(destination);
+      // Fresh login always starts on the highest-priority role, overwriting any
+      // stale active-role left over from a previous session on this device.
+      final landingRole = known.first;
+      await AuthStorage.writeActiveRole(landingRole);
+      Get.offAllNamed(RoleRouting.routeFor(landingRole)!);
     } on DioException catch (e) {
       AppSnackbar.error(_mapDioError(e), title: 'ເຂົ້າສູ່ລະບົບລົ້ມເຫລວ');
     } finally {
@@ -176,18 +180,6 @@ class AuthController extends GetxController {
     if (GetPlatform.isIOS) return 'ios';
     if (GetPlatform.isWeb) return 'web';
     return 'unknown';
-  }
-
-  /// Pick the landing page for the highest-priority role the user has, or
-  /// `null` when no recognized role is present.
-  String? _routeForRoles(List<String> roles) {
-    final lower = roles.map((r) => r.toLowerCase()).toSet();
-    if (lower.contains('administrator') || lower.contains('admin')) {
-      return Routes.ADMIN_HOME;
-    }
-    if (lower.contains('teacher')) return Routes.TEACHER_HOME;
-    if (lower.contains('student')) return Routes.HOME_STUDENT;
-    return null;
   }
 
   /// Map a [DioException] to a user-facing error message.

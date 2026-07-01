@@ -186,7 +186,7 @@ class _QuestionScoreBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final q = score;
-    final pct = (q.average / 5.0).clamp(0.0, 1.0);
+    final pct = (q.average / 10.0).clamp(0.0, 1.0);
     final barColor = evalScoreColor(q.average);
     final numColor = evalScoreTextColor(q.average);
     return Padding(

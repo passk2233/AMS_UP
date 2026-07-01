@@ -3,9 +3,9 @@ import 'package:frontend/app/widgets/widget.dart';
 
 /// Heat-scale color for an evaluation score — fill / tint / icon use only.
 Color evalScoreColor(double score) {
-  if (score >= 4.5) return AppColors.success; // emerald — strong
-  if (score >= 3.5) return AppColors.warning; // amber — medium
-  if (score >= 2.5) return AppColors.info; // blue — fair
+  if (score >= 9.0) return AppColors.success; // emerald — strong
+  if (score >= 7.0) return AppColors.warning; // amber — medium
+  if (score >= 5.0) return AppColors.info; // blue — fair
   return AppColors.danger; // red — weak
 }
 

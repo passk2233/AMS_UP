@@ -55,6 +55,11 @@ dependencies:
   # Persistent (disk + memory) cache for remote avatars / attachments so they
   # aren't re-downloaded on every cold start — important on slow campus / 3G.
   cached_network_image: ^3.4.1
+  # Evaluation report → PDF. `pdf` builds the document, `printing` opens the
+  # system print / share sheet (Save as PDF) — the native equivalent of the
+  # webapp's "browser print → Save as PDF".
+  pdf: ^3.11.1
+  printing: ^5.13.3
 
 dev_dependencies:
   flutter_test:

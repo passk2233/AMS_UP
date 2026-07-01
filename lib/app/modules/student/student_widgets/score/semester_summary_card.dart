@@ -25,7 +25,7 @@ class SemesterSummaryCard extends StatelessWidget {
                     '${controller.selectedSemesterCredits} ໜ່ວຍກິດ · ${controller.selectedSemesterSubjects} ວິຊາ',
                 metricLabel: 'GPA',
                 metricValue: controller.selectedSemesterGpa.toStringAsFixed(2),
-                color: AppColors.statsBlue,
+                color: AppColors.info,
               ),
             ),
             const VerticalDivider(width: 24),
@@ -37,7 +37,7 @@ class SemesterSummaryCard extends StatelessWidget {
                 metricValue: controller.selectedCumulativeGpa.toStringAsFixed(
                   2,
                 ),
-                color: AppColors.borderApproved,
+                color: AppColors.primaryFill,
               ),
             ),
           ],

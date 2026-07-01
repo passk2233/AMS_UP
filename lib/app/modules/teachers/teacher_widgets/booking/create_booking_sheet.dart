@@ -63,8 +63,9 @@ Future<void> showCreateBookingSheet(
                   startTime: startCtrl.text.trim(),
                   endTime: endCtrl.text.trim(),
                 );
+          final availableIds = available.map((r) => r.id).toSet();
           if (selectedRoomId.value != null &&
-              !available.any((r) => r.id == selectedRoomId.value)) {
+              !availableIds.contains(selectedRoomId.value)) {
             selectedRoomId.value = null;
           }
           final canSubmit =
@@ -75,14 +76,14 @@ Future<void> showCreateBookingSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Center(
+              Center(
                 child: SizedBox(
                   width: 40,
                   height: 4,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Color(0xFFDDDDDD),
-                      borderRadius: BorderRadius.all(Radius.circular(99)),
+                      color: Colors.grey.shade300,
+                      borderRadius: const BorderRadius.all(Radius.circular(99)),
                     ),
                   ),
                 ),
@@ -95,14 +96,24 @@ Future<void> showCreateBookingSheet(
               const SizedBox(height: 12),
               DropdownButtonFormField<int>(
                 initialValue: selectedRoomId.value,
-                items: available
-                    .map(
-                      (r) => DropdownMenuItem<int>(
-                        value: r.id,
-                        child: Text('${r.roomCode} (${r.capacity})'),
-                      ),
-                    )
-                    .toList(),
+                // Show every room, but disable the ones already booked/in-class
+                // for this slot so the teacher sees they exist but are taken,
+                // instead of them silently disappearing from the list.
+                items: controller.rooms.map((r) {
+                  final free = availableIds.contains(r.id);
+                  return DropdownMenuItem<int>(
+                    value: r.id,
+                    enabled: free,
+                    child: Text(
+                      free
+                          ? '${r.roomCode} (${r.capacity})'
+                          : '${r.roomCode} (${r.capacity}) • ບໍ່ວ່າງ',
+                      style: free
+                          ? null
+                          : TextStyle(color: Theme.of(context).disabledColor),
+                    ),
+                  );
+                }).toList(),
                 onChanged: isPast
                     ? null
                     : (v) {

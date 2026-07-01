@@ -128,6 +128,11 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                       ),
                     ),
 
+                    RoleSwitcherCard(
+                      roles: controller.user.value?.roles ?? const [],
+                      current: 'student',
+                    ),
+
                     const SizedBox(height: 30),
                     Obx(
                       () => AppSignOutButton(

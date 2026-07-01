@@ -13,7 +13,7 @@ class ProfileHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initials = _initials(user?.username ?? '?');
+    final photo = user?.teacher?.photo ?? user?.student?.photo;
     final roles = user?.roles ?? const <String>[];
     return Container(
       width: double.infinity,
@@ -35,7 +35,7 @@ class ProfileHeroCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          _AvatarCircle(initials: initials),
+          _AvatarCircle(photo: photo),
           const SizedBox(height: AppSpacing.s + 4),
           Text(
             user?.username ?? '-',
@@ -61,24 +61,15 @@ class ProfileHeroCard extends StatelessWidget {
       ),
     );
   }
-
-  /// Up to 2 uppercase letters extracted from the user's name.
-  String _initials(String name) {
-    if (name.isEmpty) return '?';
-    final parts = name.trim().split(' ').where((p) => p.isNotEmpty).toList();
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
-    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
-  }
 }
 
-/// 80×80 white-bordered circle showing the user's initials.
+/// 80×80 white-bordered circle showing the user's profile photo, falling back
+/// to the bundled placeholder when there is no photo.
 class _AvatarCircle extends StatelessWidget {
-  /// 1–2 character initial string.
-  final String initials;
+  /// Stored teacher/student photo path or URL; null shows the placeholder.
+  final String? photo;
 
-  const _AvatarCircle({required this.initials});
+  const _AvatarCircle({required this.photo});
 
   @override
   Widget build(BuildContext context) {
@@ -87,21 +78,15 @@ class _AvatarCircle extends StatelessWidget {
       height: 80,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: Colors.white.withValues(alpha: 0.2),
         border: Border.all(
           color: Colors.white.withValues(alpha: 0.5),
           width: 3,
         ),
       ),
-      child: Center(
-        child: Text(
-          initials,
-          style: const TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+      child: AppAvatar(
+        photo: photo,
+        radius: 37,
+        backgroundColor: Colors.white.withValues(alpha: 0.2),
       ),
     );
   }

@@ -10,7 +10,10 @@ class EvalSubjectCard extends StatelessWidget {
   /// Source summary.
   final SubjectEvalSummary subject;
 
-  const EvalSubjectCard({super.key, required this.subject});
+  /// Tapped when the user wants this subject's printable PDF report.
+  final VoidCallback? onDownloadPdf;
+
+  const EvalSubjectCard({super.key, required this.subject, this.onDownloadPdf});
 
   @override
   Widget build(BuildContext context) {
@@ -58,6 +61,22 @@ class EvalSubjectCard extends StatelessWidget {
                 comments: subject.evaluationDetails
                     .where((d) => d.comment != null && d.comment!.isNotEmpty)
                     .toList(),
+              ),
+            ],
+            if (onDownloadPdf != null) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: onDownloadPdf,
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                  label: const Text('ດາວໂຫຼດ PDF'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    minimumSize: const Size.fromHeight(AppColors.minTouchTarget),
+                  ),
+                ),
               ),
             ],
           ],
@@ -135,10 +154,10 @@ class _SubjectSubtitle extends StatelessWidget {
               ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${subject.totalResponses} ການປະເມີນ',
-          style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+        const SizedBox(height: 6),
+        EvalCompletionMeter(
+          respondents: subject.respondents,
+          expected: subject.expectedStudents,
         ),
       ],
     );
@@ -226,7 +245,7 @@ class _QuestionBreakdown extends StatelessWidget {
                   ),
                 ),
                 const Text(
-                  '/5',
+                  '/10',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,

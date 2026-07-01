@@ -75,14 +75,35 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
                       subtitle: 'ກະລຸນາລອງໃໝ່ພາຍຫຼັງ',
                     );
                   }
-                  return Column(
-                    children: List.generate(
-                      questions.length,
-                      (i) => _StarRatingQuestion(
+                  // Group questions by category, preserving the original index
+                  // so each star rating still maps to controller.ratings[i].
+                  final groups = <String, List<int>>{};
+                  for (var i = 0; i < questions.length; i++) {
+                    final cat = (questions[i].category?.trim().isNotEmpty ?? false)
+                        ? questions[i].category!.trim()
+                        : 'ອື່ນໆ';
+                    groups.putIfAbsent(cat, () => []).add(i);
+                  }
+                  final children = <Widget>[];
+                  var section = 0;
+                  groups.forEach((category, indices) {
+                    section++;
+                    children.add(Padding(
+                      padding: const EdgeInsets.only(
+                          top: AppSpacing.m, bottom: AppSpacing.s),
+                      child: Text('$section. $category',
+                          style: AppTypography.subheading),
+                    ));
+                    for (final i in indices) {
+                      children.add(_StarRatingQuestion(
                         index: i,
                         question: questions[i].question,
-                      ),
-                    ),
+                      ));
+                    }
+                  });
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: children,
                   );
                 }),
                 const SizedBox(height: AppSpacing.l),
@@ -159,30 +180,49 @@ class _StarRatingQuestion extends GetView<FacultyFeedbackController> {
         children: [
           Text(question, style: AppTypography.body),
           const SizedBox(height: AppSpacing.s),
-          Obx(
-            () => Row(
-              children: List.generate(5, (starIndex) {
-                final filled = starIndex < controller.ratings[index];
-                return Expanded(
-                  child: SizedBox(
-                    height: AppColors.minTouchTarget,
-                    child: IconButton(
-                      tooltip: '${starIndex + 1} ດາວ',
-                      onPressed: () =>
-                          controller.setRating(index, starIndex + 1),
-                      icon: Icon(
-                        filled ? Icons.star_rounded : Icons.star_outline_rounded,
-                        size: 30,
-                        color: filled
-                            ? AppColors.accentYellow
-                            : Colors.grey.shade300,
-                      ),
+          Obx(() {
+            final v = controller.ratings[index];
+            return Container(
+              height: AppColors.minTouchTarget + 6,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Text(
+                    '$v',
+                    style: AppTypography.subheading.copyWith(
+                      color: v == 0
+                          ? AppColors.textSecondary
+                          : AppColors.textPrimary,
                     ),
                   ),
-                );
-              }),
-            ),
-          ),
+                  const Spacer(),
+                  IconButton(
+                    tooltip: 'ຫຼຸດ',
+                    onPressed:
+                        v > 0 ? () => controller.setRating(index, v - 1) : null,
+                    icon: const Icon(Icons.remove_rounded),
+                    color: AppColors.primaryFill,
+                  ),
+                  Container(width: 1, height: 28, color: Colors.grey.shade300),
+                  IconButton(
+                    tooltip: 'ເພີ່ມ',
+                    onPressed: v < 10
+                        ? () => controller.setRating(index, v + 1)
+                        : null,
+                    icon: const Icon(Icons.add_rounded),
+                    color: AppColors.primaryFill,
+                  ),
+                ],
+              ),
+            );
+          }),
+          const SizedBox(height: 6),
+          Text('ໃຫ້ຄະແນນ 1–10 (ຄະແນນເຕັມ 10)', style: AppTypography.caption),
         ],
       ),
     );

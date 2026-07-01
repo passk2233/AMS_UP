@@ -14,6 +14,7 @@ export 'noti_cards.dart';
 export 'notification_attachments.dart';
 export 'app_cards.dart';
 export 'app_buttons.dart';
+export 'role_switcher_card.dart';
 export 'app_text_field.dart';
 export 'app_search_bar.dart';
 export 'app_snackbar.dart';

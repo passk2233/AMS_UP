@@ -18,11 +18,25 @@ class BulkActionBar extends StatelessWidget {
     return Obx(() {
       if (!controller.selectionMode.value) return const SizedBox.shrink();
       final count = controller.selectedBookingIds.length;
+      // Flat Material (elevation 0) for InkWell ripples; the separation from
+      // scrolling content is the system's single soft "Nav Lift" shadow, not a
+      // hard Material elevation tier (see Soft-Shadow Rule).
       return Material(
-        elevation: 12,
-        color: Colors.white,
-        child: SafeArea(
-          top: false,
+        elevation: 0,
+        color: Colors.transparent,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: Row(
@@ -64,6 +78,7 @@ class BulkActionBar extends StatelessWidget {
               ],
             ),
           ),
+          ),
         ),
       );
     });
@@ -93,17 +108,21 @@ class _SelectionSummary extends StatelessWidget {
             color: AppColors.textPrimary,
           ),
         ),
-        GestureDetector(
+        InkWell(
           onTap: count == 0
               ? controller.selectAllVisiblePending
               : controller.clearSelection,
-          child: Text(
-            count == 0 ? 'ເລືອກທັງໝົດທີ່ລໍຖ້າ' : 'ລ້າງການເລືອກ',
-            style: const TextStyle(
-              // On-fill teal (4.70:1); bright primary is 2.43:1 as text.
-              fontSize: 12,
-              color: AppColors.primaryFill,
-              fontWeight: FontWeight.w600,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+            child: Text(
+              count == 0 ? 'ເລືອກທັງໝົດທີ່ລໍຖ້າ' : 'ລ້າງການເລືອກ',
+              style: const TextStyle(
+                // On-fill teal (4.70:1); bright primary is 2.43:1 as text.
+                fontSize: 12,
+                color: AppColors.primaryFill,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),

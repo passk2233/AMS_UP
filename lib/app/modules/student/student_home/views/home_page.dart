@@ -43,7 +43,7 @@ class HomePage extends GetView<HomePageController> {
                 greeting: "ສະບາຍດີ, ${controller.displayName} 👋",
                 subtitle: controller.currentDate,
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: AppSpacing.l),
               AppStatsBanner(
                 items: const [
                   AppStatItem(
@@ -58,7 +58,7 @@ class HomePage extends GetView<HomePageController> {
                   ),
                 ],
               ),
-              const SizedBox(height: 25),
+              const SizedBox(height: AppSpacing.l),
               Row(
                 children: [
                   Expanded(
@@ -66,7 +66,7 @@ class HomePage extends GetView<HomePageController> {
                       label: "ຫ້ອງຮຽນ",
                       value: "${controller.totalClasses}",
                       icon: Icons.school_rounded,
-                      color: AppColors.statsBlue,
+                      color: AppColors.info,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -75,7 +75,7 @@ class HomePage extends GetView<HomePageController> {
                       label: "ວິຊາ",
                       value: "${controller.totalSubjects}",
                       icon: Icons.book_rounded,
-                      color: AppColors.borderApproved,
+                      color: AppColors.info,
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -84,7 +84,7 @@ class HomePage extends GetView<HomePageController> {
                       label: "GPA",
                       value: controller.gpa.toStringAsFixed(2),
                       icon: Icons.bar_chart_rounded,
-                      color: AppColors.borderPending,
+                      color: AppColors.primaryFill,
                     ),
                   ),
                 ],
@@ -121,7 +121,7 @@ class HomePage extends GetView<HomePageController> {
                     title: cls['subject'] ?? '',
                     time: cls['time'],
                     location: cls['room'],
-                    color: AppColors.statsBlue,
+                    color: AppColors.info,
                   ),
                 ),
             ],

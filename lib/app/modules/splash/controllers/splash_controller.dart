@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../routes/app_pages.dart';
 import '../../../services/auth_storage.dart';
+import '../../../services/role_routing.dart';
 
 /// High-level state the splash is showing.
 enum SplashPhase { connecting, error }
@@ -185,12 +186,7 @@ class SplashController extends GetxController
     }
 
     final roles = await AuthStorage.readRoles();
-    final lowered = roles.map((r) => r.toLowerCase()).toSet();
-    if (lowered.contains('administrator') || lowered.contains('admin')) {
-      return Routes.ADMIN_HOME;
-    }
-    if (lowered.contains('teacher')) return Routes.TEACHER_HOME;
-    if (lowered.contains('student')) return Routes.HOME_STUDENT;
-    return Routes.AUTH;
+    final active = await AuthStorage.readActiveRole();
+    return RoleRouting.landing(roles, active: active) ?? Routes.AUTH;
   }
 }

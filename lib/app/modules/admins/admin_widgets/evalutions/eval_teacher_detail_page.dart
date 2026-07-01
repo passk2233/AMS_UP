@@ -24,6 +24,7 @@ class EvalTeacherDetailPage extends StatelessWidget {
           _DetailTopBar(
             teacherName: '${teacher.nameLao} ${teacher.surnameLao}',
             onBack: controller.closeTeacherDetail,
+            onDownloadAll: controller.downloadTeacherReport,
           ),
           _TeacherSummaryCard(summary: summary),
           const SizedBox(height: 12),
@@ -44,12 +45,19 @@ class _DetailTopBar extends StatelessWidget {
   /// Back button tap handler.
   final VoidCallback onBack;
 
-  const _DetailTopBar({required this.teacherName, required this.onBack});
+  /// Download-all-subjects (bulk report) tap handler.
+  final VoidCallback onDownloadAll;
+
+  const _DetailTopBar({
+    required this.teacherName,
+    required this.onBack,
+    required this.onDownloadAll,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 16, 8),
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
       child: Row(
         children: [
           IconButton(
@@ -70,6 +78,12 @@ class _DetailTopBar extends StatelessWidget {
               ),
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+          TextButton.icon(
+            onPressed: onDownloadAll,
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+            label: const Text('PDF ທັງໝົດ'),
+            style: TextButton.styleFrom(foregroundColor: AppColors.primary),
           ),
         ],
       ),
@@ -160,6 +174,11 @@ class _TeacherSummaryCard extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 8),
+                EvalCompletionMeter(
+                  respondents: summary.respondents,
+                  expected: summary.expectedStudents,
+                ),
               ],
             ),
           ),
@@ -233,7 +252,10 @@ class _SubjectList extends StatelessWidget {
       return ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
         itemCount: subjects.length,
-        itemBuilder: (_, i) => EvalSubjectCard(subject: subjects[i]),
+        itemBuilder: (_, i) => EvalSubjectCard(
+          subject: subjects[i],
+          onDownloadPdf: () => controller.downloadSubjectReport(subjects[i]),
+        ),
       );
     });
   }

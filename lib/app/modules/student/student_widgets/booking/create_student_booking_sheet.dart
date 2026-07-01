@@ -74,14 +74,14 @@ Future<void> showCreateStudentBookingSheet(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Center(
+              Center(
                 child: SizedBox(
                   width: 40,
                   height: 4,
                   child: DecoratedBox(
                     decoration: BoxDecoration(
-                      color: Color(0xFFDDDDDD),
-                      borderRadius: BorderRadius.all(Radius.circular(99)),
+                      color: Colors.grey.shade300,
+                      borderRadius: const BorderRadius.all(Radius.circular(99)),
                     ),
                   ),
                 ),

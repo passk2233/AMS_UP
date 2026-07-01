@@ -86,6 +86,7 @@ class _TeacherProfileContent extends StatelessWidget {
           const SizedBox(height: 20),
           const AppSectionTitle('ກິດຈະກຳ'),
           _ActivityCard(controller: controller),
+          RoleSwitcherCard(roles: roles, current: 'teacher'),
           const SizedBox(height: 20),
           Obx(
             () => AppSignOutButton(

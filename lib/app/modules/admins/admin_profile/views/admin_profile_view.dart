@@ -87,6 +87,12 @@ class _AdminProfileContent extends StatelessWidget {
             controller.user.value;
             return ActivityCard(controller: controller);
           }),
+          Obx(
+            () => RoleSwitcherCard(
+              roles: controller.user.value?.roles ?? const [],
+              current: 'admin',
+            ),
+          ),
           const SizedBox(height: AppSpacing.l),
           Obx(
             () => AppSignOutButton(

@@ -93,7 +93,7 @@ class _SubjectDetailSheet extends StatelessWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE0E2E7),
+                    color: Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
