@@ -5,7 +5,6 @@ import '../../../../utilities/assets.dart';
 import '../../../../widgets/widget.dart';
 import '../../admin_widgets/profile/profile_hero_card.dart';
 import '../../admin_widgets/profile/profile_info_cards.dart';
-import '../../admin_widgets/profile/role_list_card.dart';
 import '../controllers/admin_profile_controller.dart';
 
 /// Profile tab in the admin shell.
@@ -81,18 +80,17 @@ class _AdminProfileContent extends StatelessWidget {
             return AccountInfoCard(controller: controller);
           }),
           const SizedBox(height: AppSpacing.s + 4),
-          Obx(() => RoleListCard(roles: controller.user.value?.roles)),
+          Obx(
+            () => RolesCard(
+              roles: controller.user.value?.roles ?? const [],
+              current: 'admin',
+            ),
+          ),
           const SizedBox(height: AppSpacing.s + 4),
           Obx(() {
             controller.user.value;
             return ActivityCard(controller: controller);
           }),
-          Obx(
-            () => RoleSwitcherCard(
-              roles: controller.user.value?.roles ?? const [],
-              current: 'admin',
-            ),
-          ),
           const SizedBox(height: AppSpacing.l),
           Obx(
             () => AppSignOutButton(

@@ -100,7 +100,16 @@ class ApproveController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
-      bookings.assignAll(await _provider.fetchBookings());
+      final list = await _provider.fetchBookings();
+      // Gateway mode returns bookings without nested room/user — refill them
+      // so the cards show the booker's name and role. Best-effort: a failure
+      // here must not blank the whole queue.
+      try {
+        await _provider.hydrateBookings(list);
+      } catch (e) {
+        debugPrint('Booking hydration failed: $e');
+      }
+      bookings.assignAll(list);
       _updateStats();
       _applyFilters();
     } on DioException catch (e) {
@@ -322,11 +331,18 @@ class ApproveController extends GetxController {
       }).toList();
     }
 
+    // Pending first, then newest booking date; ties broken by start time and
+    // finally newest request (booking_id) so equal slots don't shuffle
+    // between refreshes.
     list.sort((a, b) {
       final aPending = a.status.toLowerCase() == 'pending' ? 0 : 1;
       final bPending = b.status.toLowerCase() == 'pending' ? 0 : 1;
       if (aPending != bPending) return aPending.compareTo(bPending);
-      return b.bookingDate.compareTo(a.bookingDate);
+      final byDate = b.bookingDate.compareTo(a.bookingDate);
+      if (byDate != 0) return byDate;
+      final byTime = a.startTime.compareTo(b.startTime);
+      if (byTime != 0) return byTime;
+      return b.bookingId.compareTo(a.bookingId);
     });
 
     filteredBookings.assignAll(list);

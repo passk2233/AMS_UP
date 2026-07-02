@@ -28,6 +28,12 @@ class TeacherEvaluationController extends GetxController {
   final RxList<SubjectEvalGroup> subjectGroups = <SubjectEvalGroup>[].obs;
   final RxList<EvaluationQuestionModel> questions = <EvaluationQuestionModel>[].obs;
 
+  /// Selected semester filter — 0 means "all semesters".
+  final RxInt selectedSemesterId = 0.obs;
+
+  /// Study plans keyed by id, kept for re-grouping when the filter changes.
+  final Map<int, StudyPlanModel> _spMap = {};
+
   // Current teacher info
   final Rx<TeacherModel?> currentTeacher = Rx<TeacherModel?>(null);
   int? _currentTeacherId;
@@ -54,11 +60,12 @@ class TeacherEvaluationController extends GetxController {
       currentTeacher.value = await _people.fetchTeacherById(teacherId);
 
       // 3. Fetch study plans for this teacher (with preloads)
-      final spMap = {
-        for (final sp
-            in await _academic.fetchStudyPlans(teacherId: teacherId, limit: 200))
-          sp.id: sp,
-      };
+      _spMap.clear();
+      for (final sp
+          in await _academic.fetchStudyPlans(teacherId: teacherId, limit: 200)) {
+        _spMap[sp.id] = sp;
+      }
+      final spMap = _spMap;
 
       // 4. Fetch evaluation results — the backend scopes non-admin callers
       //    to their own teacher_id (joined through study_plan) and returns
@@ -78,7 +85,12 @@ class TeacherEvaluationController extends GetxController {
       // 5. Fetch questions
       questions.assignAll(await _eval.fetchQuestions());
 
-      _buildSubjectGroups(spMap);
+      // Drop a stale filter whose semester no longer appears in the data.
+      if (selectedSemesterId.value != 0 &&
+          !semesterOptions.any((s) => s.id == selectedSemesterId.value)) {
+        selectedSemesterId.value = 0;
+      }
+      _buildSubjectGroups();
     } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
       debugPrint('TeacherEvaluation Dio error:\n$detail');
@@ -92,7 +104,36 @@ class TeacherEvaluationController extends GetxController {
     }
   }
 
-  void _buildSubjectGroups(Map<int, StudyPlanModel> spMap) {
+  /// Distinct semesters present in [results], newest first.
+  List<({int id, String label})> get semesterOptions {
+    final seen = <int, String>{};
+    for (final r in results) {
+      final sp = r.studyPlan;
+      if (sp == null || seen.containsKey(sp.semasterId)) continue;
+      seen[sp.semasterId] = sp.semaster != null
+          ? 'ປີ ${sp.semaster!.year} ເທີມ ${sp.semaster!.term}'
+          : 'ເທີມ ${sp.semasterId}';
+    }
+    return (seen.entries.map((e) => (id: e.key, label: e.value)).toList()
+      ..sort((a, b) => b.id.compareTo(a.id)));
+  }
+
+  /// Rows narrowed to [selectedSemesterId] (all rows when the filter is 0).
+  List<EvaluationResultModel> get _filteredResults =>
+      selectedSemesterId.value == 0
+          ? results
+          : results
+              .where((r) => r.studyPlan?.semasterId == selectedSemesterId.value)
+              .toList();
+
+  /// Switch the semester filter and rebuild the per-subject groups.
+  void selectSemester(int semesterId) {
+    selectedSemesterId.value = semesterId;
+    _buildSubjectGroups();
+  }
+
+  void _buildSubjectGroups() {
+    final spMap = _spMap;
     // Build a fast lookup so question text never depends on the preloaded
     // relation (which may be absent from the API response).
     final Map<int, String> questionTextMap = {
@@ -110,7 +151,7 @@ class TeacherEvaluationController extends GetxController {
 
     final Map<int, SubjectEvalGroup> groups = {};
 
-    for (final r in results) {
+    for (final r in _filteredResults) {
       final spId = r.studyPlanId;
       final sp = spMap[spId];
       if (sp == null) continue;
@@ -164,11 +205,13 @@ class TeacherEvaluationController extends GetxController {
     subjectGroups.assignAll(list);
   }
 
-  // Overall average
+  // Overall average — respects the semester filter so the header stats match
+  // the term the teacher is looking at.
   double get overallAverage {
-    if (results.isEmpty) return 0;
-    final total = results.fold<int>(0, (sum, r) => sum + (r.score ?? 0));
-    return total / results.length;
+    final rows = _filteredResults;
+    if (rows.isEmpty) return 0;
+    final total = rows.fold<int>(0, (sum, r) => sum + (r.score ?? 0));
+    return total / rows.length;
   }
 
   /// Number of distinct students who submitted an evaluation.

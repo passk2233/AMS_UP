@@ -43,6 +43,11 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
                   ),
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                   children: [
+                    // ເບິ່ງຍ້ອນຫຼັງແຕ່ລະເທີມ — filters every stat + card below.
+                    if (controller.semesterOptions.isNotEmpty) ...[
+                      _SemesterFilterChips(controller: controller),
+                      const SizedBox(height: AppSpacing.s),
+                    ],
                     OverallScoreCard(average: controller.overallAverage),
                     const SizedBox(height: 16),
                     Row(
@@ -66,7 +71,10 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
                         ),
                       ],
                     ),
-                    if (controller.semesterTrendDelta != null) ...[
+                    // Trend compares the two most recent semesters, so it only
+                    // makes sense on the unfiltered view.
+                    if (controller.selectedSemesterId.value == 0 &&
+                        controller.semesterTrendDelta != null) ...[
                       const SizedBox(height: 12),
                       SemesterTrendCard(
                         current: controller.currentSemesterAverage ?? 0,
@@ -89,9 +97,11 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
                       (g) => SubjectEvalCard(group: g),
                     ),
                     if (controller.subjectGroups.isEmpty)
-                      const AppEmptyState(
+                      AppEmptyState(
                         icon: Icons.insert_chart_outlined,
-                        title: 'ຍັງບໍ່ມີຂໍ້ມູນການປະເມີນ',
+                        title: controller.selectedSemesterId.value == 0
+                            ? 'ຍັງບໍ່ມີຂໍ້ມູນການປະເມີນ'
+                            : 'ບໍ່ມີຂໍ້ມູນການປະເມີນໃນເທີມນີ້',
                       ),
                   ],
                 ),
@@ -100,6 +110,31 @@ class TeacherEvaluationView extends GetView<TeacherEvaluationController> {
           );
         },
       ),
+    );
+  }
+}
+
+/// Horizontal chip row: "ທັງໝົດ" + one chip per semester found in the data.
+class _SemesterFilterChips extends StatelessWidget {
+  final TeacherEvaluationController controller;
+
+  const _SemesterFilterChips({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    final options = controller.semesterOptions;
+    final selectedIndex =
+        1 + options.indexWhere((s) => s.id == controller.selectedSemesterId.value);
+    return AppFilterChipRow(
+      items: [
+        const AppFilterChip(label: 'ທັງໝົດ'),
+        for (final s in options) AppFilterChip(label: s.label),
+      ],
+      selectedIndex: selectedIndex < 1 ? 0 : selectedIndex,
+      onSelected: (i) =>
+          controller.selectSemester(i == 0 ? 0 : options[i - 1].id),
+      activeColor: AppColors.primary,
+      padding: EdgeInsets.zero,
     );
   }
 }

@@ -105,10 +105,10 @@ void main() {
 
     test('labels use the transcript format, not "ພາກ1"', () {
       final first = c.semesters.first;
-      expect(c.labelFor(first), 'ເທີມ 1 ສົກສຶກສາ 2022 - 2023');
+      expect(c.labelFor(first), 'ປີ 1 ເທີມ 1 ສົກສຶກສາ 2022 - 2023');
 
       final chip = c.chipLabelFor(first);
-      expect(chip.line1, 'ເທີມ 1');
+      expect(chip.line1, 'ປີ 1 ເທີມ 1');
       expect(chip.line2, 'ສົກສຶກສາ 2022 - 2023');
     });
 
@@ -187,6 +187,7 @@ void main() {
         ),
       ),
     ]);
-    expect(c.labelFor(c.semesters.first), '2099-T1');
+    // Year level falls back to chronological position (sole term → ປີ 1).
+    expect(c.labelFor(c.semesters.first), 'ປີ 1 2099-T1');
   });
 }

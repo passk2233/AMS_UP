@@ -95,6 +95,10 @@ class EvalutionController extends GetxController {
   /// Current search needle on the teacher list page.
   final RxString teacherSearch = ''.obs;
 
+  /// Semester filter on the results page — 0 means "all semesters".
+  /// Mirrors the semester picker on the web admin page.
+  final RxInt selectedSemesterId = 0.obs;
+
   /// Backing controller for the teacher search field.
   final TextEditingController teacherSearchCtrl = TextEditingController();
 
@@ -504,6 +508,11 @@ class EvalutionController extends GetxController {
         if (fullSp != null) r.studyPlan = fullSp;
       }
       results.assignAll(parsed);
+      // Drop a stale filter whose semester no longer appears in the data.
+      if (selectedSemesterId.value != 0 &&
+          !semesterOptions.any((s) => s.id == selectedSemesterId.value)) {
+        selectedSemesterId.value = 0;
+      }
       _buildTeacherSummaries();
     } on DioException catch (e) {
       resultsError.value = 'ບໍ່ສາມາດໂຫຼດຜົນການປະເມີນໄດ້';
@@ -551,11 +560,37 @@ class EvalutionController extends GetxController {
   /// Group [results] by teacher and aggregate counts + per-question scores.
   /// Falls back to the [teachers] map for results whose study plan has no
   /// preloaded teacher.
+  /// Distinct semesters present in [results], newest first.
+  List<({int id, String label})> get semesterOptions {
+    final seen = <int, String>{};
+    for (final r in results) {
+      final sp = r.studyPlan ?? _studyPlanMap[r.studyPlanId];
+      if (sp == null || seen.containsKey(sp.semasterId)) continue;
+      seen[sp.semasterId] = sp.semaster != null
+          ? 'ປີ ${sp.semaster!.year} ເທີມ ${sp.semaster!.term}'
+          : 'ເທີມ ${sp.semasterId}';
+    }
+    return (seen.entries.map((e) => (id: e.key, label: e.value)).toList()
+      ..sort((a, b) => b.id.compareTo(a.id)));
+  }
+
+  /// Switch the results-page semester filter and rebuild the summaries.
+  void selectSemester(int semesterId) {
+    selectedSemesterId.value = semesterId;
+    _buildTeacherSummaries();
+  }
+
   void _buildTeacherSummaries() {
     final teacherMap = {for (final t in teachers) t.id: t};
     final summaries = <int, TeacherEvalSummary>{};
+    final semFilter = selectedSemesterId.value;
 
     for (final r in results) {
+      if (semFilter != 0 &&
+          (r.studyPlan ?? _studyPlanMap[r.studyPlanId])?.semasterId !=
+              semFilter) {
+        continue;
+      }
       final teacher = _resolveTeacher(r, teacherMap);
       if (teacher == null) continue;
 

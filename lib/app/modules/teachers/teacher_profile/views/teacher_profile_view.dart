@@ -81,12 +81,10 @@ class _TeacherProfileContent extends StatelessWidget {
           const AppSectionTitle('ຂໍ້ມູນບັນຊີ'),
           _AccountInfoCard(controller: controller, email: email),
           const SizedBox(height: 20),
-          const AppSectionTitle('ບົດບາດ & ສິດ'),
-          _RolesCard(roles: roles),
+          RolesCard(roles: roles, current: 'teacher'),
           const SizedBox(height: 20),
           const AppSectionTitle('ກິດຈະກຳ'),
           _ActivityCard(controller: controller),
-          RoleSwitcherCard(roles: roles, current: 'teacher'),
           const SizedBox(height: 20),
           Obx(
             () => AppSignOutButton(
@@ -152,74 +150,6 @@ class _AccountInfoCard extends StatelessWidget {
   }
 }
 
-/// "ບົດບາດ & ສິດ" — one tile per role with a color-coded icon and subtitle,
-/// or a single empty-state tile when the user has no roles.
-class _RolesCard extends StatelessWidget {
-  /// User's role list.
-  final List<String> roles;
-
-  const _RolesCard({required this.roles});
-
-  @override
-  Widget build(BuildContext context) {
-    if (roles.isEmpty) {
-      return const AppSurfaceCard(
-        child: Column(
-          children: [
-            AppInfoTile(
-              icon: Icons.person_outline,
-              label: 'ບົດບາດ',
-              value: 'ບໍ່ມີບົດບາດ',
-            ),
-          ],
-        ),
-      );
-    }
-
-    return AppSurfaceCard(
-      child: Column(
-        children: [
-          for (final r in roles) _RoleTile(role: r, info: _RoleInfo.fromName(r)),
-        ],
-      ),
-    );
-  }
-}
-
-/// One role row inside [_RolesCard].
-class _RoleTile extends StatelessWidget {
-  /// Raw role name.
-  final String role;
-
-  /// Pre-resolved style (icon + color + description).
-  final _RoleInfo info;
-
-  const _RoleTile({required this.role, required this.info});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: info.color.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(info.icon, color: info.color, size: 20),
-      ),
-      title: Text(
-        role,
-        style: TextStyle(color: info.color, fontWeight: FontWeight.bold),
-      ),
-      subtitle: Text(
-        info.desc,
-        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
-      ),
-      trailing: Icon(Icons.check_circle_rounded, color: info.color, size: 18),
-    );
-  }
-}
-
 /// "ກິດຈະກຳ" — created-at + updated-at info rows.
 class _ActivityCard extends StatelessWidget {
   /// Source of reactive state.
@@ -252,46 +182,3 @@ class _ActivityCard extends StatelessWidget {
   }
 }
 
-/// Visual style + description for a role.
-class _RoleInfo {
-  /// Glyph rendered next to the role name.
-  final IconData icon;
-
-  /// Tint applied to the row.
-  final Color color;
-
-  /// Lao subtitle describing the role's scope.
-  final String desc;
-
-  const _RoleInfo(this.icon, this.color, this.desc);
-
-  /// Style for a given role name, with a neutral fallback for unknown roles.
-  factory _RoleInfo.fromName(String role) {
-    switch (role.toLowerCase()) {
-      case 'admin':
-        return const _RoleInfo(
-          Icons.shield_rounded,
-          AppColors.info,
-          'ເຂົ້າເຖິງລະບົບທັງໝົດ',
-        );
-      case 'teacher':
-        return const _RoleInfo(
-          Icons.school_rounded,
-          AppColors.borderApproved,
-          'ສອນ & ຈັດການການປະເມີນ',
-        );
-      case 'student':
-        return const _RoleInfo(
-          Icons.menu_book_rounded,
-          AppColors.borderPending,
-          'ເຂົ້າເຖິງຂໍ້ມູນການຮຽນ',
-        );
-      default:
-        return const _RoleInfo(
-          Icons.person_rounded,
-          Colors.grey,
-          'ບົດບາດທົ່ວໄປ',
-        );
-    }
-  }
-}

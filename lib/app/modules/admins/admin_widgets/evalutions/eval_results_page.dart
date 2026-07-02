@@ -61,6 +61,29 @@ class _TeacherListSection extends StatelessWidget {
             ),
           ),
         ),
+        // Semester filter — same picker the web admin page has.
+        Obx(() {
+          final options = controller.semesterOptions;
+          if (options.isEmpty) return const SizedBox.shrink();
+          final selectedIndex = 1 +
+              options.indexWhere(
+                (s) => s.id == controller.selectedSemesterId.value,
+              );
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: AppFilterChipRow(
+              items: [
+                const AppFilterChip(label: 'ທັງໝົດ'),
+                for (final s in options) AppFilterChip(label: s.label),
+              ],
+              selectedIndex: selectedIndex < 1 ? 0 : selectedIndex,
+              onSelected: (i) =>
+                  controller.selectSemester(i == 0 ? 0 : options[i - 1].id),
+              activeColor: AppColors.laoBlue,
+              padding: EdgeInsets.zero,
+            ),
+          );
+        }),
         Expanded(
           child: Obx(() {
             final list = controller.filteredSummaries;
@@ -71,9 +94,12 @@ class _TeacherListSection extends StatelessWidget {
               );
             }
             if (list.isEmpty) {
-              return const AppEmptyState(
+              return AppEmptyState(
                 icon: Icons.search_off_rounded,
-                title: 'ບໍ່ພົບຜົນການຄົ້ນຫາ',
+                title: controller.teacherSearch.value.isEmpty &&
+                        controller.selectedSemesterId.value != 0
+                    ? 'ບໍ່ມີຂໍ້ມູນການປະເມີນໃນເທີມນີ້'
+                    : 'ບໍ່ພົບຜົນການຄົ້ນຫາ',
               );
             }
             return RefreshIndicator(

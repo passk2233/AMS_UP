@@ -15,11 +15,10 @@ abstract class AnnouncementAudience {
   /// 0 — every active user (students + teachers).
   static const int all = 0;
 
-  /// 1 — students only, optionally filtered by department / group / type /
-  /// year.
+  /// 1 — students only, optionally filtered by student group.
   static const int students = 1;
 
-  /// 2 — teachers only, optionally filtered by department.
+  /// 2 — every teacher (no filters).
   static const int teachers = 2;
 
   /// 3 — a single student looked up by primary key via [foundStudent].
@@ -44,7 +43,7 @@ abstract class AnnouncementSortMode {
 ///
 /// Responsibilities:
 /// - Compose form state (title, message, audience selector, filters).
-/// - Reference-data fetches (departments, student groups, student types).
+/// - Reference-data fetch (student groups).
 /// - Individual-student lookup for [AnnouncementAudience.individual].
 /// - Send / delete / edit / resend notification flows.
 /// - Paginated, search-able, filterable history list.
@@ -131,37 +130,14 @@ class AnnouncementController extends GetxController {
     'ບຸກຄົນສະເພາະ',
   ];
 
-  /// Departments fetched from `/departments` and used by the dropdowns.
-  final RxList<DepartmentModel> departments = <DepartmentModel>[].obs;
-
-  /// Currently selected department filter, or `null` for "all".
-  final Rx<DepartmentModel?> selectedDepartment = Rx<DepartmentModel?>(null);
-
   /// Student groups fetched from `/student-groups`.
   final RxList<StudentGroupModel> studentGroups = <StudentGroupModel>[].obs;
 
-  /// Currently selected student group, or `null` for "all".
+  /// Currently selected student group, or `null` for "all". The only
+  /// audience filter — department/year/type scoping was removed.
   final Rx<StudentGroupModel?> selectedStudentGroup = Rx<StudentGroupModel?>(
     null,
   );
-
-  /// Student types fetched from `/student-types`.
-  final RxList<StudentTypeModel> studentTypes = <StudentTypeModel>[].obs;
-
-  /// Currently selected student type, or `null` for "all".
-  final Rx<StudentTypeModel?> selectedStudentType = Rx<StudentTypeModel?>(null);
-
-  /// Year-level filter index — 0 = all years, 1..4 = specific year.
-  final RxInt selectedYear = 0.obs;
-
-  /// Display labels for [selectedYear].
-  final List<String> yearLabels = const [
-    'ທຸກຊັ້ນປີ',
-    'ປີ 1',
-    'ປີ 2',
-    'ປີ 3',
-    'ປີ 4',
-  ];
 
   /// The student the admin has confirmed as the individual recipient. `null`
   /// until one of [searchResults] is selected (or an exact single match is
@@ -225,9 +201,7 @@ class AnnouncementController extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    fetchDepartments();
     fetchStudentGroups();
-    fetchStudentTypes();
     fetchNotifications();
   }
 
@@ -244,30 +218,12 @@ class AnnouncementController extends GetxController {
 
   // ───────────────────────────────────────────── reference data ──
 
-  /// GET `/departments` and populate [departments].
-  Future<void> fetchDepartments() async {
-    try {
-      departments.assignAll(await _reference.fetchDepartments());
-    } on DioException catch (e) {
-      debugPrint('fetchDepartments error: ${e.message}');
-    }
-  }
-
   /// GET `/student-groups` and populate [studentGroups].
   Future<void> fetchStudentGroups() async {
     try {
       studentGroups.assignAll(await _reference.fetchStudentGroups());
     } on DioException catch (e) {
       debugPrint('fetchStudentGroups error: ${e.message}');
-    }
-  }
-
-  /// GET `/student-types` and populate [studentTypes].
-  Future<void> fetchStudentTypes() async {
-    try {
-      studentTypes.assignAll(await _reference.fetchStudentTypes());
-    } on DioException catch (e) {
-      debugPrint('fetchStudentTypes error: ${e.message}');
     }
   }
 
@@ -431,11 +387,7 @@ class AnnouncementController extends GetxController {
     }
     if (audience == AnnouncementAudience.all ||
         audience == AnnouncementAudience.teachers) {
-      total += (await _people.fetchTeachers(
-        deptId: selectedDepartment.value?.id,
-        limit: 5000,
-      ))
-          .length;
+      total += (await _people.fetchTeachers(limit: 5000)).length;
     }
     return total;
   }
@@ -848,17 +800,11 @@ class AnnouncementController extends GetxController {
           .trim();
     }
 
-    final dept = selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ';
-    final group = selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ';
-    final type = selectedStudentType.value?.stdTypeNameLao ?? 'ທັງໝົດ';
-    final year = yearLabels[selectedYear.value];
-
     if (selectedAudience.value == AnnouncementAudience.students) {
-      return '$audience | ພາກ: $dept | ກຸ່ມ: $group | ປະເພດ: $type | $year';
+      final group = selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ';
+      return '$audience | ກຸ່ມ: $group';
     }
-    if (selectedAudience.value == AnnouncementAudience.teachers) {
-      return '$audience | ພາກ: $dept';
-    }
+    // Teachers/all: no filters — everyone in the audience receives it.
     return audience;
   }
 
@@ -877,15 +823,12 @@ class AnnouncementController extends GetxController {
   }
 
   Map<String, dynamic> _buildFilters() {
+    // The student group is the only audience filter; teachers/all always
+    // reach everyone.
     final f = <String, dynamic>{};
-    final deptId = selectedDepartment.value?.id;
-    if (deptId != null) f['dept_id'] = deptId;
     if (selectedAudience.value == AnnouncementAudience.students) {
       final groupId = selectedStudentGroup.value?.id;
-      final typeId = selectedStudentType.value?.id;
       if (groupId != null) f['std_group_id'] = groupId;
-      if (typeId != null) f['std_type_id'] = typeId;
-      if (selectedYear.value > 0) f['year'] = selectedYear.value;
     }
     return f;
   }
@@ -924,33 +867,13 @@ class AnnouncementController extends GetxController {
           ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ນັກສຶກສາ'))
           ..add(
             AnnouncementInfoRow(
-              'ພາກວິຊາ',
-              selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ',
-            ),
-          )
-          ..add(
-            AnnouncementInfoRow(
               'ກຸ່ມ',
               selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ',
             ),
-          )
-          ..add(
-            AnnouncementInfoRow(
-              'ປະເພດ',
-              selectedStudentType.value?.stdTypeNameLao ?? 'ທັງໝົດ',
-            ),
-          )
-          ..add(AnnouncementInfoRow('ຊັ້ນປີ', yearLabels[selectedYear.value]));
+          );
         break;
       case AnnouncementAudience.teachers:
-        rows
-          ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ອາຈານ'))
-          ..add(
-            AnnouncementInfoRow(
-              'ພາກວິຊາ',
-              selectedDepartment.value?.deptNameLao ?? 'ທັງໝົດ',
-            ),
-          );
+        rows.add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ອາຈານ (ທຸກຄົນ)'));
         break;
       default:
         rows.add(
@@ -967,10 +890,7 @@ class AnnouncementController extends GetxController {
     searchResults.clear();
     pickedFiles.clear();
     selectedAudience.value = AnnouncementAudience.all;
-    selectedDepartment.value = null;
     selectedStudentGroup.value = null;
-    selectedStudentType.value = null;
-    selectedYear.value = 0;
     foundStudent.value = null;
   }
 

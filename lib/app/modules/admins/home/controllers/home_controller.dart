@@ -136,7 +136,15 @@ class AdminHomeController extends GetxController {
 
   Future<void> _fetchBookings() async {
     try {
-      bookings.assignAll(await _booking.fetchBookings(limit: 50));
+      final list = await _booking.fetchBookings(limit: 50);
+      // Gateway mode strips nested room/user; refill so the dashboard cards
+      // show names + roles. Best-effort — keep the bare list on failure.
+      try {
+        await _booking.hydrateBookings(list);
+      } catch (e) {
+        debugPrint('Booking hydration failed: $e');
+      }
+      bookings.assignAll(list);
     } on DioException catch (e) {
       debugPrint('Failed to fetch bookings: ${e.message}');
     }

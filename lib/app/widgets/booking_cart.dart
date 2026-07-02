@@ -91,6 +91,16 @@ class _BookingDisplay {
   /// Whether the booker is a student — used to switch the role pill color.
   bool get isStudent => booking.user?.stdId != null;
 
+  /// Lao role label for the pill. Empty when the user is unknown so the
+  /// card doesn't claim a role it can't back up (was hardcoded to teacher).
+  String get roleLabel {
+    final u = booking.user;
+    if (u == null) return '';
+    if (u.stdId != null) return 'ນັກສຶກສາ';
+    if (u.teacherId != null) return 'ອາຈານ';
+    return 'ຜູ້ດູແລລະບົບ';
+  }
+
   /// Room code if the relation is populated, otherwise `-` (never a raw id).
   String get roomName => booking.room?.roomCode ?? '-';
 
@@ -109,7 +119,7 @@ class _BookingDisplay {
   /// Preferred display name: teacher → student → username fallback.
   String get displayName {
     final user = booking.user;
-    if (user == null) return 'Unknown User';
+    if (user == null) return 'ບໍ່ພົບຂໍ້ມູນຜູ້ຈອງ';
 
     final teacher = user.teacher;
     if (teacher != null) {
@@ -222,7 +232,6 @@ class _BookingUserRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isStudent = display.isStudent;
     return Row(
       children: [
         Flexible(
@@ -236,8 +245,10 @@ class _BookingUserRow extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ),
-        const SizedBox(width: 6),
-        _RolePill(isStudent: isStudent),
+        if (display.roleLabel.isNotEmpty) ...[
+          const SizedBox(width: 6),
+          _RolePill(label: display.roleLabel, isStudent: display.isStudent),
+        ],
       ],
     );
   }
@@ -245,14 +256,17 @@ class _BookingUserRow extends StatelessWidget {
 
 /// Small role chip rendered next to the booker's name.
 class _RolePill extends StatelessWidget {
-  /// `true` when the booker is a student, `false` for a teacher.
+  /// Lao role label, pre-resolved by the display adapter.
+  final String label;
+
+  /// `true` when the booker is a student — switches the pill color.
   final bool isStudent;
 
-  const _RolePill({required this.isStudent});
+  const _RolePill({required this.label, required this.isStudent});
 
   @override
   Widget build(BuildContext context) {
-    // On-palette tints: Info Blue for students, on-fill teal for teachers.
+    // On-palette tints: Info Blue for students, on-fill teal otherwise.
     // (Was raw blue/orange Material shades, off the palette entirely.)
     final color = isStudent ? AppColors.info : AppColors.primaryFill;
     return Container(
@@ -262,7 +276,7 @@ class _RolePill extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        isStudent ? 'ນັກສຶກສາ' : 'ອາຈານ',
+        label,
         style: TextStyle(
           fontSize: 12,
           color: color,

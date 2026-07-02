@@ -19,6 +19,11 @@ class SemesterController extends GetxController {
   /// Active-semester display label (e.g. `S1 (2025-2026)`).
   final RxString semester = ''.obs;
 
+  /// Year of the active semester's label (e.g. 2025 for "2025-2"), or null
+  /// until fetched / on failure. Drives the study-year computation so a
+  /// student's year matches the semester label, not the calendar date.
+  final Rxn<int> activeYear = Rxn<int>();
+
   /// `true` while [fetchActiveSemester] is in flight.
   final RxBool semesterLoading = true.obs;
 
@@ -44,7 +49,9 @@ class SemesterController extends GetxController {
       final all = _extractList(response.data)
           .map((json) => SemasterModel.fromJson(json))
           .toList();
-      semester.value = _pickActiveSemester(all);
+      final picked = _pickActiveSemester(all);
+      semester.value = picked == null ? 'No active semester' : _format(picked);
+      activeYear.value = int.tryParse('${picked?.year ?? ''}');
     } on DioException catch (e) {
       debugPrint('Failed to fetch semester: ${e.message}');
       semester.value = 'Semester';
@@ -62,10 +69,9 @@ class SemesterController extends GetxController {
   }
 
   /// Pick the semester to display using a three-tier fallback: in-range by
-  /// date → flagged active → newest. Returns the formatted label, or a
-  /// sentinel when the list is empty.
-  String _pickActiveSemester(List<SemasterModel> all) {
-    if (all.isEmpty) return 'No active semester';
+  /// date → flagged active → newest. Returns null when the list is empty.
+  SemasterModel? _pickActiveSemester(List<SemasterModel> all) {
+    if (all.isEmpty) return null;
 
     final now = DateTime.now();
     final byDate = all.where((s) {
@@ -74,12 +80,12 @@ class SemesterController extends GetxController {
       if (start == null || end == null) return false;
       return !now.isBefore(start) && !now.isAfter(end);
     }).toList();
-    if (byDate.isNotEmpty) return _format(byDate.first);
+    if (byDate.isNotEmpty) return byDate.first;
 
     final active = all.where((s) => s.status == 1).toList();
-    if (active.isNotEmpty) return _format(active.first);
+    if (active.isNotEmpty) return active.first;
 
-    return _format(all.first);
+    return all.first;
   }
 
   // Label by term/year (e.g. "ພາກຮຽນ 1/2025") rather than the raw

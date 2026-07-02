@@ -5,82 +5,126 @@ import '../services/auth_storage.dart';
 import '../services/role_routing.dart';
 import 'app_colors.dart';
 import 'app_dialogs.dart';
-import 'app_shell.dart';
 
-/// In-app role switcher shown on each role's profile screen.
+/// "ສິດທິ & ບົດບາດ" card — shows every role the user holds and, when they hold
+/// more than one, lets them tap another role to switch into its shell.
 ///
-/// A user may hold several roles (e.g. teacher + student). Each role has its
-/// own home shell; this card lets them jump to another role's shell without
-/// logging out. Renders nothing when there is no *other* role to switch to,
-/// so it is safe to drop unconditionally into every profile view.
-class RoleSwitcherCard extends StatelessWidget {
+/// The tile for the role they're currently using shows a check; the others
+/// become tappable "switch" buttons. Used verbatim by all three profile
+/// screens so the roles/permissions card looks and behaves the same for admin,
+/// teacher, and student.
+class RolesCard extends StatelessWidget {
   /// All role names from the user model (may be empty).
   final List<String> roles;
 
   /// The role whose shell is currently showing ('admin' / 'teacher' /
-  /// 'student') — excluded from the switch targets.
+  /// 'student') — shown with a check instead of a switch affordance.
   final String current;
 
-  const RoleSwitcherCard({
-    super.key,
-    required this.roles,
-    required this.current,
-  });
+  const RolesCard({super.key, required this.roles, required this.current});
 
   @override
   Widget build(BuildContext context) {
-    final targets = RoleRouting.known(roles)
-        .where((r) => r != RoleRouting.canon(current))
-        .toList();
-    if (targets.isEmpty) return const SizedBox.shrink();
+    final known = RoleRouting.known(roles);
+    final canSwitch = known.length > 1;
+    final currentCanon = RoleRouting.canon(current);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Owns its own top gap so single-role profiles (card hidden) keep the
-        // surrounding spacing unchanged.
-        const SizedBox(height: 20),
-        const AppSectionTitle('ສະຫຼັບບົດບາດ'),
-        AppSurfaceCard(
-          child: Column(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(AppColors.cardRadius + 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              for (final role in targets)
-                _SwitchTile(role: role, ui: _RoleUi.of(role)),
+              const Icon(Icons.admin_panel_settings_rounded,
+                  color: AppColors.laoBlue, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'ສິດທິ & ບົດບາດ',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              if (canSwitch) ...[
+                const Spacer(),
+                Text(
+                  'ແຕະເພື່ອສະຫຼັບ',
+                  style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                ),
+              ],
             ],
           ),
-        ),
-      ],
+          const SizedBox(height: 14),
+          if (known.isEmpty)
+            Text(
+              'ບໍ່ມີບົດບາດ',
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+            )
+          else
+            for (final role in known)
+              _RoleTile(
+                ui: _RoleUi.of(role),
+                isCurrent: role == currentCanon,
+                onSwitch: role == currentCanon ? null : () => confirmSwitchRole(role),
+              ),
+        ],
+      ),
     );
   }
 }
 
-/// One "switch to X" row. Tapping persists the new active role and replaces
-/// the whole navigation stack with that role's home — structurally the same
-/// move as a logout-then-land, so GetX disposes the old shell's controllers.
-class _SwitchTile extends StatelessWidget {
-  final String role;
+/// Confirm, persist the chosen active role, and replace the whole navigation
+/// stack with that role's home — structurally the same move as a logout-then-
+/// land, so GetX disposes the previous shell's controllers. No-op if the role
+/// has no home shell or the user cancels the dialog.
+Future<void> confirmSwitchRole(String role) async {
+  final route = RoleRouting.routeFor(role);
+  if (route == null) return;
+  final confirmed = await AppDialogs.showConfirmation(
+    title: 'ສະຫຼັບບົດບາດ',
+    message: 'ຕ້ອງການສະຫຼັບໄປໜ້າ "${_RoleUi.of(role).label}" ບໍ?',
+    confirmText: 'ສະຫຼັບ',
+    cancelText: 'ຍົກເລີກ',
+  );
+  if (confirmed != true) return;
+  await AuthStorage.writeActiveRole(role);
+  Get.offAllNamed(route);
+}
+
+/// One role row. Renders a check when it's the active role, or a tappable
+/// swap affordance otherwise.
+class _RoleTile extends StatelessWidget {
   final _RoleUi ui;
+  final bool isCurrent;
 
-  const _SwitchTile({required this.role, required this.ui});
+  /// Tap handler — `null` for the current role (not switchable to itself).
+  final VoidCallback? onSwitch;
 
-  Future<void> _switch() async {
-    final route = RoleRouting.routeFor(role);
-    if (route == null) return;
-    final confirmed = await AppDialogs.showConfirmation(
-      title: 'ສະຫຼັບບົດບາດ',
-      message: 'ຕ້ອງການສະຫຼັບໄປໜ້າ "${ui.label}" ບໍ?',
-      confirmText: 'ສະຫຼັບ',
-      cancelText: 'ຍົກເລີກ',
-    );
-    if (confirmed != true) return;
-    await AuthStorage.writeActiveRole(role);
-    Get.offAllNamed(route);
-  }
+  const _RoleTile({
+    required this.ui,
+    required this.isCurrent,
+    required this.onSwitch,
+  });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      onTap: _switch,
+      onTap: onSwitch,
+      contentPadding: EdgeInsets.zero,
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
@@ -94,20 +138,19 @@ class _SwitchTile extends StatelessWidget {
         style: TextStyle(color: ui.color, fontWeight: FontWeight.bold),
       ),
       subtitle: Text(
-        ui.desc,
+        isCurrent ? 'ກຳລັງໃຊ້ຢູ່' : ui.desc,
         style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
       ),
-      trailing: const Icon(
-        Icons.swap_horiz_rounded,
-        color: AppColors.textSecondary,
+      trailing: Icon(
+        isCurrent ? Icons.check_circle_rounded : Icons.swap_horiz_rounded,
+        color: isCurrent ? ui.color : AppColors.textSecondary,
         size: 20,
       ),
     );
   }
 }
 
-/// Icon + color + Lao label for a switch target. Mirrors the role styling
-/// used by the read-only role cards elsewhere in the profile screens.
+/// Icon + color + Lao label/description for a role.
 class _RoleUi {
   final IconData icon;
   final Color color;
@@ -117,34 +160,34 @@ class _RoleUi {
   const _RoleUi(this.icon, this.color, this.label, this.desc);
 
   factory _RoleUi.of(String role) {
-    switch (role) {
+    switch (RoleRouting.canon(role)) {
       case 'admin':
         return const _RoleUi(
           Icons.shield_rounded,
           AppColors.info,
           'ຜູ້ດູແລລະບົບ',
-          'ເຂົ້າສູ່ໜ້າຜູ້ດູແລ',
+          'ເຂົ້າເຖິງລະບົບທັງໝົດ',
         );
       case 'teacher':
         return const _RoleUi(
           Icons.school_rounded,
           AppColors.borderApproved,
           'ອາຈານ',
-          'ເຂົ້າສູ່ໜ້າອາຈານ',
+          'ສອນ & ຈັດການການປະເມີນ',
         );
       case 'student':
         return const _RoleUi(
           Icons.menu_book_rounded,
           AppColors.borderPending,
           'ນັກສຶກສາ',
-          'ເຂົ້າສູ່ໜ້ານັກສຶກສາ',
+          'ເຂົ້າເຖິງຂໍ້ມູນການຮຽນ',
         );
       default:
         return const _RoleUi(
           Icons.person_rounded,
           Colors.grey,
           'ບົດບາດ',
-          '',
+          'ບົດບາດທົ່ວໄປ',
         );
     }
   }

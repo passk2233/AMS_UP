@@ -32,6 +32,33 @@ void main() {
         'ກຸ່ມພິເສດ ຫ້ອງ 1');
   });
 
+  test('semester year is authoritative: 2022 intake is year 1 all of 2022-1/2022-2',
+      () {
+    // Semester 2022-2 runs into calendar 2023; the label year (2022) still wins.
+    expect(
+      studyYearGroupName('ນັກສຶກສາໄອທີ ປີ 2022 ຫ້ອງ 1', DateTime(2023, 3, 1),
+          semesterYear: 2022),
+      'ນັກສຶກສາໄອທີ ປີ 1 ຫ້ອງ 1',
+    );
+  });
+
+  test('semester year is authoritative: 2022 intake is year 4 all of 2025-1/2025-2',
+      () {
+    expect(
+      studyYearGroupName('ນັກສຶກສາໄອທີ ປີ 2022 ຫ້ອງ 1', DateTime(2026, 3, 1),
+          semesterYear: 2025),
+      'ນັກສຶກສາໄອທີ ປີ 4 ຫ້ອງ 1',
+    );
+  });
+
+  test('level > 4 → graduated (4-year program), no ປີ 5+', () {
+    // Academic year 2025/26 → a 2020 intake is past year 4 → graduated.
+    expect(
+      studyYearGroupName('ນັກສຶກສາໄອທີ ປີ 2020 ຫ້ອງ 1', DateTime(2025, 10, 1)),
+      'ນັກສຶກສາໄອທີ ຈົບແລ້ວ (ປີ 2020) ຫ້ອງ 1',
+    );
+  });
+
   test('future/odd cohort (level < 1) → unchanged, no fabricated level', () {
     expect(
       studyYearGroupName('ນັກສຶກສາໄອທີ ປີ 2030 ຫ້ອງ 1', DateTime(2026, 6, 1)),

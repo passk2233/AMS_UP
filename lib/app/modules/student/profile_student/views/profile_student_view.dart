@@ -128,7 +128,8 @@ class ProfileStudentView extends GetView<ProfileStudentController> {
                       ),
                     ),
 
-                    RoleSwitcherCard(
+                    const SizedBox(height: 20),
+                    RolesCard(
                       roles: controller.user.value?.roles ?? const [],
                       current: 'student',
                     ),

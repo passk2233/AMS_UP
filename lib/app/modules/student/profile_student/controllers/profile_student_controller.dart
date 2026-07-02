@@ -19,14 +19,24 @@ const int kAcademicYearStartMonth = 9;
 /// see which year of study they're in, not the calendar cohort. Returns the
 /// name unchanged when it carries no 4-digit "ປີ" token, or when the computed
 /// level would be < 1 (a future/odd cohort we shouldn't fabricate a level for).
+///
+/// [semesterYear] is the active semester's label year (e.g. 2025 for "2025-2");
+/// when known it is authoritative — a 2022 intake is year 1 throughout 2022-1
+/// and 2022-2, year 4 throughout 2025-1 and 2025-2 — since semester 2 can run
+/// past the calendar boundary. Falls back to the calendar-based rollover.
 String studyYearGroupName(String name, DateTime now,
-    {int startMonth = kAcademicYearStartMonth}) {
+    {int startMonth = kAcademicYearStartMonth, int? semesterYear}) {
   final match = RegExp(r'ປີ\s*(\d{4})').firstMatch(name);
   if (match == null) return name;
   final cohort = int.parse(match.group(1)!);
-  final academicYear = now.month >= startMonth ? now.year : now.year - 1;
+  final academicYear = semesterYear ??
+      (now.month >= startMonth ? now.year : now.year - 1);
   final level = academicYear - cohort + 1;
   if (level < 1) return name;
+  // ponytail: 4-year program hardcoded; past year 4 the student has graduated
+  if (level > 4) {
+    return name.replaceRange(match.start, match.end, 'ຈົບແລ້ວ (ປີ $cohort)');
+  }
   return name.replaceRange(match.start, match.end, 'ປີ $level');
 }
 
@@ -137,7 +147,8 @@ class ProfileStudentController extends GetxController {
   String get studentGroupName {
     final name = student?.studentGroup?.stdGroupName ?? '';
     if (name.isEmpty) return student?.studentGroup?.stdGroupCode ?? '-';
-    return studyYearGroupName(name, DateTime.now());
+    return studyYearGroupName(name, DateTime.now(),
+        semesterYear: semesterController.activeYear.value);
   }
 
   String get program {
