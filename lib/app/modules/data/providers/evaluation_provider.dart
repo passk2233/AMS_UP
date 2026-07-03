@@ -138,6 +138,23 @@ class EvaluationProvider {
     });
   }
 
+  /// GET `/eval-settings` — whether teachers may currently see their own
+  /// results (the admin visibility gate). Backend fails closed, so a missing
+  /// field reads as hidden.
+  Future<bool> fetchTeacherVisibility() async {
+    final resp = await _dio.get('/eval-settings');
+    final data = resp.data;
+    return data is Map && data['teacher_results_visible'] == true;
+  }
+
+  /// PUT `/eval-settings` — admin-only: open/close teacher access to their
+  /// own results. Throws on failure (403 for non-admin callers).
+  Future<void> setTeacherVisibility(bool visible) async {
+    await _dio.put('/eval-settings', data: {
+      'teacher_results_visible': visible,
+    });
+  }
+
   /// POST `/evaluation-results` — one row per (study plan, question). Throws
   /// on failure.
   Future<void> submitResult({

@@ -8,16 +8,13 @@ import '../../../../widgets/app_dialogs.dart';
 class TeacherEvaluationController extends GetxController {
   TeacherEvaluationController({
     AuthProvider? auth,
-    PeopleProvider? people,
     AcademicProvider? academic,
     EvaluationProvider? evaluation,
   })  : _auth = auth ?? AuthProvider(),
-        _people = people ?? PeopleProvider(),
         _academic = academic ?? AcademicProvider(),
         _eval = evaluation ?? EvaluationProvider();
 
   final AuthProvider _auth;
-  final PeopleProvider _people;
   final AcademicProvider _academic;
   final EvaluationProvider _eval;
 
@@ -34,8 +31,6 @@ class TeacherEvaluationController extends GetxController {
   /// Study plans keyed by id, kept for re-grouping when the filter changes.
   final Map<int, StudyPlanModel> _spMap = {};
 
-  // Current teacher info
-  final Rx<TeacherModel?> currentTeacher = Rx<TeacherModel?>(null);
   int? _currentTeacherId;
 
   @override
@@ -56,10 +51,7 @@ class TeacherEvaluationController extends GetxController {
         return;
       }
 
-      // 2. Fetch teacher info
-      currentTeacher.value = await _people.fetchTeacherById(teacherId);
-
-      // 3. Fetch study plans for this teacher (with preloads)
+      // 2. Fetch study plans for this teacher (with preloads)
       _spMap.clear();
       for (final sp
           in await _academic.fetchStudyPlans(teacherId: teacherId, limit: 200)) {
@@ -67,7 +59,7 @@ class TeacherEvaluationController extends GetxController {
       }
       final spMap = _spMap;
 
-      // 4. Fetch evaluation results — the backend scopes non-admin callers
+      // 3. Fetch evaluation results — the backend scopes non-admin callers
       //    to their own teacher_id (joined through study_plan) and returns
       //    the anonymised projection without student_id. The client-side
       //    spMap intersect below stays as belt-and-braces.
@@ -82,7 +74,7 @@ class TeacherEvaluationController extends GetxController {
       }
       results.assignAll(myResults);
 
-      // 5. Fetch questions
+      // 4. Fetch questions
       questions.assignAll(await _eval.fetchQuestions());
 
       // Drop a stale filter whose semester no longer appears in the data.

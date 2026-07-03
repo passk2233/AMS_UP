@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/widgets.dart';
 import 'package:get/get.dart';
 
 import 'package:frontend/app/modules/data/data_exporter.dart';
@@ -39,6 +40,15 @@ class FacultyFeedbackController extends GetxController {
   var ratings = <int>[].obs;
   var comment = "".obs;
 
+  /// One text controller + key per question: the score box is typeable and
+  /// submit can scroll to the first unanswered card.
+  final scoreCtrls = <TextEditingController>[];
+  final questionKeys = <GlobalKey>[];
+
+  /// Set on a failed submit; unanswered cards render a red border until the
+  /// student scores them (the per-card check also reads the rating).
+  final showErrors = false.obs;
+
   @override
   void onInit() {
     super.onInit();
@@ -67,6 +77,18 @@ class FacultyFeedbackController extends GetxController {
 
       questions.assignAll(await _eval.fetchQuestions(activeOnly: true));
       ratings.assignAll(List.filled(questions.length, 0));
+      // Rebuild per-question form state. The form view is never open while
+      // fetchData runs, so disposing the old controllers is safe.
+      for (final c in scoreCtrls) {
+        c.dispose();
+      }
+      scoreCtrls
+        ..clear()
+        ..addAll(List.generate(questions.length, (_) => TextEditingController()));
+      questionKeys
+        ..clear()
+        ..addAll(List.generate(questions.length, (_) => GlobalKey()));
+      showErrors.value = false;
 
       // Scope to the current semester so the student only evaluates the
       // teachers in their active study plan — not every teacher the group
@@ -151,6 +173,30 @@ class FacultyFeedbackController extends GetxController {
 
   void setRating(int questionIndex, int rating) {
     ratings[questionIndex] = rating;
+    // Keep the typeable box in sync with the +/- buttons. Empty when 0 so
+    // the hint shows instead of a real "0".
+    final ctrl = scoreCtrls[questionIndex];
+    final text = rating == 0 ? '' : '$rating';
+    if (ctrl.text != text) {
+      ctrl.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+    }
+  }
+
+  /// Digits arrive pre-filtered by the view's input formatter; here we only
+  /// clamp to the 1–10 scale (typing "11".."99" snaps to 10).
+  void onScoreTyped(int questionIndex, String value) {
+    var n = int.tryParse(value) ?? 0;
+    if (n > 10) n = 10;
+    if ('$n' != value && value.isNotEmpty) {
+      scoreCtrls[questionIndex].value = TextEditingValue(
+        text: '$n',
+        selection: TextSelection.collapsed(offset: '$n'.length),
+      );
+    }
+    ratings[questionIndex] = n;
   }
 
   Future<void> submitFeedback(Faculty faculty) async {
@@ -165,6 +211,17 @@ class FacultyFeedbackController extends GetxController {
     }
     for (int i = 0; i < ratings.length; i++) {
       if (ratings[i] <= 0) {
+        showErrors.value = true;
+        // Jump to the unanswered card so the student sees what's missing.
+        final ctx =
+            i < questionKeys.length ? questionKeys[i].currentContext : null;
+        if (ctx != null) {
+          Scrollable.ensureVisible(
+            ctx,
+            duration: const Duration(milliseconds: 300),
+            alignment: 0.1,
+          );
+        }
         Get.snackbar('ເຕືອນ', 'ກະລຸນາໃຫ້ຄະແນນຄົບທຸກຄໍາຖາມ.');
         return;
       }
@@ -195,6 +252,10 @@ class FacultyFeedbackController extends GetxController {
         );
       }
       ratings.assignAll(List.filled(questions.length, 0));
+      for (final c in scoreCtrls) {
+        c.clear();
+      }
+      showErrors.value = false;
       comment.value = '';
       Get.back();
       Future.delayed(const Duration(milliseconds: 150), () {
@@ -206,6 +267,14 @@ class FacultyFeedbackController extends GetxController {
     } finally {
       isLoading.value = false;
     }
+  }
+
+  @override
+  void onClose() {
+    for (final c in scoreCtrls) {
+      c.dispose();
+    }
+    super.onClose();
   }
 
   String _initials(String fullName) {

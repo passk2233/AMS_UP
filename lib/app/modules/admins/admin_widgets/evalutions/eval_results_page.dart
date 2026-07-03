@@ -18,6 +18,7 @@ class EvalResultsPage extends StatelessWidget {
     return Column(
       children: [
         EvalModeToggle(controller: controller),
+        _VisibilitySwitchCard(controller: controller),
         Expanded(
           child: Obx(() {
             if (controller.isLoadingResults.value) {
@@ -34,6 +35,55 @@ class EvalResultsPage extends StatelessWidget {
           }),
         ),
       ],
+    );
+  }
+}
+
+/// Admin gate switch: whether teachers may see their own evaluation results.
+class _VisibilitySwitchCard extends StatelessWidget {
+  /// Source of reactive state.
+  final EvalutionController controller;
+
+  const _VisibilitySwitchCard({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Obx(
+        () => SwitchListTile(
+          value: controller.teacherResultsVisible.value,
+          onChanged: controller.isSavingVisibility.value
+              ? null
+              : controller.toggleTeacherVisibility,
+          title: const Text(
+            'ເປີດເຜີຍຜົນໃຫ້ອາຈານ',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            controller.teacherResultsVisible.value
+                ? 'ອາຈານເຫັນຜົນການປະເມີນຂອງຕົນເອງໄດ້'
+                : 'ຜົນຖືກເຊື່ອງຈາກອາຈານຢູ່',
+            style: const TextStyle(
+                fontSize: 12, color: AppColors.textSecondary),
+          ),
+          activeTrackColor: AppColors.laoBlue,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
     );
   }
 }

@@ -106,6 +106,13 @@ class EvalutionController extends GetxController {
   final RxList<TeacherEvalSummary> teacherSummaries =
       <TeacherEvalSummary>[].obs;
 
+  /// Admin gate: whether teachers may currently see their own results
+  /// (`/eval-settings`). Mirrors the server value; defaults to hidden.
+  final RxBool teacherResultsVisible = false.obs;
+
+  /// `true` while [toggleTeacherVisibility] is persisting.
+  final RxBool isSavingVisibility = false.obs;
+
   // ───────────────────────────────────────────── evaluation window ──
 
   /// Evaluation window rows from `/open-evalu`. The row with the largest
@@ -150,6 +157,7 @@ class EvalutionController extends GetxController {
     fetchQuestions();
     fetchTeachers().then((_) => fetchResults());
     fetchOpenWindow();
+    fetchTeacherVisibility();
   }
 
   @override
@@ -167,7 +175,40 @@ class EvalutionController extends GetxController {
       fetchResults(),
       fetchTeachers(),
       fetchOpenWindow(),
+      fetchTeacherVisibility(),
     ]);
+  }
+
+  /// GET `/eval-settings` and mirror the gate into [teacherResultsVisible].
+  /// Best-effort: on failure the switch just keeps its last known state.
+  Future<void> fetchTeacherVisibility() async {
+    try {
+      teacherResultsVisible.value = await _eval.fetchTeacherVisibility();
+    } on DioException catch (e) {
+      debugPrint('fetchTeacherVisibility error: ${e.message}');
+    }
+  }
+
+  /// PUT `/eval-settings` — flip whether teachers can see their own results.
+  /// Reverts the switch and surfaces the error when the save fails.
+  Future<void> toggleTeacherVisibility(bool visible) async {
+    if (isSavingVisibility.value) return;
+    isSavingVisibility.value = true;
+    teacherResultsVisible.value = visible;
+    try {
+      await _eval.setTeacherVisibility(visible);
+      AppDialogs.showSuccess(
+        title: visible ? 'ເປີດເຜີຍຜົນແລ້ວ' : 'ປິດການເຜີຍຜົນແລ້ວ',
+        message: visible
+            ? 'ອາຈານສາມາດເບິ່ງຜົນການປະເມີນຂອງຕົນເອງໄດ້ແລ້ວ.'
+            : 'ອາຈານຈະບໍ່ເຫັນຜົນການປະເມີນຈົນກວ່າຈະເປີດອີກຄັ້ງ.',
+      );
+    } on DioException catch (e) {
+      teacherResultsVisible.value = !visible;
+      _showDioError('ບັນທຶກການຕັ້ງຄ່າລົ້ມເຫຼວ', e);
+    } finally {
+      isSavingVisibility.value = false;
+    }
   }
 
   // ─────────────────────────────────────────────── question fetch ──

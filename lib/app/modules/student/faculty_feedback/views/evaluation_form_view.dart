@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 
@@ -96,6 +97,9 @@ class EvaluationFormView extends GetView<FacultyFeedbackController> {
                     ));
                     for (final i in indices) {
                       children.add(_StarRatingQuestion(
+                        key: i < controller.questionKeys.length
+                            ? controller.questionKeys[i]
+                            : null,
                         index: i,
                         question: questions[i].question,
                       ));
@@ -168,7 +172,8 @@ class _StarRatingQuestion extends GetView<FacultyFeedbackController> {
   final int index;
   final String question;
 
-  const _StarRatingQuestion({required this.index, required this.question});
+  const _StarRatingQuestion(
+      {super.key, required this.index, required this.question});
 
   @override
   Widget build(BuildContext context) {
@@ -182,25 +187,41 @@ class _StarRatingQuestion extends GetView<FacultyFeedbackController> {
           const SizedBox(height: AppSpacing.s),
           Obx(() {
             final v = controller.ratings[index];
+            final missing = controller.showErrors.value && v == 0;
             return Container(
               height: AppColors.minTouchTarget + 6,
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border.all(color: Colors.grey.shade300),
+                border: Border.all(
+                  color: missing ? AppColors.danger : Colors.grey.shade300,
+                  width: missing ? 1.5 : 1,
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
                   const SizedBox(width: 16),
-                  Text(
-                    '$v',
-                    style: AppTypography.subheading.copyWith(
-                      color: v == 0
-                          ? AppColors.textSecondary
-                          : AppColors.textPrimary,
+                  Expanded(
+                    child: TextField(
+                      controller: controller.scoreCtrls[index],
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        LengthLimitingTextInputFormatter(2),
+                      ],
+                      decoration: InputDecoration(
+                        hintText: '0',
+                        hintStyle: AppTypography.subheading
+                            .copyWith(color: AppColors.textSecondary),
+                        border: InputBorder.none,
+                        isCollapsed: true,
+                      ),
+                      style: AppTypography.subheading
+                          .copyWith(color: AppColors.textPrimary),
+                      onChanged: (val) =>
+                          controller.onScoreTyped(index, val),
                     ),
                   ),
-                  const Spacer(),
                   IconButton(
                     tooltip: 'ຫຼຸດ',
                     onPressed:
@@ -222,7 +243,18 @@ class _StarRatingQuestion extends GetView<FacultyFeedbackController> {
             );
           }),
           const SizedBox(height: 6),
-          Text('ໃຫ້ຄະແນນ 1–10 (ຄະແນນເຕັມ 10)', style: AppTypography.caption),
+          Obx(() {
+            final missing =
+                controller.showErrors.value && controller.ratings[index] == 0;
+            return Text(
+              missing
+                  ? 'ກະລຸນາໃຫ້ຄະແນນຂໍ້ນີ້ (1–10)'
+                  : 'ໃຫ້ຄະແນນ 1–10 (ຄະແນນເຕັມ 10)',
+              style: missing
+                  ? AppTypography.caption.copyWith(color: AppColors.danger)
+                  : AppTypography.caption,
+            );
+          }),
         ],
       ),
     );
