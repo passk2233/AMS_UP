@@ -74,7 +74,10 @@ class TeacherHomeController extends GetxController {
 
       final studyPlans = await _loadTeacherStudyPlans(teacherId);
       mySubjectsCount.value = studyPlans.length;
-      todaySchedules.assignAll(_filterTodaysClasses(studyPlans));
+      final todays = _filterTodaysClasses(studyPlans);
+      final cancelledIds = await _loadTodayCancelledPlanIds(teacherId);
+      todaySchedules
+          .assignAll(todays.where((sp) => !cancelledIds.contains(sp.id)));
 
       await _loadMyBookings();
       await _loadEvaluationCount(teacherId, studyPlans);
@@ -108,14 +111,34 @@ class TeacherHomeController extends GetxController {
   }
 
   /// Filter [studyPlans] to entries whose `day_of_week` matches today and
-  /// sort by start-time ascending.
+  /// sort by start-time ascending. Uses the same tolerant weekday parsing as
+  /// the schedule view so numeric / abbreviated `day_of_week` values still hit
+  /// (the schedule showed classes the exact-name match here silently dropped).
   List<StudyPlanModel> _filterTodaysClasses(List<StudyPlanModel> studyPlans) {
-    final todayKey = _todayKey();
+    final today = DateTime.now().weekday;
     final todays = studyPlans
-        .where((sp) => (sp.dayOfWeek ?? '').toLowerCase() == todayKey)
+        .where((sp) => _dayOfWeekToWeekday(sp.dayOfWeek) == today)
         .toList();
     todays.sort((a, b) => (a.startTime ?? '').compareTo(b.startTime ?? ''));
     return todays;
+  }
+
+  /// Plan ids cancelled for today — hidden from the home list. Non-fatal:
+  /// on failure the list simply shows every scheduled class.
+  Future<Set<int>> _loadTodayCancelledPlanIds(int teacherId) async {
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final rows = await _academic.fetchClassCancellations(
+        teacherId: teacherId,
+        from: today,
+        to: today,
+      );
+      return rows.map((c) => c.studyPlanId).toSet();
+    } catch (e) {
+      debugPrint('Today cancellations error: $e');
+      return const <int>{};
+    }
   }
 
   Future<void> _loadMyBookings() async {
@@ -140,18 +163,44 @@ class TeacherHomeController extends GetxController {
         results.where((r) => spIds.contains(r.studyPlanId)).length;
   }
 
-  /// Lowercase English weekday name matching the backend's `day_of_week`
-  /// column.
-  static String _todayKey() {
-    const keys = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ];
-    return keys[(DateTime.now().weekday - 1).clamp(0, 6)];
+  /// Parse the backend `day_of_week` (full name, abbreviation, or 0/1-7
+  /// numeric) into a [DateTime.weekday] value; -1 when unrecognised.
+  // ponytail: third copy of this switch (schedule + student home have it);
+  // extract to a shared util if a fourth caller appears.
+  static int _dayOfWeekToWeekday(String? rawDay) {
+    if (rawDay == null || rawDay.trim().isEmpty) return -1;
+    switch (rawDay.trim().toLowerCase()) {
+      case 'monday':
+      case 'mon':
+      case '1':
+        return DateTime.monday;
+      case 'tuesday':
+      case 'tue':
+      case '2':
+        return DateTime.tuesday;
+      case 'wednesday':
+      case 'wed':
+      case '3':
+        return DateTime.wednesday;
+      case 'thursday':
+      case 'thu':
+      case '4':
+        return DateTime.thursday;
+      case 'friday':
+      case 'fri':
+      case '5':
+        return DateTime.friday;
+      case 'saturday':
+      case 'sat':
+      case '6':
+        return DateTime.saturday;
+      case 'sunday':
+      case 'sun':
+      case '0':
+      case '7':
+        return DateTime.sunday;
+      default:
+        return -1;
+    }
   }
 }

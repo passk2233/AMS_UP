@@ -1,12 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
+import '../modules/admins/admin_navigator_bar/bottom_nav_controller.dart';
 import '../modules/data/models/notification_file_model.dart';
 import '../modules/data/models/notification_model.dart';
+import '../modules/student/student_home/controllers/student_home_controller.dart';
 import '../modules/student/student_noti/views/notification_detail.dart';
+import '../modules/teachers/teacher_navigator_bar/teacher_bottom_nav_controller.dart';
+import '../routes/app_pages.dart';
+import '../services/auth_storage.dart';
 import 'app_colors.dart';
 import 'app_shell.dart';
 import 'notification_attachments.dart';
+
+/// Classify a notification into a tap destination: `'booking'`, `'eval'`,
+/// or `null` (no linked page — open the plain detail view).
+///
+/// The inbox row only persists the human `type` label (no machine category),
+/// so this matches keywords the backend/admin actually writes.
+// ponytail: keyword heuristic — persist a `category` column on notifications
+// (backend already computes it for FCM) if these matches start misfiring.
+String? notiKindOf(NotificationModel n) {
+  final type = (n.type ?? '').toLowerCase();
+  if (type.contains('booking') || n.title.contains('ຈອງຫ້ອງ')) return 'booking';
+  if (n.title.contains('ປະເມີນ') || type.contains('ປະເມີນ')) return 'eval';
+  return null;
+}
+
+/// Navigate from a noti-center item to the page it relates to, role-aware.
+///
+/// The noti screens are pushed over the role shell, so for shell tabs we
+/// `Get.back()` to the shell first, then switch its tab — keeping the bottom
+/// nav (unlike the FCM push path, which routes to standalone pages).
+Future<void> openNotiTarget(String kind) async {
+  final roles = await AuthStorage.readRoles();
+  final isAdmin = roles.any((r) => r == 'admin' || r == 'administrator');
+  final isTeacher = roles.contains('teacher');
+
+  if (kind == 'eval' && !isAdmin && !isTeacher) {
+    // Student eval form is its own route (same as the home-page button).
+    Get.toNamed(Routes.FACULTY_FEEDBACK);
+    return;
+  }
+
+  Get.back(); // back to the shell under the noti screen
+  if (isAdmin) {
+    final nav = Get.find<BottomNavController>();
+    kind == 'eval' ? nav.gotoEvalutionPage() : nav.gotoApprovePage();
+  } else if (isTeacher) {
+    Get.find<TeacherBottomNavController>().changeTab(
+        kind == 'eval' ? TeacherTab.evaluation : TeacherTab.booking);
+  } else {
+    Get.find<HomeStudentController>().changePage(2); // booking tab
+  }
+}
 
 /// Picks the right card for a single notification (urgent vs normal) and
 /// wires the tap handler.
@@ -35,8 +82,15 @@ class NotificationListItem extends StatelessWidget {
 
     void openDetail() {
       if (id != null) onMarkRead(id);
+      final model = item['model'] as NotificationModel;
+      final kind = notiKindOf(model);
+      if (kind != null) {
+        // Linked notification (booking / eval) — jump straight to its page.
+        openNotiTarget(kind);
+        return;
+      }
       Get.to(() => NotificationDetailView(
-            notification: item['model'] as NotificationModel,
+            notification: model,
             receivedAt: item['timestamp'] as DateTime?,
           ));
     }

@@ -62,9 +62,58 @@ class AcademicProvider {
     if (semesterId != null) query['semaster_id'] = semesterId;
     if (studentGroupId != null) query['std_group_id'] = studentGroupId;
     final resp = await _dio.get('/study-plans', queryParameters: query);
-    return _extractList(resp.data)
+    final plans = _extractList(resp.data)
         .map((j) => StudyPlanModel.fromJson(j))
         .toList();
+    await _attachGroupLabels(plans);
+    return plans;
+  }
+
+  /// Gateway study-plan rows carry no `std_group_name`, so every screen that
+  /// showed `plan.studentGroup.stdGroupName` rendered blank. Resolve each
+  /// plan's group from `/student-groups` (cached) and attach it with the
+  /// display label — "ໄອທີຕໍ່ເນື່ອງ ປີ 2 ຫ້ອງ 1", the study year computed
+  /// from the plan's semester (ຕໍ່ເນື່ອງ groups cap at year 2, others 4).
+  /// Best-effort: on failure plans keep whatever the API sent.
+  static Map<int, StudentGroupModel>? _groupsCache;
+  static DateTime? _groupsCacheAt;
+
+  Future<void> _attachGroupLabels(List<StudyPlanModel> plans) async {
+    if (plans.isEmpty) return;
+    try {
+      if (_groupsCache == null ||
+          DateTime.now().difference(_groupsCacheAt!) >
+              const Duration(minutes: 5)) {
+        final list =
+            await ReferenceProvider(dio: _dio).fetchStudentGroups(limit: 200);
+        _groupsCache = {for (final g in list) g.id: g};
+        _groupsCacheAt = DateTime.now();
+      }
+    } on DioException {
+      if (_groupsCache == null) return;
+    }
+    for (final sp in plans) {
+      final g = _groupsCache![sp.stdGroupId];
+      if (g == null) continue;
+      final semYear = sp.semaster?.year ?? 0;
+      final label =
+          g.yearRoomLabel(semYear > 0 ? semYear : DateTime.now().year);
+      // Fresh instance per plan: the label depends on the plan's semester.
+      sp.studentGroup = StudentGroupModel(
+        id: g.id,
+        stdGroupCode: g.stdGroupCode,
+        stdGroupName: label,
+        curriculumId: g.curriculumId,
+        startYear: g.startYear,
+        curriculum: g.curriculum,
+      );
+    }
+  }
+
+  /// For tests / hot reload — drop the cached groups directory.
+  static void resetGroupsCache() {
+    _groupsCache = null;
+    _groupsCacheAt = null;
   }
 
   /// GET `/class-cancellations` — single-date exceptions to the study-plan

@@ -25,6 +25,11 @@ class SchedulesController extends GetxController {
   final RxList<StudyPlanModel> schedules = <StudyPlanModel>[].obs;
   final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
 
+  /// Cancelled single-date occurrences for this teacher's plans. A plan
+  /// with a cancellation on a date is hidden from that date's list.
+  final RxList<ClassCancellationModel> cancellations =
+      <ClassCancellationModel>[].obs;
+
   int? _teacherId;
 
   @override
@@ -114,6 +119,7 @@ class SchedulesController extends GetxController {
         return (a.startTime ?? '').compareTo(b.startTime ?? '');
       });
       schedules.assignAll(list);
+      await _loadCancellations(teacherId);
     } on DioException catch (e) {
       final detail = AppDialogs.buildDioErrorDetail(e);
       debugPrint('Schedules Dio error:\n$detail');
@@ -130,6 +136,78 @@ class SchedulesController extends GetxController {
   }
 
   Future<void> refreshData() => _bootstrap();
+
+  /// Non-fatal: schedule still renders if this fails, just without
+  /// cancellation filtering.
+  Future<void> _loadCancellations(int teacherId) async {
+    try {
+      final sem = activeSemester.value;
+      final list = await _academic.fetchClassCancellations(
+        teacherId: teacherId,
+        from: sem?.startDate,
+        to: sem?.endDate,
+      );
+      cancellations.assignAll(list);
+    } catch (e) {
+      debugPrint('Schedules cancellations error: $e');
+    }
+  }
+
+  /// The cancellation row hiding [planId] on [date], if any.
+  ClassCancellationModel? cancellationFor(int planId, DateTime date) {
+    final d = _dateOnly(date);
+    for (final c in cancellations) {
+      if (c.studyPlanId == planId && _dateOnly(c.cancelDate) == d) return c;
+    }
+    return null;
+  }
+
+  /// Restore a previously cancelled occurrence. Returns true on success;
+  /// the occurrence reappears as active immediately.
+  Future<bool> restoreClass(ClassCancellationModel cancellation) async {
+    try {
+      await _academic.restoreClassOccurrence(cancellation.id);
+      cancellations.removeWhere((c) => c.id == cancellation.id);
+      schedules.refresh();
+      return true;
+    } on DioException catch (e) {
+      debugPrint(
+          'Restore class Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
+      return false;
+    } catch (e) {
+      debugPrint('Restore class error: $e');
+      return false;
+    }
+  }
+
+  /// Cancel one occurrence of [plan] on [date]. Returns true on success;
+  /// the occurrence renders struck out in the schedule immediately.
+  Future<bool> cancelClass(StudyPlanModel plan, DateTime date,
+      {String? reason}) async {
+    try {
+      final id = await _academic.cancelClassOccurrence(
+        studyPlanId: plan.id,
+        date: date,
+        reason: reason,
+      );
+      cancellations.add(ClassCancellationModel(
+        id: id ?? 0,
+        studyPlanId: plan.id,
+        cancelDate: _dateOnly(date),
+        reason: reason,
+        createdBy: 0,
+      ));
+      schedules.refresh();
+      return true;
+    } on DioException catch (e) {
+      debugPrint(
+          'Cancel class Dio error:\n${AppDialogs.buildDioErrorDetail(e)}');
+      return false;
+    } catch (e) {
+      debugPrint('Cancel class error: $e');
+      return false;
+    }
+  }
 
   void _initSelectionForSemester() {
     final sem = activeSemester.value;
@@ -289,13 +367,19 @@ class SchedulesController extends GetxController {
     final time =
         '${_formatTime(sp.startTime)} - ${_formatTime(sp.endTime)}';
     final group = sp.studentGroup?.stdGroupName ?? '';
+    final cancellation = cancellationFor(sp.id, day);
     return {
       'date': day,
-      'title': '$subject${code.isNotEmpty ? ' ($code)' : ''}',
+      'plan': sp,
+      'cancellation': cancellation,
+      'title': '$subject${code.isNotEmpty ? ' ($code)' : ''}'
+          '${cancellation != null ? ' — ຍົກເລີກແລ້ວ' : ''}',
       'subtitle': group.isNotEmpty ? group : null,
       'time': time,
       'location': room,
-      'color': _palette[index % _palette.length],
+      'color': cancellation != null
+          ? AppColors.textSecondary
+          : _palette[index % _palette.length],
     };
   }
 

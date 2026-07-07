@@ -3,6 +3,7 @@ import 'package:frontend/app/routes/app_pages.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 import '../controllers/home_page_controller.dart';
+import '../controllers/student_home_controller.dart';
 
 class HomePage extends GetView<HomePageController> {
   const HomePage({super.key});
@@ -12,6 +13,9 @@ class HomePage extends GetView<HomePageController> {
     if (!Get.isRegistered<HomePageController>()) {
       Get.put(HomePageController());
     }
+
+    // Shell nav — the home cards jump to their related tabs through it.
+    final shell = Get.find<HomeStudentController>();
 
     return GetBuilder<HomePageController>(
       builder: (controller) => LayoutBuilder(
@@ -67,6 +71,7 @@ class HomePage extends GetView<HomePageController> {
                       value: "${controller.totalClasses}",
                       icon: Icons.school_rounded,
                       color: AppColors.info,
+                      onTap: () => shell.changePage(1), // schedule tab
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -76,6 +81,7 @@ class HomePage extends GetView<HomePageController> {
                       value: "${controller.totalSubjects}",
                       icon: Icons.book_rounded,
                       color: AppColors.info,
+                      onTap: () => shell.changePage(1), // schedule tab
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -85,6 +91,7 @@ class HomePage extends GetView<HomePageController> {
                       value: controller.gpa.toStringAsFixed(2),
                       icon: Icons.bar_chart_rounded,
                       color: AppColors.primaryFill,
+                      onTap: () => shell.changePage(3), // score tab
                     ),
                   ),
                 ],
@@ -122,6 +129,7 @@ class HomePage extends GetView<HomePageController> {
                     time: cls['time'],
                     location: cls['room'],
                     color: AppColors.info,
+                    onTap: () => shell.changePage(1), // schedule tab
                   ),
                 ),
             ],

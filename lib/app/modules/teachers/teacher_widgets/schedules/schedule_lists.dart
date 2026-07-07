@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:frontend/app/widgets/widget.dart';
 import 'package:get/get.dart';
 
+import '../../../data/models/class_cancellation_model.dart';
+import '../../../data/models/study_plan_model.dart';
 import '../../schedules/controllers/schedules_controller.dart';
+import 'class_detail_sheet.dart';
 
 /// Loading / error / day / week switch for the teacher schedule body.
 class TeacherScheduleList extends StatelessWidget {
@@ -78,6 +81,14 @@ class TeacherScheduleList extends StatelessWidget {
               instructor: item['instructor'] as String?,
               location: item['location'] as String?,
               color: item['color'] as Color? ?? AppColors.statsBlue,
+              onTap: () => showClassDetailSheet(
+                context,
+                controller: controller,
+                plan: item['plan'] as StudyPlanModel,
+                date: item['date'] as DateTime,
+                cancellation:
+                    item['cancellation'] as ClassCancellationModel?,
+              ),
             );
           },
         ),
@@ -137,6 +148,14 @@ class _WeekList extends StatelessWidget {
                     instructor: item['instructor'] as String?,
                     location: item['location'] as String?,
                     color: item['color'] as Color? ?? AppColors.statsBlue,
+                    onTap: () => showClassDetailSheet(
+                      context,
+                      controller: controller,
+                      plan: item['plan'] as StudyPlanModel,
+                      date: item['date'] as DateTime,
+                      cancellation:
+                          item['cancellation'] as ClassCancellationModel?,
+                    ),
                   )),
               const SizedBox(height: 8),
             ],

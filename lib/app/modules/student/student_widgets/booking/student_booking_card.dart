@@ -24,7 +24,7 @@ class StudentBookingCard extends StatelessWidget {
   /// backend can't preload `room`), else "ຫ້ອງ #id" so the card never shows
   /// a bare "-".
   String _roomCode(RoomBookingModel b) {
-    final preloaded = b.room?.roomCode;
+    final preloaded = b.room?.roomCode ?? b.roomCode;
     if (preloaded != null && preloaded.isNotEmpty) return preloaded;
     final match = controller.rooms.where((r) => r.id == b.roomId);
     if (match.isNotEmpty && match.first.roomCode.isNotEmpty) {

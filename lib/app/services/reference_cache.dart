@@ -70,6 +70,7 @@ class ReferenceCache extends GetxService {
   void invalidate() {
     _plans.clear();
     _groupSizes.clear();
+    AcademicProvider.resetGroupsCache();
   }
 }
 

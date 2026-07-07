@@ -222,17 +222,22 @@ class AppStatCard extends StatelessWidget {
   final IconData icon;
   final Color color;
 
+  /// Optional tap handler — used to jump to the page the stat summarises.
+  final VoidCallback? onTap;
+
   const AppStatCard({
     super.key,
     required this.label,
     required this.value,
     required this.icon,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return AppSurfaceCard(
+      onTap: onTap,
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       child: Column(
         children: [
@@ -275,11 +280,16 @@ class AppStatItem {
   final String value;
   final String suffix;
   final IconData icon;
+
+  /// Optional tap handler — used to jump to the page the stat summarises.
+  final VoidCallback? onTap;
+
   const AppStatItem({
     required this.label,
     required this.value,
     required this.icon,
     this.suffix = '',
+    this.onTap,
   });
 }
 
@@ -321,7 +331,7 @@ class AppStatsBanner extends StatelessWidget {
   }
 
   Widget _buildItem(AppStatItem item) {
-    return Column(
+    final column = Column(
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -354,6 +364,12 @@ class AppStatsBanner extends StatelessWidget {
           ),
         ),
       ],
+    );
+    if (item.onTap == null) return column;
+    return InkWell(
+      onTap: item.onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: column,
     );
   }
 }

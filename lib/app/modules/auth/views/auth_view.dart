@@ -67,7 +67,7 @@ class _LoginForm extends GetView<AuthController> {
         const SizedBox(height: AppSpacing.xl),
         const _LoginHeader(),
         const SizedBox(height: AppSpacing.xl),
-        _EmailField(controller: controller),
+        _UsernameField(controller: controller),
         const SizedBox(height: AppSpacing.m),
         _PasswordField(controller: controller),
         const SizedBox(height: AppSpacing.xs),
@@ -107,21 +107,21 @@ class _LoginHeader extends StatelessWidget {
   }
 }
 
-/// Email [AppTextField] wired to the controller.
-class _EmailField extends StatelessWidget {
+/// Username [AppTextField] wired to the controller.
+class _UsernameField extends StatelessWidget {
   /// Source controller.
   final AuthController controller;
 
-  const _EmailField({required this.controller});
+  const _UsernameField({required this.controller});
 
   @override
   Widget build(BuildContext context) {
     return AppTextField(
-      label: 'ອີເມວ',
-      hint: 'ກະລຸນາໃສ່ອີເມວ',
-      controller: controller.emailController,
-      prefixIcon: Icons.email_outlined,
-      keyboardType: TextInputType.emailAddress,
+      label: 'ຊື່ຜູ້ໃຊ້',
+      hint: 'ກະລຸນາໃສ່ລະຫັດນັກສຶກສາ/ອາຈານ',
+      controller: controller.usernameController,
+      prefixIcon: Icons.person_outline_rounded,
+      keyboardType: TextInputType.text,
       textInputAction: TextInputAction.next,
       required: true,
     );

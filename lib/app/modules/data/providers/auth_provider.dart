@@ -45,8 +45,11 @@ class AuthProvider {
   /// POST `/auth/login`. Returns the token + user on success; throws on
   /// failure. The transport skips the auth header for this path, so a stale
   /// token in storage does not leak in.
+  ///
+  /// [username] is the AMS username (student/teacher code) — the gateway
+  /// delegates to the legacy `/api/login` which authenticates by username.
   Future<AuthSession> login({
-    required String email,
+    required String username,
     required String password,
     required String platform,
     String? deviceToken,
@@ -54,7 +57,7 @@ class AuthProvider {
     final response = await _dio.post(
       '/auth/login',
       data: {
-        'email': email,
+        'username': username,
         'password': password,
         'device_token': deviceToken,
         'platform': platform,

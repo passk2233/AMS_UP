@@ -37,46 +37,6 @@ class BookingProvider {
         .toList();
   }
 
-  /// Refill the nested `room` / `user` relations on [bookings].
-  ///
-  /// In gateway mode the backend cannot preload `Room` / `User` (those tables
-  /// live in the legacy system), so `/room-bookings` rows arrive bare — which
-  /// rendered as "Unknown User", room `-`, and a wrong role pill on the admin
-  /// cards. This stitches them back from the flat catalogs, resolving each
-  /// user's teacher / student record so display names and role detection work.
-  ///
-  /// No-op when every booking already has both relations. Requires an admin
-  /// caller (`/users` is admin-only). Best-effort by design: callers should
-  /// catch failures and keep the un-hydrated list.
-  Future<void> hydrateBookings(List<RoomBookingModel> bookings) async {
-    if (bookings.every((b) => b.room != null && b.user != null)) return;
-
-    final people = PeopleProvider(dio: _dio);
-    final results = await Future.wait<dynamic>([
-      fetchRooms(limit: 200),
-      people.fetchUsers(),
-      people.fetchTeachers(limit: 500),
-      people.fetchStudents(limit: 2000),
-    ]);
-    final rooms = {for (final r in results[0] as List<RoomModel>) r.id: r};
-    final teachers = {
-      for (final t in results[2] as List<TeacherModel>) t.id: t
-    };
-    final students = {
-      for (final s in results[3] as List<StudentModel>) s.id: s
-    };
-    final users = <int, UserModel>{};
-    for (final u in results[1] as List<UserModel>) {
-      u.teacher ??= teachers[u.teacherId];
-      u.student ??= students[u.stdId];
-      users[u.id] = u;
-    }
-    for (final b in bookings) {
-      b.room ??= rooms[b.roomId];
-      b.user ??= users[b.userId];
-    }
-  }
-
   /// Update a single booking's status (`approved` / `rejected` / `pending` /
   /// `cancelled`). Completes normally on success; throws on failure.
   Future<void> updateStatus(int bookingId, String status) async {

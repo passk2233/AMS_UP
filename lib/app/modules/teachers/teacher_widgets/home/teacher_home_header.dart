@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 import '../../../../widgets/widget.dart';
 import '../../../data/models/user_model.dart';
 import '../../teacher_home/controllers/teacher_home_controller.dart';
+import '../../teacher_navigator_bar/teacher_bottom_nav_controller.dart';
 
 /// Adapter that turns a [UserModel] into the display strings the dashboard
 /// needs. Keeps the formatting decisions out of the widgets.
@@ -59,22 +61,26 @@ class TeacherStatsBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final nav = Get.find<TeacherBottomNavController>();
     return AppStatsBanner(
       items: [
         AppStatItem(
           label: 'ວິຊາ',
           value: controller.mySubjectsCount.value.toString(),
           icon: Icons.grid_view_rounded,
+          onTap: () => nav.changeTab(TeacherTab.schedule),
         ),
         AppStatItem(
           label: 'ຈອງຫ້ອງ',
           value: controller.myBookingsCount.value.toString(),
           icon: Icons.meeting_room_rounded,
+          onTap: () => nav.changeTab(TeacherTab.booking),
         ),
         AppStatItem(
           label: 'ລໍຖ້າ',
           value: controller.myPendingBookingsCount.value.toString(),
           icon: Icons.pending_actions_rounded,
+          onTap: () => nav.changeTab(TeacherTab.booking),
         ),
       ],
     );

@@ -23,12 +23,20 @@ class ProfileCard extends StatelessWidget {
   /// % of rooms currently in use (top-right stat).
   final int roomInUsePercent;
 
+  /// Tap on the pending-bookings stat (jumps to the approval queue).
+  final VoidCallback? onPendingTap;
+
+  /// Tap on the approved-bookings stat (jumps to the approval queue).
+  final VoidCallback? onApprovedTap;
+
   const ProfileCard({
     super.key,
     required this.user,
     this.pendingCount = 0,
     this.approvedCount = 0,
     this.roomInUsePercent = 0,
+    this.onPendingTap,
+    this.onApprovedTap,
   });
 
   @override
@@ -70,6 +78,8 @@ class ProfileCard extends StatelessWidget {
               pendingCount: pendingCount,
               approvedCount: approvedCount,
               roomInUsePercent: roomInUsePercent,
+              onPendingTap: onPendingTap,
+              onApprovedTap: onApprovedTap,
             ),
           ],
         ),
@@ -218,10 +228,16 @@ class _ProfileStatsRow extends StatelessWidget {
   /// Room usage percentage.
   final int roomInUsePercent;
 
+  /// Optional taps for the pending / approved tiles.
+  final VoidCallback? onPendingTap;
+  final VoidCallback? onApprovedTap;
+
   const _ProfileStatsRow({
     required this.pendingCount,
     required this.approvedCount,
     required this.roomInUsePercent,
+    this.onPendingTap,
+    this.onApprovedTap,
   });
 
   @override
@@ -233,6 +249,7 @@ class _ProfileStatsRow extends StatelessWidget {
           label: 'ລໍຖ້າການຢືນຢັນ',
           value: '$pendingCount',
           color: AppColors.borderPending,
+          onTap: onPendingTap,
         ),
         const SizedBox(width: AppSpacing.s),
         _ProfileStatTile(
@@ -240,6 +257,7 @@ class _ProfileStatsRow extends StatelessWidget {
           label: 'ລາຍການອະນຸມັດ',
           value: '$approvedCount',
           color: AppColors.borderApproved,
+          onTap: onApprovedTap,
         ),
         const SizedBox(width: AppSpacing.s),
         _ProfileStatTile(
@@ -267,46 +285,57 @@ class _ProfileStatTile extends StatelessWidget {
   /// Tint applied to the icon.
   final Color color;
 
+  /// Optional tap handler (tile jumps to its related page).
+  final VoidCallback? onTap;
+
   const _ProfileStatTile({
     required this.icon,
     required this.label,
     required this.value,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        decoration: BoxDecoration(
-          // Dark wash (not white) so the white value + label keep contrast on
-          // the gradient; a translucent-white tile lightens it and fails AA.
-          color: Colors.black.withValues(alpha: 0.18),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(height: 4),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withValues(alpha: 0.8),
-              ),
-            ),
-          ],
-        ),
+    final tile = Container(
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+      decoration: BoxDecoration(
+        // Dark wash (not white) so the white value + label keep contrast on
+        // the gradient; a translucent-white tile lightens it and fails AA.
+        color: Colors.black.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(10),
       ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 10,
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+          ),
+        ],
+      ),
+    );
+    return Expanded(
+      child: onTap == null
+          ? tile
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(10),
+              child: tile,
+            ),
     );
   }
 }

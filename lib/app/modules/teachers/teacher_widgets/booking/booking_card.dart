@@ -21,7 +21,7 @@ class TeacherBookingCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final b = booking;
-    final room = b.room?.roomCode ?? '-';
+    final room = b.room?.roomCode ?? b.roomCode ?? '-';
     final date =
         '${b.bookingDate.day}/${b.bookingDate.month}/${b.bookingDate.year}';
     final status = b.status;

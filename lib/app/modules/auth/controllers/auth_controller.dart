@@ -27,8 +27,8 @@ class AuthController extends GetxController {
   /// Data-access seam for `/auth/*`.
   final AuthProvider _auth;
 
-  /// Email input controller.
-  final TextEditingController emailController = TextEditingController();
+  /// Username input controller (AMS student/teacher code).
+  final TextEditingController usernameController = TextEditingController();
 
   /// Password input controller.
   final TextEditingController passwordController = TextEditingController();
@@ -36,14 +36,16 @@ class AuthController extends GetxController {
   /// `true` when the password field hides its content (default).
   final RxBool isObscured = true.obs;
 
-  /// `true` when "remember me" is checked — the email will be restored
+  /// `true` when "remember me" is checked — the username will be restored
   /// on next launch.
   final RxBool rememberMe = false.obs;
 
   /// `true` while [login] is in flight.
   final RxBool isLoading = false.obs;
 
-  static const _savedEmailKey = 'saved_email';
+  // New key on purpose: 'saved_email' holds emails from the pre-username era,
+  // which are no longer valid identifiers — let them die silently.
+  static const _savedUsernameKey = 'saved_username';
   static const _rememberUntilKey = 'remember_until';
   static const _rememberDurationDays = 30;
 
@@ -55,7 +57,7 @@ class AuthController extends GetxController {
 
   @override
   void onClose() {
-    emailController.dispose();
+    usernameController.dispose();
     passwordController.dispose();
     super.onClose();
   }
@@ -68,13 +70,13 @@ class AuthController extends GetxController {
     if (value != null) rememberMe.value = value;
   }
 
-  /// Restore the persisted email (if any) on first build so the user
+  /// Restore the persisted username (if any) on first build so the user
   /// only needs to re-enter the password.
   Future<void> loadSaveUser() async {
     final prefs = await SharedPreferences.getInstance();
-    final savedEmail = prefs.getString(_savedEmailKey);
-    if (savedEmail != null && savedEmail.isNotEmpty) {
-      emailController.text = savedEmail;
+    final savedUsername = prefs.getString(_savedUsernameKey);
+    if (savedUsername != null && savedUsername.isNotEmpty) {
+      usernameController.text = savedUsername;
       rememberMe.value = true;
     }
   }
@@ -82,15 +84,11 @@ class AuthController extends GetxController {
   /// Run the full sign-in pipeline. Surfaces validation / network errors
   /// via [AppSnackbar] and clears [isLoading] in `finally`.
   Future<void> login() async {
-    final email = emailController.text.trim();
+    final username = usernameController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty || password.isEmpty) {
-      AppSnackbar.warning('ກະລຸນາປ້ອນອີເມວ ແລະ ລະຫັດຜ່ານ');
-      return;
-    }
-    if (!email.contains('@')) {
-      AppSnackbar.warning('ກະລຸນາປ້ອນອີເມວໃຫ້ຖືກຕ້ອງ');
+    if (username.isEmpty || password.isEmpty) {
+      AppSnackbar.warning('ກະລຸນາປ້ອນຊື່ຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານ');
       return;
     }
 
@@ -102,7 +100,7 @@ class AuthController extends GetxController {
       // call goes out unauthenticated even if a stale token is sitting in
       // secure storage.
       final session = await _auth.login(
-        email: email,
+        username: username,
         password: password,
         platform: _platformId(),
         deviceToken: deviceToken,
@@ -120,7 +118,7 @@ class AuthController extends GetxController {
         await AuthStorage.writeRefreshToken(refreshToken);
       }
       await AuthStorage.writeRoles(roles);
-      await _persistRememberMe(email);
+      await _persistRememberMe(username);
 
       AppSnackbar.success('ເຂົ້າສູ່ລະບົບສຳເລັດ');
 
@@ -159,16 +157,16 @@ class AuthController extends GetxController {
   }
 
   /// Persist or clear the "remember me" prefs.
-  Future<void> _persistRememberMe(String email) async {
+  Future<void> _persistRememberMe(String username) async {
     final prefs = await SharedPreferences.getInstance();
     if (rememberMe.value) {
       final expires = DateTime.now()
           .add(const Duration(days: _rememberDurationDays))
           .millisecondsSinceEpoch;
-      await prefs.setString(_savedEmailKey, email);
+      await prefs.setString(_savedUsernameKey, username);
       await prefs.setInt(_rememberUntilKey, expires);
     } else {
-      await prefs.remove(_savedEmailKey);
+      await prefs.remove(_savedUsernameKey);
       await prefs.remove(_rememberUntilKey);
     }
   }

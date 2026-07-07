@@ -23,11 +23,16 @@ class BookingCard extends StatelessWidget {
   /// Invoked when the user taps "Reject" (only shown while pending).
   final VoidCallback onReject;
 
+  /// Optional whole-card tap (e.g. jump to the approval queue). The
+  /// approve / reject buttons keep their own handlers.
+  final VoidCallback? onTap;
+
   const BookingCard({
     super.key,
     required this.booking,
     required this.onApprove,
     required this.onReject,
+    this.onTap,
   });
 
   @override
@@ -47,7 +52,9 @@ class BookingCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Padding(
+      child: _CardTapArea(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.all(AppSpacing.s + 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -72,6 +79,29 @@ class BookingCard extends StatelessWidget {
             ),
           ],
         ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ripple wrapper used when the whole card is tappable; pass-through
+/// otherwise.
+class _CardTapArea extends StatelessWidget {
+  final VoidCallback? onTap;
+  final Widget child;
+
+  const _CardTapArea({required this.onTap, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    if (onTap == null) return child;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(AppSpacing.s + 4),
+        child: child,
       ),
     );
   }
@@ -89,20 +119,32 @@ class _BookingDisplay {
   bool get isRejected => booking.status.toLowerCase() == 'rejected';
 
   /// Whether the booker is a student — used to switch the role pill color.
-  bool get isStudent => booking.user?.stdId != null;
+  bool get isStudent =>
+      booking.user?.stdId != null || booking.userRole == 'student';
 
   /// Lao role label for the pill. Empty when the user is unknown so the
   /// card doesn't claim a role it can't back up (was hardcoded to teacher).
   String get roleLabel {
     final u = booking.user;
-    if (u == null) return '';
-    if (u.stdId != null) return 'ນັກສຶກສາ';
-    if (u.teacherId != null) return 'ອາຈານ';
-    return 'ຜູ້ດູແລລະບົບ';
+    if (u != null) {
+      if (u.stdId != null) return 'ນັກສຶກສາ';
+      if (u.teacherId != null) return 'ອາຈານ';
+      return 'ຜູ້ດູແລລະບົບ';
+    }
+    switch (booking.userRole) {
+      case 'student':
+        return 'ນັກສຶກສາ';
+      case 'teacher':
+        return 'ອາຈານ';
+      default:
+        return '';
+    }
   }
 
-  /// Room code if the relation is populated, otherwise `-` (never a raw id).
-  String get roomName => booking.room?.roomCode ?? '-';
+  /// Room code from the nested relation or the backend-resolved `room_code`,
+  /// otherwise `-` (never a raw id).
+  String get roomName =>
+      booking.room?.roomCode ?? booking.roomCode ?? '-';
 
   /// Formatted `HH:mm - HH:mm` time range. Empty when both ends are missing.
   String get timeDisplay {
@@ -116,20 +158,24 @@ class _BookingDisplay {
     return '${_weekdays[d.weekday - 1]}, ${_months[d.month - 1]} ${d.day}';
   }
 
-  /// Preferred display name: teacher → student → username fallback.
+  /// Preferred display name: nested teacher → student → username, then the
+  /// backend-resolved `user_name` (gateway mode never sends the nested user).
   String get displayName {
     final user = booking.user;
-    if (user == null) return 'ບໍ່ພົບຂໍ້ມູນຜູ້ຈອງ';
-
-    final teacher = user.teacher;
-    if (teacher != null) {
-      return '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+    if (user != null) {
+      final teacher = user.teacher;
+      if (teacher != null) {
+        return '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+      }
+      final student = user.student;
+      if (student != null) {
+        return '${student.nameLao} ${student.surnameLao ?? ''}'.trim();
+      }
+      return user.username;
     }
-    final student = user.student;
-    if (student != null) {
-      return '${student.nameLao} ${student.surnameLao ?? ''}'.trim();
-    }
-    return user.username;
+    final name = booking.userName;
+    if (name != null && name.isNotEmpty) return name;
+    return 'ບໍ່ພົບຂໍ້ມູນຜູ້ຈອງ';
   }
 
   static const _weekdays = <String>[

@@ -14,6 +14,12 @@ class RoomBookingModel {
   RoomModel? room;
   UserModel? user;
 
+  /// Display fields resolved by the backend from the legacy system (gateway
+  /// mode has no local rooms/users, so nested `room`/`user` arrive null).
+  String? roomCode;
+  String? userName;
+  String? userRole; // teacher | student | null
+
   /// Human-readable purpose for the UI. Backend tags fixed study-plan
   /// occurrences with internal markers like `__sp_fixed:1` in `purpose`;
   /// map the known one to a friendly label and hide any other `__`-prefixed
@@ -39,6 +45,9 @@ class RoomBookingModel {
     this.createAt,
     this.room,
     this.user,
+    this.roomCode,
+    this.userName,
+    this.userRole,
   });
 
   factory RoomBookingModel.fromJson(Map<String, dynamic> json) {
@@ -54,6 +63,9 @@ class RoomBookingModel {
       createAt: json['create_at'] != null ? DateTime.tryParse(json['create_at'].toString()) : null,
       room: json['room'] != null ? RoomModel.fromJson(json['room']) : null,
       user: json['user'] != null ? UserModel.fromJson(json['user']) : null,
+      roomCode: json['room_code'] as String?,
+      userName: json['user_name'] as String?,
+      userRole: json['user_role'] as String?,
     );
   }
 

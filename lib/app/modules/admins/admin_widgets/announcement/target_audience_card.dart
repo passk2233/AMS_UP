@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../../../../widgets/widget.dart';
-import '../../../data/models/student_group_model.dart';
 import '../../announcement/controllers/announcement_controller.dart';
 import 'announcement_form_blocks.dart';
 import 'individual_search_section.dart';
@@ -37,6 +36,8 @@ class TargetAudienceCard extends StatelessWidget {
             ],
             // All / Teachers have no filters: those audiences always reach
             // every matching person.
+            const SizedBox(height: 14),
+            _LiveReachRow(controller: controller),
           ],
         );
       }),
@@ -76,7 +77,8 @@ class _AudienceChips extends StatelessWidget {
   }
 }
 
-/// Student-group dropdown — the only student filter.
+/// Multi-select student-group chips — the only student filter. An empty
+/// selection means "all groups"; the leading ທັງໝົດ chip clears it.
 class _StudentGroupSelector extends StatelessWidget {
   /// Source of reactive group selection.
   final AnnouncementController controller;
@@ -85,29 +87,99 @@ class _StudentGroupSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnnLabeledDropdown<int?>(
-      label: 'ກຸ່ມນັກສຶກສາ',
-      value: controller.selectedStudentGroup.value?.id,
-      items: [
-        const DropdownMenuItem<int?>(
-          value: null,
-          child: Text('ທັງໝົດ', style: TextStyle(fontSize: 13)),
-        ),
-        for (final g in controller.studentGroups)
-          DropdownMenuItem<int?>(
-            value: g.id,
-            child: Text(
-              g.stdGroupName,
-              style: const TextStyle(fontSize: 13),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const AnnFieldLabel('ກຸ່ມນັກສຶກສາ (ເລືອກໄດ້ຫຼາຍກຸ່ມ)'),
+        const SizedBox(height: 8),
+        Obx(() {
+          final selected = controller.selectedStudentGroups;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _groupChip(
+                label: 'ທັງໝົດ',
+                selected: selected.isEmpty,
+                onTap: controller.clearStudentGroups,
+              ),
+              for (final g in controller.studentGroups)
+                _groupChip(
+                  label: g.stdGroupName,
+                  selected: selected.any((s) => s.id == g.id),
+                  onTap: () => controller.toggleStudentGroup(g),
+                ),
+            ],
+          );
+        }),
       ],
-      onChanged: (val) => controller.selectedStudentGroup.value = val == null
-          ? null
-          : controller.studentGroups.firstWhereOrNull(
-              (StudentGroupModel g) => g.id == val,
-            ),
     );
+  }
+
+  Widget _groupChip({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return FilterChip(
+      label: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          color: selected ? Colors.white : AppColors.textPrimary,
+        ),
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+      showCheckmark: false,
+      selectedColor: AppColors.info,
+      backgroundColor: AppColors.scaffoldBg,
+      side: BorderSide(
+        color: selected ? AppColors.info : Colors.grey.shade300,
+      ),
+    );
+  }
+}
+
+/// Live recipient-count row — re-estimated automatically whenever the
+/// audience or group selection changes (see controller workers).
+class _LiveReachRow extends StatelessWidget {
+  /// Source of reactive reach state.
+  final AnnouncementController controller;
+
+  const _LiveReachRow({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Obx(() {
+      final loading = controller.isEstimatingReach.value;
+      final count = controller.estimatedReach.value;
+      return Row(
+        children: [
+          const Icon(Icons.podcasts_rounded, size: 16, color: AppColors.info),
+          const SizedBox(width: 6),
+          const Text(
+            'ຜູ້ຮັບໂດຍປະມານ:',
+            style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+          ),
+          const SizedBox(width: 6),
+          if (loading)
+            const SizedBox(
+              width: 14,
+              height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Text(
+              count == null ? '?' : '$count ຄົນ',
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+        ],
+      );
+    });
   }
 }

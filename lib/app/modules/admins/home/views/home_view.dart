@@ -62,6 +62,9 @@ class _AdminHomeBody extends StatelessWidget {
   }
 }
 
+/// Jump the admin shell to the approval-queue tab.
+void _gotoApprove() => Get.find<BottomNavController>().gotoApprovePage();
+
 /// Scrollable success state — profile card + pending booking list.
 class _AdminHomeContent extends StatelessWidget {
   /// Source of reactive state.
@@ -85,6 +88,8 @@ class _AdminHomeContent extends StatelessWidget {
                 pendingCount: controller.pendingCount.value,
                 approvedCount: controller.approvedCount.value,
                 roomInUsePercent: controller.roomInUsePercent.value,
+                onPendingTap: _gotoApprove,
+                onApprovedTap: _gotoApprove,
               ),
             ),
             Padding(
@@ -167,6 +172,7 @@ class _PendingBookingsList extends StatelessWidget {
               booking: booking,
               onApprove: () => controller.approveBooking(booking.bookingId),
               onReject: () => controller.rejectBooking(booking.bookingId),
+              onTap: _gotoApprove,
             ),
         ],
       );

@@ -133,11 +133,10 @@ class AnnouncementController extends GetxController {
   /// Student groups fetched from `/student-groups`.
   final RxList<StudentGroupModel> studentGroups = <StudentGroupModel>[].obs;
 
-  /// Currently selected student group, or `null` for "all". The only
+  /// Currently selected student groups; empty means "all groups". The only
   /// audience filter — department/year/type scoping was removed.
-  final Rx<StudentGroupModel?> selectedStudentGroup = Rx<StudentGroupModel?>(
-    null,
-  );
+  final RxList<StudentGroupModel> selectedStudentGroups =
+      <StudentGroupModel>[].obs;
 
   /// The student the admin has confirmed as the individual recipient. `null`
   /// until one of [searchResults] is selected (or an exact single match is
@@ -198,15 +197,33 @@ class AnnouncementController extends GetxController {
   static const int _pageSize = 20;
   int _currentPage = 1;
 
+  /// Workers driving the live reach estimate; disposed in [onClose].
+  final List<Worker> _reachWorkers = [];
+
   @override
   void onInit() {
     super.onInit();
     fetchStudentGroups();
     fetchNotifications();
+    // Live reach: re-estimate whenever the audience configuration changes.
+    // Group toggles are debounced so tapping several chips fires one request.
+    _reachWorkers.addAll([
+      ever(selectedAudience, (_) => _refreshEstimatedReach()),
+      ever(foundStudent, (_) => _refreshEstimatedReach()),
+      debounce(
+        selectedStudentGroups,
+        (_) => _refreshEstimatedReach(),
+        time: const Duration(milliseconds: 400),
+      ),
+    ]);
+    _refreshEstimatedReach();
   }
 
   @override
   void onClose() {
+    for (final w in _reachWorkers) {
+      w.dispose();
+    }
     titleCtrl.dispose();
     messageCtrl.dispose();
     individualSearchCtrl.dispose();
@@ -334,6 +351,22 @@ class AnnouncementController extends GetxController {
     searchResults.clear();
     individualSearchCtrl.clear();
   }
+
+  // ──────────────────────────────────────── student-group selection ──
+
+  /// Add [group] to the selection, or remove it when already selected.
+  void toggleStudentGroup(StudentGroupModel group) {
+    final i = selectedStudentGroups.indexWhere((g) => g.id == group.id);
+    i >= 0 ? selectedStudentGroups.removeAt(i) : selectedStudentGroups.add(group);
+  }
+
+  /// Reset to "all groups" (empty selection).
+  void clearStudentGroups() => selectedStudentGroups.clear();
+
+  /// Human-readable summary of the group selection.
+  String get selectedGroupsLabel => selectedStudentGroups.isEmpty
+      ? 'ທັງໝົດ'
+      : selectedStudentGroups.map((g) => g.stdGroupName).join(', ');
 
   // ─────────────────────────────────────────────── reach estimate ──
 
@@ -801,8 +834,7 @@ class AnnouncementController extends GetxController {
     }
 
     if (selectedAudience.value == AnnouncementAudience.students) {
-      final group = selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ';
-      return '$audience | ກຸ່ມ: $group';
+      return '$audience | ກຸ່ມ: $selectedGroupsLabel';
     }
     // Teachers/all: no filters — everyone in the audience receives it.
     return audience;
@@ -826,9 +858,10 @@ class AnnouncementController extends GetxController {
     // The student group is the only audience filter; teachers/all always
     // reach everyone.
     final f = <String, dynamic>{};
-    if (selectedAudience.value == AnnouncementAudience.students) {
-      final groupId = selectedStudentGroup.value?.id;
-      if (groupId != null) f['std_group_id'] = groupId;
+    if (selectedAudience.value == AnnouncementAudience.students &&
+        selectedStudentGroups.isNotEmpty) {
+      // Comma-separated ids — the backend parses this into an IN filter.
+      f['std_group_id'] = selectedStudentGroups.map((g) => g.id).join(',');
     }
     return f;
   }
@@ -865,12 +898,7 @@ class AnnouncementController extends GetxController {
       case AnnouncementAudience.students:
         rows
           ..add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ນັກສຶກສາ'))
-          ..add(
-            AnnouncementInfoRow(
-              'ກຸ່ມ',
-              selectedStudentGroup.value?.stdGroupName ?? 'ທັງໝົດ',
-            ),
-          );
+          ..add(AnnouncementInfoRow('ກຸ່ມ', selectedGroupsLabel));
         break;
       case AnnouncementAudience.teachers:
         rows.add(const AnnouncementInfoRow('ສົ່ງຫາ', 'ອາຈານ (ທຸກຄົນ)'));
@@ -890,7 +918,7 @@ class AnnouncementController extends GetxController {
     searchResults.clear();
     pickedFiles.clear();
     selectedAudience.value = AnnouncementAudience.all;
-    selectedStudentGroup.value = null;
+    selectedStudentGroups.clear();
     foundStudent.value = null;
   }
 

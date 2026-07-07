@@ -100,15 +100,9 @@ class ApproveController extends GetxController {
     isLoading.value = true;
     errorMessage.value = '';
     try {
+      // The backend enriches each row with room_code / user_name / user_role
+      // (resolved from legacy) — no client-side stitching needed.
       final list = await _provider.fetchBookings();
-      // Gateway mode returns bookings without nested room/user — refill them
-      // so the cards show the booker's name and role. Best-effort: a failure
-      // here must not blank the whole queue.
-      try {
-        await _provider.hydrateBookings(list);
-      } catch (e) {
-        debugPrint('Booking hydration failed: $e');
-      }
       bookings.assignAll(list);
       _updateStats();
       _applyFilters();
@@ -197,7 +191,7 @@ class ApproveController extends GetxController {
 
   Future<void> _confirmAndPatch(int bookingId, String status) async {
     final booking = bookings.firstWhereOrNull((b) => b.bookingId == bookingId);
-    final roomName = booking?.room?.roomCode ?? '-';
+    final roomName = booking?.room?.roomCode ?? booking?.roomCode ?? '-';
     final approving = status == 'approved';
 
     final confirmed = await AppDialogs.showConfirmation(
@@ -322,7 +316,8 @@ class ApproveController extends GetxController {
     final q = searchQuery.value.toLowerCase();
     if (q.isNotEmpty) {
       list = list.where((b) {
-        final roomCode = b.room?.roomCode.toLowerCase() ?? '';
+        final roomCode =
+            (b.room?.roomCode ?? b.roomCode ?? '').toLowerCase();
         final purpose = (b.purpose ?? '').toLowerCase();
         final userName = _displayName(b).toLowerCase();
         return roomCode.contains(q) ||
@@ -363,16 +358,18 @@ class ApproveController extends GetxController {
 
   String _displayName(RoomBookingModel b) {
     final user = b.user;
-    if (user == null) return '';
-    final teacher = user.teacher;
-    if (teacher != null) {
-      return '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+    if (user != null) {
+      final teacher = user.teacher;
+      if (teacher != null) {
+        return '${teacher.nameLao} ${teacher.surnameLao}'.trim();
+      }
+      final student = user.student;
+      if (student != null) {
+        return '${student.nameLao} ${student.surnameLao ?? ''}'.trim();
+      }
+      return user.username;
     }
-    final student = user.student;
-    if (student != null) {
-      return '${student.nameLao} ${student.surnameLao ?? ''}'.trim();
-    }
-    return user.username;
+    return b.userName ?? '';
   }
 
   void _updateStats() {
