@@ -47,6 +47,9 @@ class TeacherHomeController extends GetxController {
   /// Today's classes, sorted by start time ascending.
   final RxList<StudyPlanModel> todaySchedules = <StudyPlanModel>[].obs;
 
+  /// Semester the dashboard is scoped to (same pick as the schedules tab).
+  final Rx<SemasterModel?> activeSemester = Rx<SemasterModel?>(null);
+
   /// Currently signed-in user (used to derive [UserModel.teacherId]).
   final Rx<UserModel?> currentUser = Rx<UserModel?>(null);
 
@@ -72,6 +75,7 @@ class TeacherHomeController extends GetxController {
         return;
       }
 
+      await _loadActiveSemester();
       final studyPlans = await _loadTeacherStudyPlans(teacherId);
       mySubjectsCount.value = studyPlans.length;
       final todays = _filterTodaysClasses(studyPlans);
@@ -100,14 +104,31 @@ class TeacherHomeController extends GetxController {
     currentUser.value = await _auth.me();
   }
 
-  /// Server-side filter by `teacher_id`, with a client-side fallback when
-  /// the backend ignores the filter (returns the full list, possibly empty).
-  Future<List<StudyPlanModel>> _loadTeacherStudyPlans(int teacherId) async {
-    final scoped = await _academic.fetchStudyPlans(teacherId: teacherId);
-    if (scoped.isNotEmpty) return scoped;
+  /// Best-effort: without it the dashboard falls back to unscoped plans.
+  Future<void> _loadActiveSemester() async {
+    try {
+      activeSemester.value = await _academic.fetchActiveSemester();
+    } catch (e) {
+      debugPrint('Teacher home semester error: $e');
+    }
+  }
 
-    final all = await _academic.fetchStudyPlans();
-    return all.where((sp) => sp.teacherId == teacherId).toList();
+  /// Server-side filter by `teacher_id` scoped to the active semester, with a
+  /// client-side fallback when the backend ignores either filter. Without the
+  /// semester scope the by-teacher endpoint returns plans from *every*
+  /// semester, so "today's classes" listed old-semester rows too.
+  Future<List<StudyPlanModel>> _loadTeacherStudyPlans(int teacherId) async {
+    final semId = activeSemester.value?.id;
+    var scoped =
+        await _academic.fetchStudyPlans(teacherId: teacherId, semesterId: semId);
+    if (scoped.isEmpty) {
+      final all = await _academic.fetchStudyPlans(semesterId: semId);
+      scoped = all.where((sp) => sp.teacherId == teacherId).toList();
+    }
+    if (semId != null) {
+      scoped = scoped.where((sp) => sp.semasterId == semId).toList();
+    }
+    return scoped;
   }
 
   /// Filter [studyPlans] to entries whose `day_of_week` matches today and
