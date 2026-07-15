@@ -659,8 +659,29 @@ class EvalutionController extends GetxController {
     for (final s in summaries.values) {
       _computeTeacherCompletion(s);
     }
+    // Backfill every teacher with no evaluation rows so the admin list
+    // always shows the full faculty, not just evaluated teachers.
+    for (final t in teachers) {
+      summaries.putIfAbsent(
+        t.id,
+        () => TeacherEvalSummary(
+          teacher: t,
+          totalResponses: 0,
+          totalScore: 0,
+          questionScores: {},
+          subjectNames: {},
+          results: [],
+        ),
+      );
+    }
     final list = summaries.values.toList()
-      ..sort((a, b) => b.averageScore.compareTo(a.averageScore));
+      ..sort((a, b) {
+        // Evaluated teachers first (by score), un-evaluated ones at the end.
+        final cmp = b.averageScore.compareTo(a.averageScore);
+        if (cmp != 0) return cmp;
+        return '${a.teacher.nameLao} ${a.teacher.surnameLao}'
+            .compareTo('${b.teacher.nameLao} ${b.teacher.surnameLao}');
+      });
     teacherSummaries.assignAll(list);
   }
 
