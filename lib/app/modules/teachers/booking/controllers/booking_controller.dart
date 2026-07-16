@@ -313,6 +313,9 @@ class BookingController extends GetxController {
 
     for (final p in studyPlans) {
       if (p.roomId != roomId) continue;
+      // The teacher's own class never blocks their booking — the room is
+      // already theirs in that slot (backend applies the same exemption).
+      if (p.teacherId == currentUser.value?.teacherId) continue;
       if (dayOfWeekToWeekday(p.dayOfWeek) != weekday) continue;
       if (!timeRangesOverlap(
           startTime, endTime, p.startTime ?? '', p.endTime ?? '')) {

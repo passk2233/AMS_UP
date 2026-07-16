@@ -35,16 +35,35 @@ class EvaluationProvider {
     int? teacherId,
     int? studyPlanId,
     int? studentId,
-    int limit = 500,
+    int limit = 10000,
   }) async {
-    final query = <String, dynamic>{'limit': limit};
+    final query = <String, dynamic>{};
     if (teacherId != null) query['teacher_id'] = teacherId;
     if (studyPlanId != null) query['study_plan_id'] = studyPlanId;
     if (studentId != null) query['student_id'] = studentId;
-    final resp = await _dio.get('/evaluation-results', queryParameters: query);
-    return _extractList(resp.data)
-        .map((j) => EvaluationResultModel.fromJson(j))
-        .toList();
+
+    // The backend caps page size at 200 (helpers.go maxLimit) regardless of
+    // the requested limit, so a single call silently drops every row past the
+    // first 200 — walk meta.total_pages instead. [limit] is only a safety cap.
+    final all = <EvaluationResultModel>[];
+    var page = 1;
+    while (all.length < limit) {
+      final resp = await _dio.get('/evaluation-results', queryParameters: {
+        ...query,
+        'page': page,
+        'limit': 200,
+      });
+      final items = _extractList(resp.data);
+      all.addAll(items.map((j) => EvaluationResultModel.fromJson(j)));
+
+      final data = resp.data;
+      final meta = data is Map ? data['meta'] : null;
+      final totalPages =
+          meta is Map ? ((meta['total_pages'] as num?)?.toInt() ?? 1) : 1;
+      if (items.isEmpty || page >= totalPages) break;
+      page++;
+    }
+    return all;
   }
 
   /// GET `/evaluation-questions`. [activeOnly] adds `?is_active=1` (the

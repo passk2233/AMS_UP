@@ -543,7 +543,7 @@ class EvalutionController extends GetxController {
       await _fetchStudyPlans();
       await _fetchGroupSizes();
 
-      final parsed = await _eval.fetchResults(limit: 500);
+      final parsed = await _eval.fetchResults();
       for (final r in parsed) {
         final fullSp = _studyPlanMap[r.studyPlanId];
         if (fullSp != null) r.studyPlan = fullSp;
@@ -566,7 +566,9 @@ class EvalutionController extends GetxController {
   Future<void> _fetchStudyPlans() async {
     try {
       _studyPlanMap.clear();
-      for (final sp in await ReferenceCache.to.studyPlans(limit: 500)) {
+      // The proxy honours any requested limit (no GetPage cap on legacy
+      // routes); 2000 covers every semester so no teacher's plans fall off.
+      for (final sp in await ReferenceCache.to.studyPlans(limit: 2000)) {
         _studyPlanMap[sp.id] = sp;
       }
     } on DioException catch (e) {
@@ -622,7 +624,15 @@ class EvalutionController extends GetxController {
   }
 
   void _buildTeacherSummaries() {
-    final teacherMap = {for (final t in teachers) t.id: t};
+    // Union of teacher sources: legacy /teachers 500s at times, and the
+    // backend proxy then falls back to plan-derived rows only — so also fold
+    // in every teacher carried on a cached study plan. /teachers rows win
+    // (they carry the department); plan rows fill whoever /teachers missed.
+    final teacherMap = <int, TeacherModel>{
+      for (final sp in _studyPlanMap.values)
+        if (sp.teacher != null) sp.teacher!.id: sp.teacher!,
+      for (final t in teachers) t.id: t,
+    };
     final summaries = <int, TeacherEvalSummary>{};
     final semFilter = selectedSemesterId.value;
 
@@ -661,7 +671,7 @@ class EvalutionController extends GetxController {
     }
     // Backfill every teacher with no evaluation rows so the admin list
     // always shows the full faculty, not just evaluated teachers.
-    for (final t in teachers) {
+    for (final t in teacherMap.values) {
       summaries.putIfAbsent(
         t.id,
         () => TeacherEvalSummary(
